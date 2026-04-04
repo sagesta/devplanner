@@ -117,6 +117,3 @@ npm run worker
 
 - RAG / embeddings pipeline, AI tool-calling, populate-board diff UI, LangGraph, 2-way CalDAV, PWA, Better Auth UI.
 
-## Legacy
-
-The Python **Personal Workbench** app lives at the repo root (`../app`).
