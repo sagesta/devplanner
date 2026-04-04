@@ -1,0 +1,33 @@
+services:
+  devplanner-db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: devplanner
+      POSTGRES_USER: devplanner
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-devplanner}
+    volumes:
+      - devplanner_db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+
+  devplanner-redis:
+    image: redis:7-alpine
+    volumes:
+      - devplanner_redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  radicale:
+    image: tomsquest/docker-radicale:latest
+    volumes:
+      - radicale_data:/data
+    ports:
+      - "5232:5232"
+    restart: unless-stopped
+
+volumes:
+  devplanner_db_data:
+  devplanner_redis_data:
+  radicale_data:

@@ -1,0 +1,21 @@
+{
+  "name": "devplanner",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -i -n web,api -c green,blue \"npm run dev -w @devplanner/web\" \"npm run dev -w @devplanner/api\"",
+    "build": "npm run build -w @devplanner/api && npm run build -w @devplanner/web",
+    "db:generate": "npm run db:generate -w @devplanner/api",
+    "db:migrate": "npm run db:migrate -w @devplanner/api",
+    "db:studio": "npm run db:studio -w @devplanner/api",
+    "db:push": "npm run db:push -w @devplanner/api",
+    "worker": "npm run worker -w @devplanner/api",
+    "seed": "npm run seed -w @devplanner/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
