@@ -98,7 +98,7 @@ export function CommandMenu({
             >
               <Lightbulb size={14} className="text-muted" />
               Brain dump
-              <span className="ml-auto text-[10px] text-muted/60">⌘⇧D</span>
+              <span className="ml-auto text-[10px] text-muted/60">Ctrl/Cmd+Shift+D</span>
             </Command.Item>
           </Command.Group>
         </Command.List>

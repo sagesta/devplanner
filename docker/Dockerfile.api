@@ -1,0 +1,30 @@
+# API (Hono) — production image
+FROM node:20-bookworm-slim AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+RUN npm ci
+
+FROM deps AS build
+COPY apps/api apps/api
+RUN npm run build -w @devplanner/api
+
+FROM node:20-bookworm-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=build /app/apps/api/dist ./apps/api/dist
+# drizzle-kit push at container start (see docker-entrypoint.mjs)
+COPY apps/api/drizzle.config.ts ./apps/api/
+COPY apps/api/src/db ./apps/api/src/db
+COPY apps/api/scripts/docker-entrypoint.mjs ./apps/api/scripts/
+COPY docker/entrypoint-api.sh ./docker/entrypoint-api.sh
+RUN chmod +x ./docker/entrypoint-api.sh
+EXPOSE 3001
+# Healthcheck is defined on the `api` service in docker-compose.yml (worker shares this image).
+ENTRYPOINT ["/app/docker/entrypoint-api.sh"]

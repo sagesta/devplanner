@@ -102,7 +102,7 @@ export default function BacklogPage() {
           <Inbox size={32} className="text-primary/40 mb-3" />
           <p className="text-muted text-sm">Empty backlog.</p>
           <p className="text-muted/60 text-xs mt-1">
-            <Link href="/board" className="text-primary hover:underline">Board</Link> or brain dump (⌘⇧D).
+            <Link href="/board" className="text-primary hover:underline">Board</Link> or brain dump (Ctrl/Cmd+Shift+D).
           </p>
         </div>
       )}

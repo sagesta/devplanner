@@ -6,12 +6,12 @@
     "node": ">=18.18.0"
   },
   "scripts": {
-    "dev": "cross-env NEXT_TELEMETRY_DISABLED=1 next dev -p 3000 -H 0.0.0.0 --turbo",
+    "dev": "cross-env WATCHPACK_POLLING=1 CHOKIDAR_USEPOLLING=1 NEXT_TELEMETRY_DISABLED=1 next dev -p 3000 -H 0.0.0.0",
     "dev:webpack": "cross-env WATCHPACK_POLLING=1 CHOKIDAR_USEPOLLING=1 NEXT_TELEMETRY_DISABLED=1 next dev -p 3000 -H 0.0.0.0",
     "dev:turbo": "cross-env NEXT_TELEMETRY_DISABLED=1 next dev -p 3000 -H 0.0.0.0 --turbo",
     "dev:diag": "node -e \"console.log('node',process.version,'cwd',process.cwd())\" && npx next info",
     "build": "next build",
-    "start": "next start -p 3000",
+    "start": "next start -p 3000 -H 0.0.0.0",
     "lint": "next lint"
   },
   "dependencies": {

@@ -90,17 +90,39 @@ export function BrainDumpModal({
           One thought per line — saved to backlog (no AI required).
         </p>
         <label className="mt-4 block text-xs font-medium text-muted">Area</label>
-        <select
-          className="mt-1 w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground"
-          value={areaId}
-          onChange={(e) => setAreaId(e.target.value)}
-        >
-          {(areasQ.data ?? []).map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
+        {!userId ? (
+          <p className="mt-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200/90">
+            Set <code className="rounded bg-black/30 px-1">NEXT_PUBLIC_DEV_USER_ID</code> in{" "}
+            <code className="rounded bg-black/30 px-1">apps/web/.env.local</code> to the UUID from{" "}
+            <code className="rounded bg-black/30 px-1">npm run seed</code>, then restart{" "}
+            <code className="rounded bg-black/30 px-1">npm run dev</code>.
+          </p>
+        ) : areasQ.isError ? (
+          <p className="mt-1 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200/90">
+            Could not load areas — is the API running and{" "}
+            <code className="rounded bg-black/30 px-1">NEXT_PUBLIC_API_URL</code> correct?{" "}
+            {areasQ.error instanceof Error ? areasQ.error.message : String(areasQ.error)}
+          </p>
+        ) : (
+          <select
+            className="mt-1 w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground disabled:opacity-50"
+            value={areaId}
+            disabled={areasQ.isLoading || areasQ.isFetching}
+            onChange={(e) => setAreaId(e.target.value)}
+          >
+            {areasQ.isLoading || areasQ.isFetching ? (
+              <option value="">Loading areas…</option>
+            ) : (areasQ.data?.length ?? 0) === 0 ? (
+              <option value="">No areas — run npm run seed</option>
+            ) : (
+              (areasQ.data ?? []).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))
+            )}
+          </select>
+        )}
         <textarea
           ref={textareaRef}
           className="mt-3 min-h-[200px] w-full rounded-lg border border-white/10 bg-background p-3 text-sm text-foreground placeholder:text-muted/50 resize-none"

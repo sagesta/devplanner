@@ -88,5 +88,6 @@ app.route("/api/ai", aiRoutes);
 app.route("/api/sync", syncRoutes);
 
 const port = Number(process.env.PORT) || 3001;
-console.log(`DevPlanner API listening on http://localhost:${port}`);
-serve({ fetch: app.fetch, port });
+const hostname = process.env.HOST?.trim() || "0.0.0.0";
+console.log(`DevPlanner API listening on http://${hostname}:${port}`);
+serve({ fetch: app.fetch, port, hostname });

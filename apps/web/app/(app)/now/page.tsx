@@ -122,7 +122,7 @@ export default function NowPage() {
           <Sparkles size={32} className="text-primary/40 mb-3" />
           <p className="text-muted text-sm">Nothing scheduled for today.</p>
           <p className="text-muted/60 text-xs mt-1">
-            Use Brain Dump (⌘⇧D) to capture tasks, or schedule them from the Board.
+            Use Brain Dump (Ctrl/Cmd+Shift+D) to capture tasks, or schedule them from the Board.
           </p>
         </div>
       )}

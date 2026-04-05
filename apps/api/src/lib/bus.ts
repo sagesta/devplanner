@@ -19,7 +19,9 @@ export type ConnectedPayload = {
 
 export type CaldavPayload = {
   type: "caldav_queued";
-  taskId: string;
+  userId: string;
+  taskId?: string;
+  message?: string;
 };
 
 export type HeartbeatPayload = {

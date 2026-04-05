@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/client.js";
 import { areas, tasks } from "../db/schema.js";
-import { enqueueCaldavSync } from "../queues/definitions.js";
+import { enqueueTaskCalendarSync } from "../queues/definitions.js";
 import { rollupParentTaskStatus } from "../services/task-rollup.js";
 import type { AppEnv } from "../types.js";
 
@@ -161,6 +161,16 @@ export const taskRoutes = new Hono<AppEnv>()
         }))
       )
       .returning();
+    for (const t of inserted) {
+      await enqueueTaskCalendarSync({
+        userId: t.userId,
+        taskId: t.id,
+        caldavUid: t.caldavUid,
+        resourceFilename: t.caldavResourceFilename,
+        googleEventId: t.googleEventId,
+        action: "create",
+      }).catch(() => {});
+    }
     return c.json({ tasks: inserted, count: inserted.length }, 201);
   })
   .post("/bulk-status", async (c) => {
@@ -174,9 +184,21 @@ export const taskRoutes = new Hono<AppEnv>()
       .update(tasks)
       .set({ status, updatedAt: new Date(), completedAt })
       .where(and(eq(tasks.userId, userId), inArray(tasks.id, taskIds)))
-      .returning({ id: tasks.id });
+      .returning({
+        id: tasks.id,
+        caldavUid: tasks.caldavUid,
+        caldavResourceFilename: tasks.caldavResourceFilename,
+        googleEventId: tasks.googleEventId,
+      });
     for (const row of updated) {
-      await enqueueCaldavSync({ userId, taskId: row.id, action: "update" }).catch(() => {});
+      await enqueueTaskCalendarSync({
+        userId,
+        taskId: row.id,
+        caldavUid: row.caldavUid,
+        resourceFilename: row.caldavResourceFilename,
+        googleEventId: row.googleEventId,
+        action: "update",
+      }).catch(() => {});
     }
     return c.json({ updated: updated.length });
   })
@@ -237,7 +259,14 @@ export const taskRoutes = new Hono<AppEnv>()
     if (row.parentTaskId) {
       await rollupParentTaskStatus(db, row.parentTaskId);
     }
-    await enqueueCaldavSync({ userId: row.userId, taskId: row.id, action: "create" }).catch(() => {});
+    await enqueueTaskCalendarSync({
+      userId: row.userId,
+      taskId: row.id,
+      caldavUid: row.caldavUid,
+      resourceFilename: row.caldavResourceFilename,
+      googleEventId: row.googleEventId,
+      action: "create",
+    }).catch(() => {});
     return c.json({ task: row }, 201);
   })
   .patch("/:id", async (c) => {
@@ -277,7 +306,14 @@ export const taskRoutes = new Hono<AppEnv>()
     if (row.parentTaskId) {
       await rollupParentTaskStatus(db, row.parentTaskId);
     }
-    await enqueueCaldavSync({ userId: row.userId, taskId: row.id, action: "update" }).catch(() => {});
+    await enqueueTaskCalendarSync({
+      userId: row.userId,
+      taskId: row.id,
+      caldavUid: row.caldavUid,
+      resourceFilename: row.caldavResourceFilename,
+      googleEventId: row.googleEventId,
+      action: "update",
+    }).catch(() => {});
     return c.json({ task: row });
   })
   .delete("/:id", async (c) => {
@@ -299,6 +335,13 @@ export const taskRoutes = new Hono<AppEnv>()
     if (row.parentTaskId) {
       await rollupParentTaskStatus(db, row.parentTaskId);
     }
-    await enqueueCaldavSync({ userId: row.userId, taskId: row.id, action: "delete" }).catch(() => {});
+    await enqueueTaskCalendarSync({
+      userId: row.userId,
+      taskId: row.id,
+      caldavUid: row.caldavUid,
+      resourceFilename: row.caldavResourceFilename,
+      googleEventId: row.googleEventId,
+      action: "delete",
+    }).catch(() => {});
     return c.json({ ok: true });
   });

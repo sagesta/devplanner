@@ -27,11 +27,7 @@ body {
 }
 
 /* ─── Smooth defaults ──────────────────────────────────────────── */
-*, *::before, *::after {
-  transition-property: background-color, border-color, color, opacity, box-shadow, transform;
-  transition-duration: var(--transition-fast);
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
+/* Removed wildcard transitions which caused layout thrashing */
 
 button, a, input, select, textarea {
   @apply outline-none;

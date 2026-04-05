@@ -45,6 +45,13 @@ export type TaskRow = {
   dueDate: string | null;
   sprintId: string | null;
   parentTaskId: string | null;
+  icalUid?: string | null;
+  caldavResourceFilename?: string | null;
+  caldavRemoteDtstamp?: string | null;
+  caldavLastPullAt?: string | null;
+  googleEventId?: string | null;
+  googleRemoteUpdated?: string | null;
+  googleLastPullAt?: string | null;
   sortOrder: number;
   idleFlagged: boolean;
   createdAt: string;
@@ -209,6 +216,74 @@ export async function fetchAiLogs(userId: string, limit = 30) {
 // ─── Focus ────────────────────────────────────────────────────────
 export async function fetchFocusExport(userId: string) {
   return fetchJson<{ date: string; tasks: unknown[] }>(apiUrl("/api/focus/export", { userId }));
+}
+
+// ─── CalDAV sync ───────────────────────────────────────────────────
+export type CaldavPullStats = {
+  imported: number;
+  updated: number;
+  removed: number;
+  skipped: number;
+  errors: string[];
+};
+
+export async function postCaldavMkcol() {
+  return fetchJson<{ ok: boolean; message?: string; error?: string }>(apiUrl("/api/sync/caldav/mkcol"), {
+    method: "POST",
+    body: "{}",
+  });
+}
+
+export async function postCaldavPullQueued(userId: string) {
+  return fetchJson<{ ok: boolean; queued?: boolean; error?: string }>(apiUrl("/api/sync/caldav/pull"), {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+/** Runs pull in the API process (no Redis job). Good for debugging; can be slow. */
+export async function postCaldavPullNow(userId: string) {
+  return fetchJson<{ ok: boolean; stats: CaldavPullStats; error?: string }>(apiUrl("/api/sync/caldav/pull-now"), {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+// ─── Google Calendar (OAuth + Calendar API) ───────────────────────
+export function getGoogleOAuthStartUrl(userId: string): string {
+  return apiUrl("/api/sync/google/start", { userId });
+}
+
+export async function fetchGoogleCalendarStatus(userId: string) {
+  return fetchJson<{
+    ok: boolean;
+    connected: boolean;
+    oauthConfigured: boolean;
+  }>(apiUrl("/api/sync/google/status", { userId }));
+}
+
+export async function postGoogleCalendarDisconnect(userId: string) {
+  return fetchJson<{ ok: boolean }>(apiUrl("/api/sync/google/disconnect"), {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export async function postGoogleCalendarPullQueued(userId: string) {
+  return fetchJson<{ ok: boolean; queued?: boolean }>(apiUrl("/api/sync/google/pull"), {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export async function postGoogleCalendarPullNow(userId: string) {
+  return fetchJson<{ ok: boolean; stats: CaldavPullStats; error?: string }>(
+    apiUrl("/api/sync/google/pull-now"),
+    {
+      method: "POST",
+      body: JSON.stringify({ userId }),
+    }
+  );
 }
 
 export { getDevUserId };

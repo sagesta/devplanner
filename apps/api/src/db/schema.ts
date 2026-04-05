@@ -140,6 +140,18 @@ export const tasks = pgTable(
     dueDate: date("due_date"),
     recurrenceRule: text("recurrence_rule"),
     caldavUid: uuid("caldav_uid").defaultRandom(),
+    /** RFC5545 UID from the calendar (imports + stable identity for round-trip). */
+    icalUid: varchar("ical_uid", { length: 512 }),
+    /** Filename within the CalDAV collection, e.g. `abc.ics` (defaults to `{caldavUid}.ics`). */
+    caldavResourceFilename: varchar("caldav_resource_filename", { length: 512 }),
+    /** Last DTSTAMP seen from the server (pull merge / conflict hint). */
+    caldavRemoteDtstamp: varchar("caldav_remote_dtstamp", { length: 64 }),
+    caldavLastPullAt: timestamp("caldav_last_pull_at", { withTimezone: true }),
+    /** Google Calendar API event id (opaque); set after first push or pull. */
+    googleEventId: varchar("google_event_id", { length: 1024 }),
+    /** Last `updated` field from Google (RFC3339) for merge / skip logic. */
+    googleRemoteUpdated: varchar("google_remote_updated", { length: 64 }),
+    googleLastPullAt: timestamp("google_last_pull_at", { withTimezone: true }),
     tags: text("tags").array(),
     sortOrder: integer("sort_order").notNull().default(0),
     idleFlagged: boolean("idle_flagged").notNull().default(false),
@@ -154,6 +166,7 @@ export const tasks = pgTable(
     index("tasks_area_idx").on(t.areaId),
     index("tasks_parent_idx").on(t.parentTaskId),
     index("tasks_scheduled_date_idx").on(t.scheduledDate),
+    uniqueIndex("tasks_user_ical_uid_uidx").on(t.userId, t.icalUid),
   ]
 );
 
@@ -207,6 +220,23 @@ export const aiSuggestions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("ai_suggestions_user_idx").on(t.userId)]
+);
+
+/** Per-user Google OAuth link (primary calendar by default). */
+export const googleCalendarLinks = pgTable(
+  "google_calendar_links",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    refreshToken: text("refresh_token").notNull(),
+    /** Google calendar id, e.g. `primary` or an email. */
+    calendarId: varchar("calendar_id", { length: 512 }).notNull().default("primary"),
+    /** Incremental sync token from Calendar API `events.list`. */
+    syncToken: text("sync_token"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  }
 );
 
 export const caldavSyncLog = pgTable(
@@ -268,9 +298,17 @@ export const sprintsRelations = relations(sprints, ({ one, many }) => ({
   tasks: many(tasks),
 }));
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const googleCalendarLinksRelations = relations(googleCalendarLinks, ({ one }) => ({
+  user: one(users, { fields: [googleCalendarLinks.userId], references: [users.id] }),
+}));
+
+export const usersRelations = relations(users, ({ many, one }) => ({
   areas: many(areas),
   projects: many(projects),
   sprints: many(sprints),
   tasks: many(tasks),
+  googleCalendarLink: one(googleCalendarLinks, {
+    fields: [users.id],
+    references: [googleCalendarLinks.userId],
+  }),
 }));

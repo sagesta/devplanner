@@ -1,10 +1,24 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { Calendar, Download, Settings as SettingsIcon, Cpu, Zap } from "lucide-react";
-import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Calendar, Download, RefreshCw, Settings as SettingsIcon, Cpu, FolderPlus, LogOut, Zap } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { fetchAiLogs, fetchFocusExport, getDevUserId, type AiLogRow } from "@/lib/api";
+import {
+  fetchAiLogs,
+  fetchFocusExport,
+  fetchGoogleCalendarStatus,
+  getDevUserId,
+  getGoogleOAuthStartUrl,
+  postCaldavMkcol,
+  postCaldavPullNow,
+  postCaldavPullQueued,
+  postGoogleCalendarDisconnect,
+  postGoogleCalendarPullNow,
+  postGoogleCalendarPullQueued,
+  type AiLogRow,
+} from "@/lib/api";
 import { Skeleton } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -17,13 +31,37 @@ const TABS = [
 
 export default function SettingsPage() {
   const userId = getDevUserId();
-  const [tab, setTab] = useState<string>("general");
+  const qc = useQueryClient();
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<string>(() => searchParams.get("tab") ?? "general");
   const [exporting, setExporting] = useState(false);
+  const [calBusy, setCalBusy] = useState<"mkcol" | "pull" | "queue" | null>(null);
+  const [googleBusy, setGoogleBusy] = useState<"pull" | "queue" | "disconnect" | null>(null);
+
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t === "general" || t === "calendar" || t === "focus" || t === "ai") setTab(t);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (searchParams.get("google") === "connected") {
+      toast.success("Google Calendar connected");
+      void qc.invalidateQueries({ queryKey: ["google-cal", userId] });
+    }
+    const ge = searchParams.get("google_error");
+    if (ge) toast.error(decodeURIComponent(ge));
+  }, [searchParams, qc, userId]);
 
   const logsQ = useQuery({
     queryKey: ["ai-logs", userId],
     queryFn: () => fetchAiLogs(userId, 40),
     enabled: Boolean(userId) && tab === "ai",
+  });
+
+  const googleQ = useQuery({
+    queryKey: ["google-cal", userId],
+    queryFn: () => fetchGoogleCalendarStatus(userId),
+    enabled: Boolean(userId) && tab === "calendar",
   });
 
   async function downloadFocus() {
@@ -43,6 +81,113 @@ export default function SettingsPage() {
       toast.error(String(e));
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function runMkcol() {
+    setCalBusy("mkcol");
+    try {
+      const r = await postCaldavMkcol();
+      if (r.ok) toast.success(r.message ?? "Calendar folder ready");
+      else toast.error(r.error ?? "MKCOL failed");
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setCalBusy(null);
+    }
+  }
+
+  async function runPullNow() {
+    if (!userId) return;
+    setCalBusy("pull");
+    try {
+      const r = await postCaldavPullNow(userId);
+      if (!r.ok) {
+        toast.error("Pull failed");
+        return;
+      }
+      const { stats } = r;
+      toast.success(
+        `Imported ${stats.imported}, updated ${stats.updated}, removed/cancelled ${stats.removed}, skipped ${stats.skipped}`
+      );
+      if (stats.errors.length) {
+        toast.error(stats.errors.slice(0, 2).join(" · "));
+      }
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setCalBusy(null);
+    }
+  }
+
+  async function queuePull() {
+    if (!userId) return;
+    setCalBusy("queue");
+    try {
+      const r = await postCaldavPullQueued(userId);
+      if (r.ok && r.queued) toast.success("Pull queued — ensure the worker is running");
+      else toast.error(r.error ?? "Could not queue pull");
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setCalBusy(null);
+    }
+  }
+
+  function connectGoogle() {
+    if (!userId) return;
+    window.location.href = getGoogleOAuthStartUrl(userId);
+  }
+
+  async function disconnectGoogle() {
+    if (!userId) return;
+    setGoogleBusy("disconnect");
+    try {
+      await postGoogleCalendarDisconnect(userId);
+      toast.success("Disconnected Google Calendar");
+      void qc.invalidateQueries({ queryKey: ["google-cal", userId] });
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setGoogleBusy(null);
+    }
+  }
+
+  async function googlePullNow() {
+    if (!userId) return;
+    setGoogleBusy("pull");
+    try {
+      const r = await postGoogleCalendarPullNow(userId);
+      if (!r.ok) {
+        toast.error("Google pull failed");
+        return;
+      }
+      const { stats } = r;
+      toast.success(
+        `Google: imported ${stats.imported}, updated ${stats.updated}, removed ${stats.removed}, skipped ${stats.skipped}`
+      );
+      if (stats.errors.length) toast.error(stats.errors.slice(0, 2).join(" · "));
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setGoogleBusy(null);
+    }
+  }
+
+  async function googleQueuePull() {
+    if (!userId) return;
+    setGoogleBusy("queue");
+    try {
+      const r = await postGoogleCalendarPullQueued(userId);
+      if (r.ok && r.queued) toast.success("Google pull queued — ensure the worker is running");
+      else toast.error("Could not queue Google pull");
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setGoogleBusy(null);
     }
   }
 
@@ -86,16 +231,142 @@ export default function SettingsPage() {
         )}
 
         {tab === "calendar" && (
-          <section className="rounded-xl border border-white/10 bg-surface p-5">
-            <h2 className="text-sm font-semibold text-foreground">Calendar / CalDAV</h2>
+          <section className="space-y-6">
+            <div className="rounded-xl border border-white/10 bg-surface p-5">
+              <h2 className="text-sm font-semibold text-foreground">Google Calendar</h2>
+              <p className="mt-2 text-sm text-muted leading-relaxed">
+                Connect your Google account to sync tasks that have a <strong>scheduled date</strong> or{" "}
+                <strong>due date</strong> with your primary Google calendar (two-way: edits in DevPlanner push via the
+                worker; pull imports changes from Google). Set{" "}
+                <code className="rounded bg-background px-1 text-xs">GOOGLE_*</code> and{" "}
+                <code className="rounded bg-background px-1 text-xs">WEB_APP_URL</code> in the API{" "}
+                <code className="rounded bg-background px-1 text-xs">.env</code> — see{" "}
+                <code className="rounded bg-background px-1 text-xs">.env.example</code>.
+              </p>
+              {!userId && <p className="mt-2 text-xs text-muted">Set NEXT_PUBLIC_DEV_USER_ID to use this.</p>}
+              {googleQ.data && (
+                <div className="mt-3 rounded-lg bg-background/50 p-3 text-xs text-muted space-y-2">
+                  <p>
+                    API OAuth:{" "}
+                    <span className="text-foreground">
+                      {googleQ.data.oauthConfigured ? "configured" : "not configured"}
+                    </span>
+                    {" · "}
+                    Account:{" "}
+                    <span className="text-foreground">{googleQ.data.connected ? "connected" : "not connected"}</span>
+                  </p>
+                  {!googleQ.data.oauthConfigured && (
+                    <p>
+                      Add Google OAuth credentials and redirect URI{" "}
+                      <code className="text-foreground">…/api/sync/google/callback</code> in Google Cloud Console.
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    !userId ||
+                    googleBusy !== null ||
+                    googleQ.isLoading ||
+                    (googleQ.isFetched && !googleQ.data?.oauthConfigured)
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
+                  onClick={() => connectGoogle()}
+                >
+                  Connect Google Calendar
+                </button>
+                <button
+                  type="button"
+                  disabled={!userId || !googleQ.data?.connected || googleBusy !== null}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 disabled:opacity-40"
+                  onClick={() => void disconnectGoogle()}
+                >
+                  <LogOut size={14} />
+                  {googleBusy === "disconnect" ? "…" : "Disconnect"}
+                </button>
+                <button
+                  type="button"
+                  disabled={!userId || !googleQ.data?.connected || googleBusy !== null}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 disabled:opacity-40"
+                  onClick={() => void googlePullNow()}
+                >
+                  <RefreshCw size={14} className={googleBusy === "pull" ? "animate-spin" : ""} />
+                  {googleBusy === "pull" ? "Pulling…" : "Pull from Google now"}
+                </button>
+                <button
+                  type="button"
+                  disabled={!userId || !googleQ.data?.connected || googleBusy !== null}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 disabled:opacity-40"
+                  onClick={() => void googleQueuePull()}
+                >
+                  {googleBusy === "queue" ? "Queuing…" : "Queue Google pull (worker)"}
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-surface p-5">
+            <h2 className="text-sm font-semibold text-foreground">CalDAV (optional)</h2>
             <p className="mt-2 text-sm text-muted leading-relaxed">
-              Radicale runs via <code className="rounded bg-background px-1 text-xs">docker compose</code> on port 5232.
-              Task changes enqueue a <code className="rounded bg-background px-1 text-xs">caldav-sync</code> job;
-              the worker logs rows in <code className="rounded bg-background px-1 text-xs">caldav_sync_log</code> until real iCal write is added.
+              Tasks with a <strong>scheduled date</strong> or <strong>due date</strong> sync as VEVENT <code className="rounded bg-background px-1 text-xs">.ics</code> files
+              to a CalDAV collection (e.g. Radicale from <code className="rounded bg-background px-1 text-xs">docker compose</code> on port 5232).
+              Run <code className="rounded bg-background px-1 text-xs">npm run worker</code> with Redis so jobs run.
             </p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted">
+              <li>
+                In API <code className="rounded bg-background px-1 text-xs">.env</code>: set{" "}
+                <code className="rounded bg-background px-1 text-xs">CALDAV_CALENDAR_URL</code> to your collection (must end with{" "}
+                <code className="rounded bg-background px-1 text-xs">/</code>, e.g.{" "}
+                <code className="rounded bg-background px-1 text-xs">http://localhost:5232/alice/tasks/</code>
+                ), plus <code className="rounded bg-background px-1 text-xs">CALDAV_USER</code> and{" "}
+                <code className="rounded bg-background px-1 text-xs">CALDAV_PASSWORD</code>.
+              </li>
+              <li>
+                Optional: <code className="rounded bg-background px-1 text-xs">CALDAV_IMPORT_AREA_ID</code> (UUID) for new events from
+                the calendar; otherwise the first area (by name) is used.
+              </li>
+              <li>
+                Optional: <code className="rounded bg-background px-1 text-xs">CALDAV_PULL_INTERVAL_MS</code> on the{" "}
+                <strong>worker</strong> for automatic pull (e.g. <code className="text-foreground">3600000</code> hourly).
+              </li>
+              <li>
+                <strong>Two-way:</strong> edits in DevPlanner push to CalDAV; use <strong>Pull from calendar</strong> to import/merge
+                external events and reconcile deletions.
+              </li>
+            </ul>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!userId || calBusy !== null}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 disabled:opacity-40"
+                onClick={() => void runMkcol()}
+              >
+                <FolderPlus size={14} />
+                {calBusy === "mkcol" ? "Working…" : "Ensure calendar folder (MKCOL)"}
+              </button>
+              <button
+                type="button"
+                disabled={!userId || calBusy !== null}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
+                onClick={() => void runPullNow()}
+              >
+                <RefreshCw size={14} className={calBusy === "pull" ? "animate-spin" : ""} />
+                {calBusy === "pull" ? "Pulling…" : "Pull from calendar now"}
+              </button>
+              <button
+                type="button"
+                disabled={!userId || calBusy !== null}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 disabled:opacity-40"
+                onClick={() => void queuePull()}
+              >
+                {calBusy === "queue" ? "Queuing…" : "Queue pull (worker)"}
+              </button>
+            </div>
             <div className="mt-4 rounded-lg bg-background/50 p-3 text-xs text-muted font-mono space-y-1">
-              <p>CalDAV URL: http://localhost:5232/</p>
-              <p>Status: stub (log only)</p>
+              <p>Server root: http://localhost:5232/</p>
+              <p>Push errors: <code className="text-foreground">caldav_sync_log</code> after task edits.</p>
+            </div>
             </div>
           </section>
         )}

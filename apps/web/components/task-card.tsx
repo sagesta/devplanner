@@ -1,5 +1,7 @@
 "use client";
 
+import { memo } from "react";
+
 import { cn } from "@/lib/utils";
 
 type TaskCardProps = {
@@ -57,7 +59,7 @@ const STATUS_COLORS: Record<string, string> = {
   blocked: "bg-red-600",
 };
 
-export function StatusDot({
+export const StatusDot = memo(function StatusDot({
   status,
   onClick,
   className,
@@ -79,7 +81,7 @@ export function StatusDot({
       )}
     />
   );
-}
+});
 
 export function SubtaskBar({
   done,
@@ -104,7 +106,7 @@ export function SubtaskBar({
   );
 }
 
-export function TaskCard({
+export const TaskCard = memo(function TaskCard({
   title,
   status,
   priority,
@@ -180,4 +182,4 @@ export function TaskCard({
       </div>
     </div>
   );
-}
+});

@@ -8,15 +8,21 @@ services:
     volumes:
       - devplanner_db_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devplanner -d devplanner"]
+      interval: 3s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
 
   devplanner-redis:
     image: redis:7-alpine
     volumes:
       - devplanner_redis_data:/data
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     restart: unless-stopped
 
   radicale:
@@ -24,8 +30,93 @@ services:
     volumes:
       - radicale_data:/data
     ports:
-      - "5232:5232"
+      - "${RADICALE_PORT:-5232}:5232"
     restart: unless-stopped
+
+  # --- App (default `docker compose up -d` starts db, redis, radicale, api, web, worker)
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    ports:
+      - "${API_PORT:-3001}:3001"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3001
+      DATABASE_URL: postgresql://devplanner:${DB_PASSWORD:-devplanner}@devplanner-db:5432/devplanner
+      REDIS_URL: redis://devplanner-redis:6379
+    depends_on:
+      devplanner-db:
+        condition: service_healthy
+      devplanner-redis:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+        NEXT_PUBLIC_DEV_USER_ID: ${NEXT_PUBLIC_DEV_USER_ID:-}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DEVPLANNER_PROCESS: worker
+      DATABASE_URL: postgresql://devplanner:${DB_PASSWORD:-devplanner}@devplanner-db:5432/devplanner
+      REDIS_URL: redis://devplanner-redis:6379
+    depends_on:
+      devplanner-db:
+        condition: service_healthy
+      devplanner-redis:
+        condition: service_started
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional: one-off schema push from the host repo (no image rebuild). Usually unnecessary — the API container runs push on start.
+  # docker compose --profile tools run --rm migrate
+  migrate:
+    profiles: ["tools"]
+    image: node:20-bookworm-slim
+    working_dir: /src
+    volumes:
+      - .:/src
+    environment:
+      DATABASE_URL: postgresql://devplanner:${DB_PASSWORD:-devplanner}@devplanner-db:5432/devplanner
+    command: ["sh", "-c", "npm ci && npm run db:push -w @devplanner/api"]
+    depends_on:
+      devplanner-db:
+        condition: service_healthy
 
 volumes:
   devplanner_db_data:

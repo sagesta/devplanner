@@ -11,9 +11,13 @@
     "db:generate": "npm run db:generate -w @devplanner/api",
     "db:migrate": "npm run db:migrate -w @devplanner/api",
     "db:studio": "npm run db:studio -w @devplanner/api",
+    "db:vector": "docker compose exec -T devplanner-db psql -U devplanner -d devplanner -c \"CREATE EXTENSION IF NOT EXISTS vector;\"",
     "db:push": "npm run db:push -w @devplanner/api",
     "worker": "npm run worker -w @devplanner/api",
-    "seed": "npm run seed -w @devplanner/api"
+    "seed": "npm run seed -w @devplanner/api",
+    "docker:up": "docker compose up -d --build",
+    "docker:infra": "docker compose up -d devplanner-db devplanner-redis radicale",
+    "docker:migrate": "docker compose --profile tools run --rm migrate"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
