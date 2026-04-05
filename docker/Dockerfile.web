@@ -12,6 +12,8 @@ ARG NEXT_PUBLIC_DEV_USER_ID=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_DEV_USER_ID=$NEXT_PUBLIC_DEV_USER_ID
 COPY apps/web apps/web
+# Next.js allows no `public/` in repo; Docker COPY requires the path to exist in the build stage.
+RUN mkdir -p apps/web/public
 RUN npm run build -w @devplanner/web
 
 FROM node:20-bookworm-slim AS runner

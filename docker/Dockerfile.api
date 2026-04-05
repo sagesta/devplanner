@@ -17,14 +17,16 @@ ENV HOST=0.0.0.0
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
-RUN npm ci --omit=dev && npm cache clean --force
+# Full `npm ci` then prune: `npm ci --omit=dev` skips lockfile entries marked dev (e.g. esbuild under drizzle-kit) and breaks `drizzle-kit push` at startup.
+RUN npm ci && npm prune --production && npm cache clean --force
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 # drizzle-kit push at container start (see docker-entrypoint.mjs)
 COPY apps/api/drizzle.config.ts ./apps/api/
 COPY apps/api/src/db ./apps/api/src/db
 COPY apps/api/scripts/docker-entrypoint.mjs ./apps/api/scripts/
 COPY docker/entrypoint-api.sh ./docker/entrypoint-api.sh
-RUN chmod +x ./docker/entrypoint-api.sh
+# Windows/WSL checkouts often use CRLF; Linux then reports "no such file or directory" for the shebang.
+RUN sed -i 's/\r$//' ./docker/entrypoint-api.sh && chmod +x ./docker/entrypoint-api.sh
 EXPOSE 3001
 # Healthcheck is defined on the `api` service in docker-compose.yml (worker shares this image).
-ENTRYPOINT ["/app/docker/entrypoint-api.sh"]
+ENTRYPOINT ["/bin/sh", "/app/docker/entrypoint-api.sh"]
