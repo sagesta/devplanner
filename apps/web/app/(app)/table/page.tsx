@@ -1,10 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { fetchTasks, getDevUserId, patchTask, postBulkStatus, type TaskRow } from "@/lib/api";
+import { deleteTask, fetchTasks, getDevUserId, patchTask, postBulkStatus, type TaskRow } from "@/lib/api";
 import { SkeletonRow } from "@/lib/skeleton";
 import { StatusDot } from "@/components/task-card";
 import { cn } from "@/lib/utils";
@@ -81,6 +81,15 @@ export default function TablePage() {
     onSuccess: () => {
       setEditCell(null);
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const del = useMutation({
+    mutationFn: (id: string) => deleteTask(id, userId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["tasks-today"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -164,6 +173,7 @@ export default function TablePage() {
               <SortHeader field="priority" label="Priority" />
               <SortHeader field="energyLevel" label="Energy" />
               <SortHeader field="scheduledDate" label="Scheduled" />
+              <th className="p-2 w-10 text-right text-[10px] uppercase text-muted"> </th>
             </tr>
           </thead>
           <tbody>
@@ -227,11 +237,35 @@ export default function TablePage() {
                 <td className="p-2 text-muted text-xs capitalize">{t.priority}</td>
                 <td className="p-2 text-muted text-xs">{t.energyLevel.replace("_", " ")}</td>
                 <td className="p-2 text-muted text-xs">{t.scheduledDate ?? "—"}</td>
+                <td className="p-2 text-right">
+                  <button
+                    type="button"
+                    className="rounded p-1 text-muted hover:bg-red-500/15 hover:text-red-300"
+                    title="Delete task"
+                    disabled={del.isPending}
+                    onClick={() => {
+                      if (!confirm(`Delete “${t.title}”?`)) return;
+                      del.mutate(t.id);
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {!q.isLoading && roots.length === 0 && (
+        <p className="mt-6 text-center text-sm text-muted">
+          No tasks yet. Add some from the{" "}
+          <a href="/board" className="text-primary hover:underline">
+            Board
+          </a>{" "}
+          or Brain dump.
+        </p>
+      )}
     </div>
   );
 }

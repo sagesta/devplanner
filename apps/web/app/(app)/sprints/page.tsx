@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarCheck, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { createSprint, fetchSprints, getDevUserId, type SprintRow } from "@/lib/api";
+import { createSprint, fetchSprints, getDevUserId, patchSprint, type SprintRow } from "@/lib/api";
 import { Skeleton } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +27,13 @@ export default function SprintsPage() {
     queryKey: ["sprints", userId],
     queryFn: () => fetchSprints(userId),
     enabled: Boolean(userId),
+  });
+
+  const patchMut = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: { status?: string; name?: string; goal?: string | null } }) =>
+      patchSprint(id, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["sprints", userId] }),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const createMut = useMutation({
@@ -175,6 +182,48 @@ export default function SprintsPage() {
                   {s.taskCount ?? 0} tasks
                 </p>
               </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5 border-t border-white/5 pt-3">
+              {s.status !== "active" && (
+                <button
+                  type="button"
+                  disabled={patchMut.isPending}
+                  className="rounded-md bg-primary/80 px-2.5 py-1 text-[10px] font-medium text-white hover:bg-primary disabled:opacity-40"
+                  onClick={() => patchMut.mutate({ id: s.id, body: { status: "active" } })}
+                >
+                  Set active
+                </button>
+              )}
+              {s.status === "active" && (
+                <button
+                  type="button"
+                  disabled={patchMut.isPending}
+                  className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-foreground hover:bg-white/5 disabled:opacity-40"
+                  onClick={() => patchMut.mutate({ id: s.id, body: { status: "planned" } })}
+                >
+                  Unset active
+                </button>
+              )}
+              {s.status !== "completed" && (
+                <button
+                  type="button"
+                  disabled={patchMut.isPending}
+                  className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-muted hover:bg-white/5 disabled:opacity-40"
+                  onClick={() => patchMut.mutate({ id: s.id, body: { status: "completed" } })}
+                >
+                  Mark completed
+                </button>
+              )}
+              {s.status === "completed" && (
+                <button
+                  type="button"
+                  disabled={patchMut.isPending}
+                  className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-muted hover:bg-white/5 disabled:opacity-40"
+                  onClick={() => patchMut.mutate({ id: s.id, body: { status: "planned" } })}
+                >
+                  Reopen
+                </button>
+              )}
             </div>
           </div>
         ))}

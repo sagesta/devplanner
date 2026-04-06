@@ -1,9 +1,11 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Inbox } from "lucide-react";
 import Link from "next/link";
-import { fetchAreas, fetchBacklog, getDevUserId, type AreaRow, type TaskRow } from "@/lib/api";
+import { useState } from "react";
+import { toast } from "sonner";
+import { fetchAreas, fetchBacklog, getDevUserId, patchTask, type AreaRow, type TaskRow } from "@/lib/api";
 import { SkeletonListItem } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -14,8 +16,12 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: "bg-zinc-700/20 text-zinc-500",
 };
 
+type AreaFilter = "all" | "work" | "personal";
+
 export default function BacklogPage() {
   const userId = getDevUserId();
+  const qc = useQueryClient();
+  const [areaFilter, setAreaFilter] = useState<AreaFilter>("all");
 
   const areasQ = useQuery({
     queryKey: ["areas", userId],
@@ -29,6 +35,15 @@ export default function BacklogPage() {
     enabled: Boolean(userId),
   });
 
+  const moveArea = useMutation({
+    mutationFn: ({ taskId, areaId }: { taskId: string; areaId: string }) => patchTask(taskId, { areaId }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["backlog", userId] });
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   if (!userId) return <p className="text-muted">Set NEXT_PUBLIC_DEV_USER_ID</p>;
 
   const areaMap = new Map<string, AreaRow>();
@@ -37,10 +52,21 @@ export default function BacklogPage() {
   // Group tasks by area
   const grouped = new Map<string, TaskRow[]>();
   for (const t of q.data ?? []) {
-    const areaId = t.areaId;
-    if (!grouped.has(areaId)) grouped.set(areaId, []);
-    grouped.get(areaId)!.push(t);
+    const aid = t.areaId;
+    if (!grouped.has(aid)) grouped.set(aid, []);
+    grouped.get(aid)!.push(t);
   }
+
+  function matchesAreaFilter(area: AreaRow | undefined): boolean {
+    if (areaFilter === "all") return true;
+    const n = (area?.name ?? "").toLowerCase();
+    if (areaFilter === "work") return n.includes("work");
+    return n.includes("personal");
+  }
+
+  const filteredGroups = Array.from(grouped.entries()).filter(([areaId]) =>
+    matchesAreaFilter(areaMap.get(areaId))
+  );
 
   return (
     <div>
@@ -48,6 +74,23 @@ export default function BacklogPage() {
       <p className="mt-1 text-sm text-muted">
         Tasks without a sprint — {q.data?.length ?? 0} total.
       </p>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {(["all", "work", "personal"] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setAreaFilter(key)}
+            className={cn(
+              "rounded-full px-3 py-1 text-[11px] font-medium transition-colors",
+              areaFilter === key
+                ? "bg-primary text-white"
+                : "bg-white/5 text-muted hover:bg-white/10 hover:text-foreground"
+            )}
+          >
+            {key === "all" ? "All areas" : key === "work" ? "Work" : "Personal"}
+          </button>
+        ))}
+      </div>
 
       {q.isLoading && (
         <div className="mt-4 space-y-2">
@@ -58,7 +101,7 @@ export default function BacklogPage() {
       )}
 
       <div className="mt-4 space-y-6">
-        {Array.from(grouped.entries()).map(([areaId, tasks]) => {
+        {filteredGroups.map(([areaId, tasks]) => {
           const area = areaMap.get(areaId);
           return (
             <div key={areaId}>
@@ -78,9 +121,24 @@ export default function BacklogPage() {
                 {tasks.map((t) => (
                   <li
                     key={t.id}
-                    className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2.5 text-sm text-foreground card-hover"
+                    className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-surface px-3 py-2.5 text-sm text-foreground card-hover"
                   >
-                    <span className="flex-1">{t.title}</span>
+                    <span className="min-w-0 flex-1">{t.title}</span>
+                    <select
+                      className="max-w-[140px] rounded-md border border-white/10 bg-background px-2 py-1 text-[11px] text-muted"
+                      value={t.areaId}
+                      disabled={moveArea.isPending}
+                      onChange={(e) =>
+                        moveArea.mutate({ taskId: t.id, areaId: e.target.value })
+                      }
+                      aria-label="Category / area"
+                    >
+                      {(areasQ.data ?? []).map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
                     <span
                       className={cn(
                         "inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider",
@@ -96,6 +154,12 @@ export default function BacklogPage() {
           );
         })}
       </div>
+
+      {!q.isLoading &&
+        (q.data?.length ?? 0) > 0 &&
+        filteredGroups.length === 0 && (
+          <p className="mt-6 text-center text-sm text-muted">No tasks in this category filter.</p>
+        )}
 
       {!q.isLoading && (q.data?.length ?? 0) === 0 && (
         <div className="mt-12 flex flex-col items-center text-center">

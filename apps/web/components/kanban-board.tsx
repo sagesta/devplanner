@@ -11,11 +11,20 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { ChevronDown, ChevronUp, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { createTask, fetchAreas, fetchTaskDetail, fetchTasks, getDevUserId, patchTask, type TaskRow, type AreaRow } from "@/lib/api";
-import { getApiBase } from "@/lib/env";
+import {
+  createTask,
+  deleteTask,
+  fetchAreas,
+  fetchTaskDetail,
+  fetchTasks,
+  getDevUserId,
+  patchTask,
+  type AreaRow,
+  type TaskRow,
+} from "@/lib/api";
 import { SkeletonCard } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 import { StatusDot, SubtaskBar, TaskCard } from "./task-card";
@@ -61,12 +70,14 @@ function DroppableColumn({
   count,
   children,
   onAdd,
+  emptyHint,
 }: {
   id: string;
   title: string;
   count: number;
   children: React.ReactNode;
   onAdd: () => void;
+  emptyHint?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
@@ -94,8 +105,25 @@ function DroppableColumn({
         </button>
       </div>
       <div className="space-y-2 stagger-list">{children}</div>
+      {emptyHint && (
+        <p className="mt-2 text-center text-[11px] text-muted/50 py-4 border border-dashed border-white/5 rounded-lg">
+          Drop tasks here or add one
+        </p>
+      )}
     </section>
   );
+}
+
+const RECURRENCE_PRESETS: { label: string; value: string }[] = [
+  { label: "No repeat", value: "" },
+  { label: "Daily", value: "FREQ=DAILY" },
+  { label: "Weekly", value: "FREQ=WEEKLY" },
+  { label: "Weekdays", value: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR" },
+];
+
+function toPgTime(v: string): string | null {
+  if (!v) return null;
+  return v.length === 5 ? `${v}:00` : v;
 }
 
 function InlineAddTask({
@@ -110,40 +138,117 @@ function InlineAddTask({
   onDone: () => void;
 }) {
   const [title, setTitle] = useState("");
+  const [more, setMore] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [startT, setStartT] = useState("");
+  const [endT, setEndT] = useState("");
+  const [recurrence, setRecurrence] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
   const m = useMutation({
-    mutationFn: () => createTask({ userId, areaId, title: title.trim(), status }),
+    mutationFn: () =>
+      createTask({
+        userId,
+        areaId,
+        title: title.trim(),
+        status,
+        scheduledDate: scheduledDate || null,
+        scheduledStartTime: toPgTime(startT),
+        scheduledEndTime: toPgTime(endT),
+        recurrenceRule: recurrence || null,
+      }),
     onSuccess: () => {
       setTitle("");
+      setScheduledDate("");
+      setStartT("");
+      setEndT("");
+      setRecurrence("");
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
       inputRef.current?.focus();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   return (
-    <div className="animate-slideIn flex gap-1.5">
-      <input
-        ref={inputRef}
-        autoFocus
-        className="flex-1 rounded-md border border-white/10 bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted/50"
-        placeholder="Task title…"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && title.trim()) m.mutate();
-          if (e.key === "Escape") onDone();
-        }}
-      />
+    <div className="animate-slideIn space-y-2 rounded-md border border-white/10 bg-background/40 p-2">
+      <div className="flex gap-1.5">
+        <input
+          ref={inputRef}
+          autoFocus
+          className="flex-1 rounded-md border border-white/10 bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted/50"
+          placeholder="Task title…"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && title.trim()) m.mutate();
+            if (e.key === "Escape") onDone();
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => onDone()}
+          className="rounded p-1 text-muted hover:text-foreground"
+        >
+          <X size={14} />
+        </button>
+      </div>
       <button
         type="button"
-        onClick={() => onDone()}
-        className="rounded p-1 text-muted hover:text-foreground"
+        className="flex w-full items-center justify-center gap-1 text-[10px] text-muted hover:text-foreground"
+        onClick={() => setMore((v) => !v)}
       >
-        <X size={14} />
+        {more ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        Date &amp; time (optional)
       </button>
+      {more && (
+        <div className="grid gap-2 text-[10px]">
+          <label className="text-muted">
+            Day
+            <input
+              type="date"
+              className="mt-0.5 w-full rounded border border-white/10 bg-background px-1.5 py-1 text-foreground"
+              value={scheduledDate}
+              onChange={(e) => setScheduledDate(e.target.value)}
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-1">
+            <label className="text-muted">
+              Start
+              <input
+                type="time"
+                className="mt-0.5 w-full rounded border border-white/10 bg-background px-1.5 py-1 text-foreground"
+                value={startT}
+                onChange={(e) => setStartT(e.target.value)}
+              />
+            </label>
+            <label className="text-muted">
+              End
+              <input
+                type="time"
+                className="mt-0.5 w-full rounded border border-white/10 bg-background px-1.5 py-1 text-foreground"
+                value={endT}
+                onChange={(e) => setEndT(e.target.value)}
+              />
+            </label>
+          </div>
+          <label className="text-muted">
+            Recurrence
+            <select
+              className="mt-0.5 w-full rounded border border-white/10 bg-background px-1.5 py-1 text-foreground"
+              value={recurrence}
+              onChange={(e) => setRecurrence(e.target.value)}
+            >
+              {RECURRENCE_PRESETS.map((p) => (
+                <option key={p.label} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
     </div>
   );
 }
@@ -213,6 +318,7 @@ export function KanbanBoard() {
                 id={key}
                 title={label}
                 count={colTasks.length}
+                emptyHint={!q.isLoading && colTasks.length === 0 && addingCol !== key}
                 onAdd={() => setAddingCol(addingCol === key ? null : key)}
               >
                 {q.isLoading && (
@@ -245,13 +351,35 @@ export function KanbanBoard() {
                           }}
                         />
                       </DraggableCard>
-                      <button
-                        type="button"
-                        className="pl-1 text-[10px] text-primary/70 hover:text-primary hover:underline transition-colors"
-                        onClick={() => setOpenTaskId(t.id)}
-                      >
-                        Details / subtasks
-                      </button>
+                      <div className="flex items-center gap-2 pl-1">
+                        <button
+                          type="button"
+                          className="text-[10px] text-primary/70 hover:text-primary hover:underline transition-colors"
+                          onClick={() => setOpenTaskId(t.id)}
+                        >
+                          Details / subtasks
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded p-0.5 text-muted hover:bg-red-500/15 hover:text-red-300"
+                          title="Delete task"
+                          onClick={() => {
+                            if (!confirm(`Delete “${t.title}”?`)) return;
+                            void (async () => {
+                              try {
+                                await deleteTask(t.id, userId);
+                                toast.success("Task deleted");
+                                void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+                                void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
+                              } catch (e) {
+                                toast.error(String(e));
+                              }
+                            })();
+                          }}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -303,7 +431,32 @@ function TaskDrawer({
     queryFn: () => fetchTaskDetail(userId, taskId),
   });
 
+  const areasQ = useQuery({
+    queryKey: ["areas", userId],
+    queryFn: () => fetchAreas(userId),
+    enabled: Boolean(userId),
+  });
+
   const [title, setTitle] = useState("");
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [startT, setStartT] = useState("");
+  const [endT, setEndT] = useState("");
+  const [recurrence, setRecurrence] = useState("");
+  const [areaId, setAreaId] = useState("");
+
+  useEffect(() => {
+    const t = q.data?.task;
+    if (!t) return;
+    setScheduledDate(t.scheduledDate ?? "");
+    setStartT(t.scheduledStartTime ? t.scheduledStartTime.slice(0, 5) : "");
+    setEndT(t.scheduledEndTime ? t.scheduledEndTime.slice(0, 5) : "");
+    const rr = t.recurrenceRule ?? "";
+    if (!rr) setRecurrence("");
+    else if (RECURRENCE_PRESETS.some((p) => p.value === rr)) setRecurrence(rr);
+    else setRecurrence("__custom");
+    setAreaId(t.areaId);
+  }, [q.data?.task]);
+
   const addSub = useMutation({
     mutationFn: async () => {
       if (!title.trim() || !q.data) return null;
@@ -334,6 +487,42 @@ function TaskDrawer({
     },
   });
 
+  const saveMeta = useMutation({
+    mutationFn: async () => {
+      if (!q.data) return;
+      let recurrenceRule: string | null;
+      if (recurrence === "") recurrenceRule = null;
+      else if (recurrence === "__custom") recurrenceRule = q.data.task.recurrenceRule ?? null;
+      else recurrenceRule = recurrence;
+      return patchTask(taskId, {
+        scheduledDate: scheduledDate || null,
+        scheduledStartTime: toPgTime(startT),
+        scheduledEndTime: toPgTime(endT),
+        recurrenceRule,
+        areaId: areaId || q.data.task.areaId,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Saved");
+      void qc.invalidateQueries({ queryKey: ["task", taskId] });
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["backlog", userId] });
+      void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const delTask = useMutation({
+    mutationFn: () => deleteTask(taskId, userId),
+    onSuccess: () => {
+      toast.success("Task deleted");
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div
       className="fixed inset-0 z-50 flex justify-end bg-black/60 animate-fadeIn"
@@ -362,14 +551,103 @@ function TaskDrawer({
                   )}
                 </p>
               </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  className="rounded-lg p-1.5 text-muted hover:bg-red-500/15 hover:text-red-300"
+                  title="Delete task"
+                  disabled={delTask.isPending}
+                  onClick={() => {
+                    if (!confirm(`Delete “${q.data!.task.title}”?`)) return;
+                    delTask.mutate();
+                  }}
+                >
+                  <Trash2 size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg p-1.5 text-muted hover:bg-white/10 hover:text-foreground"
+                  onClick={onClose}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3 rounded-xl border border-white/10 bg-background/30 p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Schedule</p>
+              <label className="block text-[11px] text-muted">
+                Area
+                <select
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                  value={areaId}
+                  onChange={(e) => setAreaId(e.target.value)}
+                >
+                  {(areasQ.data ?? []).map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-[11px] text-muted">
+                Day
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                  value={scheduledDate}
+                  onChange={(e) => setScheduledDate(e.target.value)}
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-[11px] text-muted">
+                  Start
+                  <input
+                    type="time"
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm"
+                    value={startT}
+                    onChange={(e) => setStartT(e.target.value)}
+                  />
+                </label>
+                <label className="text-[11px] text-muted">
+                  End
+                  <input
+                    type="time"
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm"
+                    value={endT}
+                    onChange={(e) => setEndT(e.target.value)}
+                  />
+                </label>
+              </div>
+              <label className="block text-[11px] text-muted">
+                Recurrence (RRULE)
+                <select
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                  value={recurrence}
+                  onChange={(e) => setRecurrence(e.target.value)}
+                >
+                  {RECURRENCE_PRESETS.map((p) => (
+                    <option key={p.label} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                  {((q.data.task.recurrenceRule &&
+                    !RECURRENCE_PRESETS.some((p) => p.value === (q.data.task.recurrenceRule ?? ""))) ||
+                    recurrence === "__custom") && (
+                    <option value="__custom">Custom (keep current)</option>
+                  )}
+                </select>
+              </label>
               <button
                 type="button"
-                className="rounded-lg p-1.5 text-muted hover:bg-white/10 hover:text-foreground"
-                onClick={onClose}
+                disabled={saveMeta.isPending}
+                className="w-full rounded-lg bg-primary py-2 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
+                onClick={() => saveMeta.mutate()}
               >
-                <X size={16} />
+                {saveMeta.isPending ? "Saving…" : "Save schedule & area"}
               </button>
             </div>
+
             {q.data.subtaskProgress && (
               <div className="mt-3">
                 <SubtaskBar done={q.data.subtaskProgress.done} total={q.data.subtaskProgress.total} />

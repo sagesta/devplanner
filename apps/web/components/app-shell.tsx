@@ -116,11 +116,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Mobile header */}
           <header className="border-b border-white/10 bg-surface/80 backdrop-blur-sm md:hidden">
-            <div className="flex items-center justify-between px-4 py-2.5">
-              <span className="font-display text-lg text-foreground">DevPlanner</span>
+            <div className="flex items-center gap-2 px-4 py-2.5">
+              <span className="min-w-0 flex-1 truncate font-display text-lg text-foreground">DevPlanner</span>
               <button
                 type="button"
-                className="flex items-center gap-1 rounded-lg bg-primary/80 px-2.5 py-1.5 text-xs text-white"
+                className="flex shrink-0 items-center gap-1 rounded-lg bg-primary/80 px-2.5 py-1.5 text-xs text-white"
                 onClick={() => setBrainOpen(true)}
               >
                 <Lightbulb size={12} />

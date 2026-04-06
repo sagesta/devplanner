@@ -1,10 +1,11 @@
 # Next.js web — production image (NEXT_PUBLIC_* baked in at build)
+# Uses npm workspaces + package-lock.json only (no pnpm).
 FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 
 FROM deps AS build
 ARG NEXT_PUBLIC_API_URL=http://localhost:3001
@@ -22,7 +23,7 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY --from=build /app/apps/web/.next ./apps/web/.next
 COPY --from=build /app/apps/web/public ./apps/web/public
 EXPOSE 3000

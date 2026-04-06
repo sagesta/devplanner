@@ -33,12 +33,30 @@ export function SkeletonCard() {
 export function SkeletonRow() {
   return (
     <tr className="border-b border-white/5">
-      <td className="p-2"><Skeleton className="h-4 w-4" /></td>
-      <td className="p-2"><Skeleton className="h-4 w-40" /></td>
-      <td className="p-2"><Skeleton className="h-4 w-16" /></td>
-      <td className="p-2"><Skeleton className="h-4 w-14" /></td>
-      <td className="p-2"><Skeleton className="h-4 w-14" /></td>
-      <td className="p-2"><Skeleton className="h-4 w-20" /></td>
+      <td className="p-2">
+        <Skeleton className="h-4 w-4" />
+      </td>
+      <td className="p-2">
+        <Skeleton className="h-3 w-3 rounded-full" />
+      </td>
+      <td className="p-2">
+        <Skeleton className="h-4 w-40" />
+      </td>
+      <td className="p-2">
+        <Skeleton className="h-4 w-16" />
+      </td>
+      <td className="p-2">
+        <Skeleton className="h-4 w-14" />
+      </td>
+      <td className="p-2">
+        <Skeleton className="h-4 w-14" />
+      </td>
+      <td className="p-2">
+        <Skeleton className="h-4 w-20" />
+      </td>
+      <td className="p-2">
+        <Skeleton className="h-4 w-6 ml-auto" />
+      </td>
     </tr>
   );
 }

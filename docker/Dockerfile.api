@@ -1,10 +1,11 @@
 # API (Hono) — production image
+# Uses npm workspaces + package-lock.json (npm ci). Entrypoint runs `npm run db:push -w @devplanner/api`.
 FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 
 FROM deps AS build
 COPY apps/api apps/api
@@ -18,7 +19,7 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 # Full `npm ci` then prune: `npm ci --omit=dev` skips lockfile entries marked dev (e.g. esbuild under drizzle-kit) and breaks `drizzle-kit push` at startup.
-RUN npm ci && npm prune --production && npm cache clean --force
+RUN npm ci --no-audit --no-fund && npm prune --omit=dev && npm cache clean --force
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 # drizzle-kit push at container start (see docker-entrypoint.mjs)
 COPY apps/api/drizzle.config.ts ./apps/api/

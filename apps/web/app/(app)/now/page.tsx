@@ -2,20 +2,28 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { fetchToday, getDevUserId, patchTask, type TaskRow } from "@/lib/api";
 import { SkeletonListItem } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 
+function localISODate(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export default function NowPage() {
   const userId = getDevUserId();
   const qc = useQueryClient();
   const [doneId, setDoneId] = useState<string | null>(null);
+  const todayLocal = useMemo(() => localISODate(), []);
 
   const q = useQuery({
-    queryKey: ["tasks-today", userId],
-    queryFn: () => fetchToday(userId),
+    queryKey: ["tasks-today", userId, todayLocal],
+    queryFn: () => fetchToday(userId, todayLocal),
     enabled: Boolean(userId),
   });
 
@@ -51,7 +59,14 @@ export default function NowPage() {
         <div>
           <h1 className="font-display text-2xl text-foreground">Now</h1>
           <p className="mt-1 text-sm text-muted">
-            {q.data?.date ?? "…"}
+            <time dateTime={todayLocal}>
+              {new Date(todayLocal + "T12:00:00").toLocaleDateString(undefined, {
+                weekday: "long",
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </time>
             {tasks.length > 0 && (
               <span className="ml-2">
                 · {tasks.length} task{tasks.length !== 1 ? "s" : ""}

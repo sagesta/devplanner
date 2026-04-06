@@ -1,10 +1,13 @@
 {
   "name": "devplanner",
   "private": true,
-  "packageManager": "pnpm@9.15.0",
   "workspaces": [
     "apps/*"
   ],
+  "engines": {
+    "node": ">=18.18.0",
+    "npm": ">=10"
+  },
   "scripts": {
     "dev": "concurrently -i -n web,api -c green,blue \"npm run dev -w @devplanner/web\" \"npm run dev -w @devplanner/api\"",
     "build": "npm run build -w @devplanner/api && npm run build -w @devplanner/web",
@@ -20,6 +23,6 @@
     "docker:migrate": "docker compose --profile tools run --rm migrate"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.2.1"
   }
 }

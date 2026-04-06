@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lightbulb, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Lightbulb, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { fetchAreas, postBrainDumpLines } from "@/lib/api";
@@ -17,7 +17,24 @@ export function BrainDumpModal({
   const userId = getDevUserId();
   const qc = useQueryClient();
   const [text, setText] = useState("");
+  const [moreSchedule, setMoreSchedule] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [startT, setStartT] = useState("");
+  const [endT, setEndT] = useState("");
+  const [recurrence, setRecurrence] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const RECURRENCE_PRESETS: { label: string; value: string }[] = [
+    { label: "No repeat", value: "" },
+    { label: "Daily", value: "FREQ=DAILY" },
+    { label: "Weekly", value: "FREQ=WEEKLY" },
+    { label: "Weekdays", value: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR" },
+  ];
+
+  const toPgTime = (v: string): string | null => {
+    if (!v) return null;
+    return v.length === 5 ? `${v}:00` : v;
+  };
 
   const areasQ = useQuery({
     queryKey: ["areas", userId],
@@ -48,13 +65,27 @@ export function BrainDumpModal({
   const m = useMutation({
     mutationFn: async () => {
       const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-      return postBrainDumpLines(userId, areaId, lines);
+      const schedule =
+        scheduledDate || startT || endT || recurrence
+          ? {
+              scheduledDate: scheduledDate || null,
+              scheduledStartTime: toPgTime(startT),
+              scheduledEndTime: toPgTime(endT),
+              recurrenceRule: recurrence || null,
+            }
+          : undefined;
+      return postBrainDumpLines(userId, areaId, lines, schedule);
     },
     onSuccess: (data) => {
       toast.success(`Added ${data.count} task(s) to backlog`);
       void qc.invalidateQueries({ queryKey: ["tasks"] });
       void qc.invalidateQueries({ queryKey: ["backlog"] });
+      void qc.invalidateQueries({ queryKey: ["tasks-today"] });
       setText("");
+      setScheduledDate("");
+      setStartT("");
+      setEndT("");
+      setRecurrence("");
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -130,6 +161,61 @@ export function BrainDumpModal({
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
+        <button
+          type="button"
+          className="mt-2 flex w-full items-center justify-center gap-1 text-[11px] text-muted hover:text-foreground"
+          onClick={() => setMoreSchedule((v) => !v)}
+        >
+          {moreSchedule ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          Optional: same schedule for all lines (date, time, repeat)
+        </button>
+        {moreSchedule && (
+          <div className="mt-2 grid gap-2 rounded-lg border border-white/10 bg-background/40 p-3 text-xs">
+            <label className="text-muted">
+              Date
+              <input
+                type="date"
+                className="mt-1 w-full rounded-md border border-white/10 bg-background px-2 py-1.5 text-foreground"
+                value={scheduledDate}
+                onChange={(e) => setScheduledDate(e.target.value)}
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-muted">
+                Start
+                <input
+                  type="time"
+                  className="mt-1 w-full rounded-md border border-white/10 bg-background px-2 py-1.5"
+                  value={startT}
+                  onChange={(e) => setStartT(e.target.value)}
+                />
+              </label>
+              <label className="text-muted">
+                End
+                <input
+                  type="time"
+                  className="mt-1 w-full rounded-md border border-white/10 bg-background px-2 py-1.5"
+                  value={endT}
+                  onChange={(e) => setEndT(e.target.value)}
+                />
+              </label>
+            </div>
+            <label className="text-muted">
+              Recurrence
+              <select
+                className="mt-1 w-full rounded-md border border-white/10 bg-background px-2 py-1.5 text-foreground"
+                value={recurrence}
+                onChange={(e) => setRecurrence(e.target.value)}
+              >
+                {RECURRENCE_PRESETS.map((p) => (
+                  <option key={p.label} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
         <div className="mt-1 text-[10px] text-muted">
           {lineCount > 0 ? `${lineCount} task${lineCount !== 1 ? "s" : ""}` : "Start typing…"}
         </div>

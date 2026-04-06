@@ -188,7 +188,7 @@ Webpack (and to a lesser extent Turbopack) on **DrvFS** (`/mnt/c/Users/...`) can
 npm run worker
 ```
 
-*(pnpm works too if you install it; root scripts use `npm run -w`.)*
+*Use **npm** at the repo root (`package-lock.json`). Docker images run `npm ci` — keep the lockfile committed and in sync after dependency changes.*
 
 ## Main API routes
 

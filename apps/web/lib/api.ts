@@ -57,6 +57,8 @@ export type TaskRow = {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  recurrenceRule?: string | null;
+  tags?: string[] | null;
   // Batch-loaded subtask progress (from refactored API)
   _subtasksDone?: number;
   _subtasksTotal?: number;
@@ -109,8 +111,10 @@ export async function fetchBacklog(userId: string): Promise<TaskRow[]> {
   return data.tasks;
 }
 
-export async function fetchToday(userId: string) {
-  return fetchJson<{ tasks: TaskRow[]; date: string }>(apiUrl("/api/tasks/today", { userId }));
+export async function fetchToday(userId: string, date?: string) {
+  const params: Record<string, string> = { userId };
+  if (date) params.date = date;
+  return fetchJson<{ tasks: TaskRow[]; date: string }>(apiUrl("/api/tasks/today", params));
 }
 
 export async function fetchTaskDetail(userId: string, taskId: string) {
@@ -133,6 +137,10 @@ export async function createTask(body: {
   energyLevel?: string;
   taskType?: string;
   scheduledDate?: string | null;
+  scheduledStartTime?: string | null;
+  scheduledEndTime?: string | null;
+  dueDate?: string | null;
+  recurrenceRule?: string | null;
   estimatedMinutes?: number | null;
   description?: string | null;
 }) {
@@ -149,16 +157,26 @@ export async function patchTask(taskId: string, body: Record<string, unknown>) {
   });
 }
 
-export async function deleteTask(taskId: string) {
-  return fetchJson<{ ok: boolean }>(apiUrl(`/api/tasks/${taskId}`), {
+export async function deleteTask(taskId: string, userId: string) {
+  return fetchJson<{ ok: boolean }>(apiUrl(`/api/tasks/${taskId}`, { userId }), {
     method: "DELETE",
   });
 }
 
-export async function postBrainDumpLines(userId: string, areaId: string, lines: string[]) {
+export async function postBrainDumpLines(
+  userId: string,
+  areaId: string,
+  lines: string[],
+  schedule?: {
+    scheduledDate?: string | null;
+    scheduledStartTime?: string | null;
+    scheduledEndTime?: string | null;
+    recurrenceRule?: string | null;
+  }
+) {
   return fetchJson<{ tasks: TaskRow[]; count: number }>(apiUrl("/api/tasks/brain-dump"), {
     method: "POST",
-    body: JSON.stringify({ userId, areaId, lines }),
+    body: JSON.stringify({ userId, areaId, lines, ...schedule }),
   });
 }
 
@@ -206,7 +224,34 @@ export async function createSprint(body: {
   });
 }
 
+export async function patchSprint(
+  sprintId: string,
+  body: Partial<{
+    name: string;
+    startDate: string;
+    endDate: string;
+    goal: string | null;
+    status: string;
+    capacityHours: number | null;
+  }>
+) {
+  return fetchJson<{ sprint: SprintRow }>(apiUrl(`/api/sprints/${sprintId}`), {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
 // ─── AI ───────────────────────────────────────────────────────────
+export type AiConfigResponse = {
+  openaiKeySet: boolean;
+  defaultChatModel: string;
+  allowedChatModels: string[];
+};
+
+export async function fetchAiConfig(): Promise<AiConfigResponse> {
+  return fetchJson<AiConfigResponse>(apiUrl("/api/ai/config"));
+}
+
 export async function fetchAiLogs(userId: string, limit = 30) {
   return fetchJson<{ logs: AiLogRow[] }>(
     apiUrl("/api/ai/logs", { userId, limit: String(limit) })

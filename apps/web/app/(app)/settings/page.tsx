@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
+  fetchAiConfig,
   fetchAiLogs,
   fetchFocusExport,
   fetchGoogleCalendarStatus,
@@ -56,6 +57,12 @@ export default function SettingsPage() {
     queryKey: ["ai-logs", userId],
     queryFn: () => fetchAiLogs(userId, 40),
     enabled: Boolean(userId) && tab === "ai",
+  });
+
+  const aiConfigQ = useQuery({
+    queryKey: ["ai-config"],
+    queryFn: () => fetchAiConfig(),
+    enabled: tab === "ai",
   });
 
   const googleQ = useQuery({
@@ -223,6 +230,9 @@ export default function SettingsPage() {
             <p className="mt-2 text-sm text-muted leading-relaxed">
               Daily budgets (<strong>4h work / 2h personal</strong>) are enforced in AI prompts when
               OPENAI_API_KEY is set. User profile fields live on the <code className="rounded bg-background px-1 text-xs">users</code> row (seeded dev user).
+            </p>
+            <p className="mt-3 text-sm text-muted leading-relaxed">
+              <strong className="text-foreground">Theme:</strong> use the Sun / Moon control in the sidebar (bottom) to switch light and dark mode.
             </p>
             <div className="mt-4 rounded-lg bg-background/50 p-3 text-xs text-muted">
               <p>User ID: <code className="text-foreground">{userId || "not set"}</code></p>
@@ -393,6 +403,34 @@ export default function SettingsPage() {
         )}
 
         {tab === "ai" && (
+          <div className="space-y-6">
+          <div className="rounded-xl border border-white/10 bg-surface p-5">
+            <h2 className="text-sm font-semibold text-foreground">AI assistant</h2>
+            <p className="mt-2 text-xs text-muted leading-relaxed">
+              The chat dock calls <code className="rounded bg-background px-1">POST /api/ai/chat</code>. Set{" "}
+              <code className="rounded bg-background px-1">OPENAI_API_KEY</code> in the API{" "}
+              <code className="rounded bg-background px-1">.env</code> (never in the browser). Optional:{" "}
+              <code className="rounded bg-background px-1">OPENAI_SMART_MODEL</code> (default{" "}
+              <code className="text-foreground">gpt-4o-mini</code>).
+            </p>
+            {aiConfigQ.data && (
+              <div
+                className={cn(
+                  "mt-3 rounded-lg border px-3 py-2 text-xs",
+                  aiConfigQ.data.openaiKeySet
+                    ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100/90"
+                    : "border-amber-500/30 bg-amber-500/10 text-amber-100/90"
+                )}
+              >
+                {aiConfigQ.data.openaiKeySet
+                  ? "OpenAI API key is configured on the server."
+                  : "OpenAI API key is not set — chat will show a stub message until OPENAI_API_KEY is set."}
+              </div>
+            )}
+            <p className="mt-3 text-xs text-muted">
+              <strong className="text-foreground">Model &amp; tools</strong> are chosen in the floating AI panel (model list + “task tools” toggle). Task tools let the assistant list, create, update, delete, and reschedule tasks.
+            </p>
+          </div>
           <section className="rounded-xl border border-white/10 bg-surface p-5">
             <h2 className="text-sm font-semibold text-foreground">AI cost log</h2>
             {!userId && <p className="mt-2 text-sm text-muted">Set user ID to load logs.</p>}
@@ -443,6 +481,7 @@ export default function SettingsPage() {
               <p className="mt-3 text-sm text-muted">No AI calls logged yet.</p>
             )}
           </section>
+          </div>
         )}
       </div>
     </div>

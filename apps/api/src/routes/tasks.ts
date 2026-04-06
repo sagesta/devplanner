@@ -28,14 +28,20 @@ const createBody = z.object({
   estimatedMinutes: z.number().int().optional().nullable(),
   description: z.string().optional().nullable(),
   dueDate: z.string().optional().nullable(),
+  recurrenceRule: z.string().optional().nullable(),
+  tags: z.array(z.string()).optional().nullable(),
 });
 
-const patchBody = createBody.partial().omit({ userId: true, areaId: true });
+const patchBody = createBody.partial().omit({ userId: true });
 
 const brainDumpBody = z.object({
   userId: z.string().uuid(),
   areaId: z.string().uuid(),
   lines: z.union([z.array(z.string()), z.string()]),
+  scheduledDate: z.string().optional().nullable(),
+  scheduledStartTime: z.string().optional().nullable(),
+  scheduledEndTime: z.string().optional().nullable(),
+  recurrenceRule: z.string().optional().nullable(),
 });
 
 const bulkStatusBody = z.object({
@@ -46,9 +52,10 @@ const bulkStatusBody = z.object({
 
 // Allowlist of patchable fields for cleaner update logic
 const PATCH_FIELDS = [
-  "title", "description", "projectId", "sprintId", "parentTaskId",
+  "title", "description", "projectId", "sprintId", "parentTaskId", "areaId",
   "priority", "energyLevel", "taskType", "scheduledDate",
   "scheduledStartTime", "scheduledEndTime", "estimatedMinutes", "dueDate",
+  "recurrenceRule", "tags",
 ] as const;
 
 export const taskRoutes = new Hono<AppEnv>()
@@ -106,7 +113,11 @@ export const taskRoutes = new Hono<AppEnv>()
     if (!userId) {
       return c.json({ error: "userId query required" }, 400);
     }
-    const today = new Date().toISOString().slice(0, 10);
+    const dateParam = c.req.query("date");
+    const today =
+      dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
+        ? dateParam
+        : new Date().toISOString().slice(0, 10);
     const rows = await db.query.tasks.findMany({
       where: and(eq(tasks.userId, userId), eq(tasks.scheduledDate, today)),
       orderBy: (t, { desc: descFn, asc: ascFn }) => [descFn(t.priority), ascFn(t.scheduledStartTime)],
@@ -146,6 +157,7 @@ export const taskRoutes = new Hono<AppEnv>()
     if (!titles.length) {
       return c.json({ error: "no lines" }, 422);
     }
+    const { scheduledDate, scheduledStartTime, scheduledEndTime, recurrenceRule } = parsed.data;
     const inserted = await db
       .insert(tasks)
       .values(
@@ -158,6 +170,10 @@ export const taskRoutes = new Hono<AppEnv>()
           parentTaskId: null,
           taskType: "main" as const,
           sortOrder: i,
+          scheduledDate: scheduledDate ?? null,
+          scheduledStartTime: scheduledStartTime ?? null,
+          scheduledEndTime: scheduledEndTime ?? null,
+          recurrenceRule: recurrenceRule ?? null,
         }))
       )
       .returning();
@@ -254,6 +270,8 @@ export const taskRoutes = new Hono<AppEnv>()
         estimatedMinutes: v.estimatedMinutes ?? null,
         description: v.description ?? null,
         dueDate: v.dueDate ?? null,
+        recurrenceRule: v.recurrenceRule ?? null,
+        tags: v.tags ?? null,
       })
       .returning();
     if (row.parentTaskId) {

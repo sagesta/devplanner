@@ -75,8 +75,14 @@ export default function ReviewPage() {
         <div className="mt-4 flex justify-between gap-2">
           <button
             type="button"
-            className="rounded-lg px-3 py-2 text-sm text-muted hover:bg-white/5 disabled:opacity-30 transition-colors"
+            className={cn(
+              "rounded-lg px-3 py-2 text-sm transition-colors",
+              step === 0
+                ? "cursor-not-allowed text-muted/25"
+                : "text-muted hover:bg-white/5"
+            )}
             disabled={step === 0}
+            aria-disabled={step === 0}
             onClick={() => setStep((s) => Math.max(0, s - 1))}
           >
             ← Back

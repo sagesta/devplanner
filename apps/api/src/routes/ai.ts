@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { streamText } from "hono/streaming";
 import OpenAI from "openai";
 import { z } from "zod";
+import { executePlannerTool, PLANNER_CHAT_TOOLS } from "../ai/ai-task-tools.js";
 import { logAiCall } from "../ai/logCall.js";
 import { openaiJsonCompletion } from "../ai/openai-json.js";
 import { db } from "../db/client.js";
@@ -23,7 +24,79 @@ const breakdownBody = z.object({
 const chatBody = z.object({
   userId: z.string().uuid(),
   message: z.string().min(1),
+  model: z.string().optional(),
+  enableTools: z.boolean().optional(),
 });
+
+const ALLOWED_CHAT_MODELS = new Set(["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4"]);
+
+function resolveChatModel(requested?: string): string {
+  const fallback = process.env.OPENAI_SMART_MODEL ?? "gpt-4o-mini";
+  if (requested && ALLOWED_CHAT_MODELS.has(requested)) return requested;
+  return fallback;
+}
+
+async function runPlannerToolLoop(
+  client: OpenAI,
+  model: string,
+  userId: string,
+  userMessage: string
+): Promise<{ text: string; approxChars: number }> {
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    {
+      role: "system",
+      content:
+        "You are DevPlanner assistant with tools that read and modify the user's real task board. " +
+        "When asked to list, create, update, delete, or reschedule tasks, call the appropriate tools. " +
+        "For bulk deletes (e.g. all done tasks), call listTasks with status filter first, then deleteTask for each id. " +
+        "After tools finish, reply in one or two short sentences confirming what changed (counts, titles). " +
+        "Be concise and ADHD-friendly.",
+    },
+    { role: "user", content: userMessage.slice(0, 8000) },
+  ];
+
+  let approxChars = userMessage.length;
+
+  for (let round = 0; round < 8; round++) {
+    const resp = await client.chat.completions.create({
+      model,
+      messages,
+      tools: PLANNER_CHAT_TOOLS,
+      tool_choice: "auto",
+      max_tokens: 2000,
+    });
+    const msg = resp.choices[0]?.message;
+    if (!msg) break;
+
+    if (msg.tool_calls?.length) {
+      messages.push(msg);
+      for (const tc of msg.tool_calls) {
+        if (tc.type !== "function") continue;
+        let args: unknown = {};
+        try {
+          args = JSON.parse(tc.function.arguments || "{}");
+        } catch {
+          args = {};
+        }
+        const result = await executePlannerTool(tc.function.name, args, userId);
+        const out = JSON.stringify(result);
+        approxChars += out.length;
+        messages.push({
+          role: "tool",
+          tool_call_id: tc.id,
+          content: out,
+        });
+      }
+      continue;
+    }
+
+    const text = msg.content?.trim() ?? "";
+    approxChars += text.length;
+    return { text: text || "(No response)", approxChars };
+  }
+
+  return { text: "Too many tool steps — try a simpler request.", approxChars };
+}
 
 export const aiRoutes = new Hono<AppEnv>()
   .get("/logs", async (c) => {
@@ -127,6 +200,13 @@ export const aiRoutes = new Hono<AppEnv>()
       tasks: openToday.map((t) => ({ id: t.id, title: t.title, status: t.status })),
     });
   })
+  .get("/config", (c) => {
+    return c.json({
+      openaiKeySet: Boolean(process.env.OPENAI_API_KEY?.trim()),
+      defaultChatModel: process.env.OPENAI_SMART_MODEL ?? "gpt-4o-mini",
+      allowedChatModels: [...ALLOWED_CHAT_MODELS],
+    });
+  })
   .post("/chat", async (c) => {
     // SafeParse instead of .parse() — won't throw unhandled
     const parsed = chatBody.safeParse(await c.req.json());
@@ -134,17 +214,38 @@ export const aiRoutes = new Hono<AppEnv>()
       return c.json({ error: parsed.error.flatten() }, 422);
     }
     const body = parsed.data;
-    const key = process.env.OPENAI_API_KEY;
-    if (!key) {
-      return c.json({ reply: "Set OPENAI_API_KEY for chat. (DevPlanner AI stub.)" });
-    }
-    const client = new OpenAI({ apiKey: key });
-    const model = process.env.OPENAI_SMART_MODEL ?? "gpt-4o-mini";
+    const key = process.env.OPENAI_API_KEY?.trim();
+    const client = key ? new OpenAI({ apiKey: key }) : null;
+    const model = resolveChatModel(body.model);
     const started = Date.now();
+    const useTools = body.enableTools !== false;
 
-    // Stream tokens to client via text/event-stream for snappy UX
     return streamText(c, async (stream) => {
       try {
+        if (!client) {
+          await stream.write("Set OPENAI_API_KEY on the API server to enable chat.");
+          return;
+        }
+
+        if (useTools) {
+          const { text, approxChars } = await runPlannerToolLoop(client, model, body.userId, body.message);
+          const chunkSize = 24;
+          for (let i = 0; i < text.length; i += chunkSize) {
+            await stream.write(text.slice(i, i + chunkSize));
+          }
+          const latencyMs = Date.now() - started;
+          await logAiCall({
+            userId: body.userId,
+            jobType: "chat_tools",
+            model,
+            provider: "openai",
+            latencyMs,
+            inputTokens: null,
+            outputTokens: Math.ceil(approxChars / 4),
+          }).catch(() => {});
+          return;
+        }
+
         const resp = await client.chat.completions.create({
           model,
           stream: true,
