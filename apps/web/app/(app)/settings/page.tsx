@@ -289,6 +289,11 @@ export default function SettingsPage() {
                 </p>
               )}
             </div>
+            <p className="mt-4 text-xs text-muted leading-relaxed border-t border-white/10 pt-4">
+              <strong className="text-foreground">API 401</strong> on pages like Now/Board usually means the browser is not sending the session cookie to your API host. If the UI and API use different subdomains (e.g.{" "}
+              <code className="rounded bg-background px-1">planner.*</code> and <code className="rounded bg-background px-1">api.*</code>), set{" "}
+              <code className="rounded bg-background px-1">NEXTAUTH_COOKIE_DOMAIN=.yourdomain.com</code> in server <code className="rounded bg-background px-1">.env</code>, rebuild/restart the <strong>web</strong> container, then sign out and sign in again. See README → &quot;401 Unauthorized&quot;.
+            </p>
           </section>
         )}
 

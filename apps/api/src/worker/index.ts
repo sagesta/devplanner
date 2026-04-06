@@ -2,6 +2,7 @@
  * Run: npm run worker (from devplanner root) or npm run worker -w @devplanner/api
  * Requires Redis. CalDAV push/pull + idle scan (15m).
  */
+import "../lib/loadRootEnv.js";
 import { Worker } from "bullmq";
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { caldavEnabled } from "../caldav/config.js";

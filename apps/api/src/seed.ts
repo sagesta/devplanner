@@ -1,6 +1,7 @@
 /**
  * One-shot dev seed: default user + area. Run from repo root: npm run seed
  */
+import "./lib/loadRootEnv.js";
 import { eq } from "drizzle-orm";
 import { db, pool } from "./db/client.js";
 import { areas, users } from "./db/schema.js";

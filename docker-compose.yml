@@ -32,6 +32,9 @@ services:
     ports:
       - "${RADICALE_PORT:-5232}:5232"
     restart: unless-stopped
+    # Image ships a ~30s curl healthcheck → noisy INFO logs. Nothing in this compose waits on Radicale health.
+    healthcheck:
+      disable: true
 
   # --- App (default `docker compose up -d` starts db, redis, radicale, api, web, worker)
   api:
@@ -67,6 +70,8 @@ services:
       start_period: 120s
     restart: unless-stopped
 
+  # If NEXT_PUBLIC_API_URL is another subdomain, set NEXTAUTH_COOKIE_DOMAIN=.parentdomain in .env
+  # so the session cookie is sent to the API (see README "401 Unauthorized").
   web:
     build:
       context: .

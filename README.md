@@ -45,11 +45,17 @@ Those two names mean the **same thing** here: the URL users open in the browser 
 
 ### Browser shows `401 Unauthorized` from the API
 
-`fetch(..., { credentials: "include" })` only sends the NextAuth cookie when the API is **same-site** with the page, or you configure a **shared cookie domain**.
+`fetch(..., { credentials: "include" })` only sends the NextAuth session cookie when the API is **same-site** with the page, or you set a **shared parent cookie domain**. Docker does not change that: `https://planner.example.com` and `https://api.example.com` are still two hosts until you fix cookies (or proxy).
 
-- If the UI is `https://planner.example.com` but `NEXT_PUBLIC_API_URL` is another host (e.g. `https://api.example.com`), set **`NEXTAUTH_COOKIE_DOMAIN=.example.com`** in `.env` (loaded by the **web** container), use **HTTPS**, restart/rebuild **web**, and sign in again.
-- Alternatively, expose **one** public hostname and **reverse-proxy** `/api/*` (except Next’s `/api/auth/*`) to Hono so the browser stays same-site.
-- Set **`NEXTAUTH_URL`** and **`CORS_ORIGIN`** to the exact public origin of the Next app (e.g. `https://planner.samueladebodun.com`).
+**Split UI + API subdomains (typical production):**
+
+1. Put **`NEXTAUTH_COOKIE_DOMAIN=.example.com`** in the same `.env` your **web** container loads (leading dot, your real registrable domain — not `planner.` or `api.`).
+2. **`NEXTAUTH_SECRET`** must be **identical** in web and API (same `.env` on the server is fine).
+3. **`NEXTAUTH_URL`** and **`CORS_ORIGIN`** must be the **exact** browser origin of the Next app (e.g. `https://planner.example.com`), including `https` and no trailing slash.
+4. **`docker compose build --no-cache web && docker compose up -d web`** (or your deploy) so the web process picks up `NEXTAUTH_COOKIE_DOMAIN`.
+5. **Sign out**, then clear site data for the planner origin (or use a private window), **sign in again** — old session cookies were scoped to `planner` only and will not be sent to `api`.
+
+**Alternative:** expose **one** public hostname and **reverse-proxy** app API routes to Hono so the browser stays same-site and you can leave `NEXTAUTH_COOKIE_DOMAIN` unset.
 
 ## Stack
 
