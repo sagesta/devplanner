@@ -39,9 +39,9 @@ docker compose up -d --build
 4. **Authorized redirect URIs:** `https://yourdomain.com/api/auth/callback/google` (NextAuth). Add your API origin + `/api/sync/google/callback` for Calendar sync if you use it.
 5. Paste Client ID + Secret into `.env` (same values are used by the Next.js app and the API)
 
-### `WEB_APP_URL` vs `APP_URL`
+### Public web URL (`WEB_APP_URL` / `APP_URL`)
 
-The API uses **`WEB_APP_URL`** after Google **Calendar** OAuth (redirect back to Settings). **`APP_URL` is optional**: if `WEB_APP_URL` is empty, the API falls back to **`APP_URL`**. You do not need both; set at least one to your public web origin (same idea as `NEXTAUTH_URL`).
+Those two names mean the **same thing** here: the URL users open in the browser (usually the same value as **`NEXTAUTH_URL`**). Set **only one** of them in `.env`. The API reads **`WEB_APP_URL` first**, then **`APP_URL`** if the first is empty, for Google Calendar OAuth redirects back to Settings.
 
 ### Browser shows `401 Unauthorized` from the API
 
@@ -111,7 +111,7 @@ Two-way sync uses the **Google Calendar API** (OAuth2 + refresh token in Postgre
    - `GOOGLE_CLIENT_ID=…`
    - `GOOGLE_CLIENT_SECRET=…`
    - `GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3001/api/sync/google/callback` (in production, use your public API URL + `/api/sync/google/callback` and register it in Google Cloud).
-   - `WEB_APP_URL=http://localhost:3000` — browser lands here after OAuth (Settings → Calendar).
+   - `WEB_APP_URL=http://localhost:3000` (or `APP_URL` — same value) — browser lands here after Calendar OAuth (Settings → Calendar).
    - `CORS_ORIGIN=http://localhost:3000` — must list the **exact origin(s)** the web app is served from (comma-separated if multiple). Production: your real `https://…` origin.
 6. **Database** — `npm run db:push` so `google_calendar_links` and task Google columns exist. **Docker full stack:** the API container runs `drizzle-kit push` on startup (unless `SKIP_SCHEMA_SYNC=1`); you can skip this step when only using Compose.
 7. **Worker + Redis** — `npm run worker` processes **Google** push jobs (and CalDAV if configured). Without the worker, use **Pull from Google now** in Settings for pulls only; pushes queue until the worker runs. **Docker full stack:** the **`worker`** service already runs; you do not need `npm run worker` on the host.
@@ -144,7 +144,7 @@ docker compose up -d --build
 
 Plain **`docker compose up -d`** uses existing images; add **`--build`** when Dockerfiles or app code changed.
 
-Set in **`.env`** at least: `CORS_ORIGIN`, `WEB_APP_URL`, **`NEXT_PUBLIC_API_URL`** (browser → API), **`NEXTAUTH_SECRET`**, **`NEXTAUTH_URL`**, **`ALLOWED_EMAILS`**, **`GOOGLE_CLIENT_ID`**, **`GOOGLE_CLIENT_SECRET`**, **`DATABASE_URL`**, **`REDIS_URL`**. Compose passes `NEXT_PUBLIC_API_URL` into the **web** image at **build** time; the **web** container also receives `DATABASE_URL` and auth vars for NextAuth.
+Set in **`.env`** at least: `CORS_ORIGIN`, **`WEB_APP_URL` or `APP_URL`** (public UI URL), **`NEXT_PUBLIC_API_URL`** (browser → API), **`NEXTAUTH_SECRET`**, **`NEXTAUTH_URL`**, **`ALLOWED_EMAILS`**, **`GOOGLE_CLIENT_ID`**, **`GOOGLE_CLIENT_SECRET`**, **`DATABASE_URL`**, **`REDIS_URL`**. Compose passes `NEXT_PUBLIC_API_URL` into the **web** image at **build** time; the **web** container also receives `DATABASE_URL` and auth vars for NextAuth.
 
 **Infra only** (for **`npm run dev`** on the host — no API/web/worker images):
 
@@ -165,7 +165,7 @@ Then open **http://localhost:3000** (or your host/IP). API: **http://localhost:3
 
 **Local Node dev** with **`docker:infra`**: run **`npm run db:vector`** once and **`npm run db:push`** yourself — see **Setup** above.
 
-Production checklist: `NODE_ENV=production` in `.env`, strong `DB_PASSWORD`, HTTPS reverse proxy in front of web + API, Google redirect URIs and `CORS_ORIGIN` / `WEB_APP_URL` matching public URLs. Consider **`SKIP_SCHEMA_SYNC=1`** plus versioned migrations if you do not want `push` on container start.
+Production checklist: `NODE_ENV=production` in `.env`, strong `DB_PASSWORD`, HTTPS reverse proxy in front of web + API, Google redirect URIs and `CORS_ORIGIN` / `WEB_APP_URL` (or `APP_URL`) matching public URLs. Consider **`SKIP_SCHEMA_SYNC=1`** plus versioned migrations if you do not want `push` on container start.
 
 ## Run (local Node dev)
 
