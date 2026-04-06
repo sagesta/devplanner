@@ -19,7 +19,7 @@ import { enqueueCaldavPull, enqueueGoogleCalendarPull } from "../queues/definiti
 import type { AppEnv } from "../types.js";
 
 function webAppOrigin(): string {
-  const u = process.env.WEB_APP_URL?.trim();
+  const u = process.env.WEB_APP_URL?.trim() || process.env.APP_URL?.trim();
   if (u) return u.replace(/\/$/, "");
   const c = process.env.CORS_ORIGIN?.split(",")[0]?.trim();
   if (c) return c.replace(/\/$/, "");

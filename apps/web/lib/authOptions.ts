@@ -12,7 +12,32 @@ function allowedEmailSet(): Set<string> {
   );
 }
 
+const cookieDomain = process.env.NEXTAUTH_COOKIE_DOMAIN?.trim();
+
+/** When the API is on another subdomain, share the session cookie across your root domain (HTTPS). */
+const crossSubdomainCookies =
+  cookieDomain != null && cookieDomain.length > 0
+    ? {
+        cookies: {
+          sessionToken: {
+            name:
+              process.env.NODE_ENV === "production"
+                ? "__Secure-next-auth.session-token"
+                : "next-auth.session-token",
+            options: {
+              httpOnly: true,
+              sameSite: "none" as const,
+              path: "/",
+              secure: true,
+              domain: cookieDomain,
+            },
+          },
+        },
+      }
+    : {};
+
 export const authOptions: NextAuthOptions = {
+  ...crossSubdomainCookies,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID ?? "",

@@ -39,6 +39,18 @@ docker compose up -d --build
 4. **Authorized redirect URIs:** `https://yourdomain.com/api/auth/callback/google` (NextAuth). Add your API origin + `/api/sync/google/callback` for Calendar sync if you use it.
 5. Paste Client ID + Secret into `.env` (same values are used by the Next.js app and the API)
 
+### `WEB_APP_URL` vs `APP_URL`
+
+The API uses **`WEB_APP_URL`** after Google **Calendar** OAuth (redirect back to Settings). **`APP_URL` is optional**: if `WEB_APP_URL` is empty, the API falls back to **`APP_URL`**. You do not need both; set at least one to your public web origin (same idea as `NEXTAUTH_URL`).
+
+### Browser shows `401 Unauthorized` from the API
+
+`fetch(..., { credentials: "include" })` only sends the NextAuth cookie when the API is **same-site** with the page, or you configure a **shared cookie domain**.
+
+- If the UI is `https://planner.example.com` but `NEXT_PUBLIC_API_URL` is another host (e.g. `https://api.example.com`), set **`NEXTAUTH_COOKIE_DOMAIN=.example.com`** in `.env` (loaded by the **web** container), use **HTTPS**, restart/rebuild **web**, and sign in again.
+- Alternatively, expose **one** public hostname and **reverse-proxy** `/api/*` (except Next’s `/api/auth/*`) to Hono so the browser stays same-site.
+- Set **`NEXTAUTH_URL`** and **`CORS_ORIGIN`** to the exact public origin of the Next app (e.g. `https://planner.samueladebodun.com`).
+
 ## Stack
 
 - **Web:** Next.js 14 (`apps/web`) — Board (dnd-kit), Now, Table, Backlog, Sprints, Review, Settings, brain dump, Ctrl/Cmd+K palette, AI dock, SSE idle banner, light/dark.
