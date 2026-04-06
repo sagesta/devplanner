@@ -45,7 +45,7 @@ Those two names mean the **same thing** here: the URL users open in the browser 
 
 ### Browser shows `401 Unauthorized` from the API
 
-`fetch(..., { credentials: "include" })` only sends the NextAuth session cookie when the API is **same-site** with the page, or you set a **shared parent cookie domain**. Docker does not change that: `https://planner.example.com` and `https://api.example.com` are still two hosts until you fix cookies (or proxy).
+`fetch(..., { credentials: "include" })` only sends the NextAuth session cookie when the API is **same-site** with the page, or you set a **shared parent cookie domain**. Docker does not change that: `https://planner.example.com` and `https://api.example.com` are still two hosts until you fix cookies (or proxy). The API reads that cookie by parsing the `Cookie` header (Hono is not Next.js `req.cookies`).
 
 **Split UI + API subdomains (typical production):**
 
