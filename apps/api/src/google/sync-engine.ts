@@ -373,7 +373,12 @@ export async function runGooglePullForUser(userId: string): Promise<{
   let nextSyncToken: string | undefined;
   let fullSync = !linkRow.syncToken?.trim();
 
-  const listOnce = async (opts: { syncToken?: string; pageToken?: string; timeMin?: string }) => {
+  const listOnce = async (opts: {
+    syncToken?: string;
+    pageToken?: string;
+    timeMin?: string;
+    timeMax?: string;
+  }) => {
     const res = await calendar.events.list({
       calendarId,
       maxResults: 250,
@@ -382,6 +387,7 @@ export async function runGooglePullForUser(userId: string): Promise<{
       syncToken: opts.syncToken,
       pageToken: opts.pageToken,
       timeMin: opts.timeMin,
+      timeMax: opts.timeMax,
     });
     return res.data;
   };
@@ -415,8 +421,10 @@ export async function runGooglePullForUser(userId: string): Promise<{
 
     if (fullSync) {
       seenIds.clear();
+      // stress-test-fix: expand recurring instances + bounded future window for Google API
       const tMin = new Date(Date.now() - 90 * 86400000).toISOString();
-      let data = await listOnce({ timeMin: tMin });
+      const tMax = new Date(Date.now() + 28 * 86400000).toISOString();
+      let data = await listOnce({ timeMin: tMin, timeMax: tMax });
       for (;;) {
         for (const ev of data.items ?? []) {
           if (ev.id) seenIds.add(ev.id);
@@ -464,6 +472,13 @@ export async function runGooglePullForUser(userId: string): Promise<{
   return stats;
 }
 
+function clampImportedYmd(s: string | null): string | null {
+  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const y = Number(s.slice(0, 4));
+  if (y > new Date().getFullYear() + 2) return null;
+  return s;
+}
+
 async function applyOneGoogleEvent(
   userId: string,
   areaId: string,
@@ -476,6 +491,8 @@ async function applyOneGoogleEvent(
     stats.skipped++;
     return;
   }
+  parsed.scheduledDate = clampImportedYmd(parsed.scheduledDate);
+  parsed.dueDate = clampImportedYmd(parsed.dueDate);
 
   const remoteRev = parsed.remoteRevision ?? "";
   const evId = raw.id!;
@@ -579,7 +596,9 @@ async function applyOneGoogleEvent(
     description: parsed.description,
     status,
     priority: "normal",
-    energyLevel: "shallow",
+    energyLevel: "admin",
+    workDepth: null,
+    physicalEnergy: null,
     taskType: "main",
     parentTaskId: null,
     scheduledDate: parsed.scheduledDate,

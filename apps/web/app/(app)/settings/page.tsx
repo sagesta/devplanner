@@ -2,15 +2,16 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Calendar, Download, RefreshCw, Settings as SettingsIcon, Cpu, FolderPlus, LogOut, Zap } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { toast } from "sonner";
+import { useAppUserId } from "@/hooks/use-app-user-id";
 import {
   fetchAiConfig,
   fetchAiLogs,
   fetchFocusExport,
   fetchGoogleCalendarStatus,
-  getDevUserId,
   getGoogleOAuthStartUrl,
   postCaldavMkcol,
   postCaldavPullNow,
@@ -21,6 +22,15 @@ import {
   type AiLogRow,
 } from "@/lib/api";
 import { Skeleton } from "@/lib/skeleton";
+import {
+  LS_AI_BUDGET,
+  LS_AI_ENERGY_SUGGEST,
+  LS_CHAT_MODEL,
+  LS_FOCUS_MODE,
+  LS_POMO_LONG,
+  LS_POMO_SHORT,
+  LS_POMO_WORK,
+} from "@/lib/planner-prefs";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -31,13 +41,22 @@ const TABS = [
 ] as const;
 
 export default function SettingsPage() {
-  const userId = getDevUserId();
+  const { data: session } = useSession();
+  const userId = useAppUserId();
   const qc = useQueryClient();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<string>(() => searchParams.get("tab") ?? "general");
   const [exporting, setExporting] = useState(false);
   const [calBusy, setCalBusy] = useState<"mkcol" | "pull" | "queue" | null>(null);
   const [googleBusy, setGoogleBusy] = useState<"pull" | "queue" | "disconnect" | null>(null);
+  const [pomoWork, setPomoWork] = useState("25");
+  const [pomoShort, setPomoShort] = useState("5");
+  const [pomoLong, setPomoLong] = useState("15");
+  const [focusModeDef, setFocusModeDef] = useState(false);
+  const [aiModel, setAiModel] = useState("");
+  const [aiBudget, setAiBudget] = useState(false);
+  const [aiEnergySuggest, setAiEnergySuggest] = useState(true);
+  const [calPrimaryOnly, setCalPrimaryOnly] = useState(true);
 
   useEffect(() => {
     const t = searchParams.get("tab");
@@ -53,9 +72,30 @@ export default function SettingsPage() {
     if (ge) toast.error(decodeURIComponent(ge));
   }, [searchParams, qc, userId]);
 
+  // AI tab: read localStorage before paint so the model select does not flash the server default first.
+  useLayoutEffect(() => {
+    if (typeof window === "undefined" || tab !== "ai") return;
+    setAiModel(localStorage.getItem(LS_CHAT_MODEL) ?? "");
+    setAiBudget(localStorage.getItem(LS_AI_BUDGET) === "1");
+    setAiEnergySuggest(localStorage.getItem(LS_AI_ENERGY_SUGGEST) !== "0");
+  }, [tab]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (tab === "focus") {
+      setPomoWork(localStorage.getItem(LS_POMO_WORK) ?? "25");
+      setPomoShort(localStorage.getItem(LS_POMO_SHORT) ?? "5");
+      setPomoLong(localStorage.getItem(LS_POMO_LONG) ?? "15");
+      setFocusModeDef(localStorage.getItem(LS_FOCUS_MODE) === "1");
+    }
+    if (tab === "calendar") {
+      setCalPrimaryOnly(localStorage.getItem("devplanner.googleImportPrimaryOnly") !== "0");
+    }
+  }, [tab]);
+
   const logsQ = useQuery({
     queryKey: ["ai-logs", userId],
-    queryFn: () => fetchAiLogs(userId, 40),
+    queryFn: () => fetchAiLogs(40),
     enabled: Boolean(userId) && tab === "ai",
   });
 
@@ -63,19 +103,23 @@ export default function SettingsPage() {
     queryKey: ["ai-config"],
     queryFn: () => fetchAiConfig(),
     enabled: tab === "ai",
+    // Override Providers staleTime (30s): server key / model list must not look fresh while outdated.
+    staleTime: 0,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: "always",
   });
 
   const googleQ = useQuery({
     queryKey: ["google-cal", userId],
-    queryFn: () => fetchGoogleCalendarStatus(userId),
-    enabled: Boolean(userId) && tab === "calendar",
+    queryFn: () => fetchGoogleCalendarStatus(),
+    enabled: Boolean(userId),
   });
 
   async function downloadFocus() {
     if (!userId) return;
     setExporting(true);
     try {
-      const data = await fetchFocusExport(userId);
+      const data = await fetchFocusExport();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -108,7 +152,7 @@ export default function SettingsPage() {
     if (!userId) return;
     setCalBusy("pull");
     try {
-      const r = await postCaldavPullNow(userId);
+      const r = await postCaldavPullNow();
       if (!r.ok) {
         toast.error("Pull failed");
         return;
@@ -132,7 +176,7 @@ export default function SettingsPage() {
     if (!userId) return;
     setCalBusy("queue");
     try {
-      const r = await postCaldavPullQueued(userId);
+      const r = await postCaldavPullQueued();
       if (r.ok && r.queued) toast.success("Pull queued — ensure the worker is running");
       else toast.error(r.error ?? "Could not queue pull");
     } catch (e) {
@@ -144,14 +188,14 @@ export default function SettingsPage() {
 
   function connectGoogle() {
     if (!userId) return;
-    window.location.href = getGoogleOAuthStartUrl(userId);
+    window.location.href = getGoogleOAuthStartUrl();
   }
 
   async function disconnectGoogle() {
     if (!userId) return;
     setGoogleBusy("disconnect");
     try {
-      await postGoogleCalendarDisconnect(userId);
+      await postGoogleCalendarDisconnect();
       toast.success("Disconnected Google Calendar");
       void qc.invalidateQueries({ queryKey: ["google-cal", userId] });
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
@@ -166,7 +210,7 @@ export default function SettingsPage() {
     if (!userId) return;
     setGoogleBusy("pull");
     try {
-      const r = await postGoogleCalendarPullNow(userId);
+      const r = await postGoogleCalendarPullNow();
       if (!r.ok) {
         toast.error("Google pull failed");
         return;
@@ -188,7 +232,7 @@ export default function SettingsPage() {
     if (!userId) return;
     setGoogleBusy("queue");
     try {
-      const r = await postGoogleCalendarPullQueued(userId);
+      const r = await postGoogleCalendarPullQueued();
       if (r.ok && r.queued) toast.success("Google pull queued — ensure the worker is running");
       else toast.error("Could not queue Google pull");
     } catch (e) {
@@ -234,8 +278,16 @@ export default function SettingsPage() {
             <p className="mt-3 text-sm text-muted leading-relaxed">
               <strong className="text-foreground">Theme:</strong> use the Sun / Moon control in the sidebar (bottom) to switch light and dark mode.
             </p>
-            <div className="mt-4 rounded-lg bg-background/50 p-3 text-xs text-muted">
-              <p>User ID: <code className="text-foreground">{userId || "not set"}</code></p>
+            <div className="mt-4 rounded-lg bg-background/50 p-3 text-xs text-muted space-y-1">
+              <p>
+                Signed in as{" "}
+                <span className="text-foreground">{session?.user?.email ?? "—"}</span>
+              </p>
+              {userId && (
+                <p>
+                  Account ID: <code className="text-foreground">{userId}</code>
+                </p>
+              )}
             </div>
           </section>
         )}
@@ -253,7 +305,9 @@ export default function SettingsPage() {
                 <code className="rounded bg-background px-1 text-xs">.env</code> — see{" "}
                 <code className="rounded bg-background px-1 text-xs">.env.example</code>.
               </p>
-              {!userId && <p className="mt-2 text-xs text-muted">Set NEXT_PUBLIC_DEV_USER_ID to use this.</p>}
+              {googleQ.isLoading && (
+                <p className="mt-3 text-xs text-muted">Loading connection status…</p>
+              )}
               {googleQ.data && (
                 <div className="mt-3 rounded-lg bg-background/50 p-3 text-xs text-muted space-y-2">
                   <p>
@@ -265,12 +319,47 @@ export default function SettingsPage() {
                     Account:{" "}
                     <span className="text-foreground">{googleQ.data.connected ? "connected" : "not connected"}</span>
                   </p>
+                  {googleQ.data.connected && (
+                    <>
+                      <p>
+                        Calendar ID:{" "}
+                        <code className="text-foreground">{googleQ.data.calendarId ?? "primary"}</code>
+                      </p>
+                      <p>
+                        Last import:{" "}
+                        <span className="text-foreground">
+                          {googleQ.data.lastGooglePullAt
+                            ? new Date(googleQ.data.lastGooglePullAt).toLocaleString()
+                            : "— (run Pull from Google)"}
+                        </span>
+                      </p>
+                      <p className="text-[10px] text-muted/80">
+                        Link updated:{" "}
+                        {googleQ.data.linkUpdatedAt
+                          ? new Date(googleQ.data.linkUpdatedAt).toLocaleString()
+                          : "—"}
+                      </p>
+                    </>
+                  )}
                   {!googleQ.data.oauthConfigured && (
                     <p>
                       Add Google OAuth credentials and redirect URI{" "}
                       <code className="text-foreground">…/api/sync/google/callback</code> in Google Cloud Console.
                     </p>
                   )}
+                  <label className="flex cursor-pointer items-center gap-2 pt-1 text-[11px] text-foreground">
+                    <input
+                      type="checkbox"
+                      className="rounded"
+                      checked={calPrimaryOnly}
+                      onChange={(e) => {
+                        const on = e.target.checked;
+                        setCalPrimaryOnly(on);
+                        localStorage.setItem("devplanner.googleImportPrimaryOnly", on ? "1" : "0");
+                      }}
+                    />
+                    Import primary calendar only (preference — multi-calendar picker coming later)
+                  </label>
                 </div>
               )}
               <div className="mt-4 flex flex-wrap gap-2">
@@ -382,23 +471,81 @@ export default function SettingsPage() {
         )}
 
         {tab === "focus" && (
-          <section className="rounded-xl border border-white/10 bg-surface p-5">
-            <h2 className="text-sm font-semibold text-foreground">Focus app</h2>
-            <p className="mt-2 text-sm text-muted">
-              Export today&apos;s scheduled tasks as JSON (pomodoro estimates).
-            </p>
-            <button
-              type="button"
-              disabled={!userId || exporting}
-              className="mt-4 flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-40 hover:bg-primary-hover transition-colors"
-              onClick={() => void downloadFocus()}
-            >
-              <Download size={14} />
-              {exporting ? "Exporting…" : "Download export"}
-            </button>
-            <p className="mt-3 text-xs text-muted">
-              Import from Focus is stubbed on POST /api/focus/import.
-            </p>
+          <section className="space-y-4">
+            <div className="rounded-xl border border-white/10 bg-surface p-5">
+              <h2 className="text-sm font-semibold text-foreground">Pomodoro &amp; focus</h2>
+              <p className="mt-2 text-xs text-muted leading-relaxed">
+                Stored in this browser only. Use these values in your focus routine or a future in-app timer.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <label className="text-[11px] text-muted">
+                  Work (minutes)
+                  <input
+                    type="number"
+                    min={5}
+                    max={120}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                    value={pomoWork}
+                    onChange={(e) => setPomoWork(e.target.value)}
+                    onBlur={() => localStorage.setItem(LS_POMO_WORK, pomoWork)}
+                  />
+                </label>
+                <label className="text-[11px] text-muted">
+                  Short break
+                  <input
+                    type="number"
+                    min={1}
+                    max={60}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                    value={pomoShort}
+                    onChange={(e) => setPomoShort(e.target.value)}
+                    onBlur={() => localStorage.setItem(LS_POMO_SHORT, pomoShort)}
+                  />
+                </label>
+                <label className="text-[11px] text-muted">
+                  Long break
+                  <input
+                    type="number"
+                    min={1}
+                    max={60}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                    value={pomoLong}
+                    onChange={(e) => setPomoLong(e.target.value)}
+                    onBlur={() => localStorage.setItem(LS_POMO_LONG, pomoLong)}
+                  />
+                </label>
+              </div>
+              <label className="mt-4 flex cursor-pointer items-center gap-2 text-[11px] text-foreground">
+                <input
+                  type="checkbox"
+                  className="rounded"
+                  checked={focusModeDef}
+                  onChange={(e) => {
+                    setFocusModeDef(e.target.checked);
+                    localStorage.setItem(LS_FOCUS_MODE, e.target.checked ? "1" : "0");
+                  }}
+                />
+                Prefer focus mode (fewer distractions) by default
+              </label>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-surface p-5">
+              <h2 className="text-sm font-semibold text-foreground">Focus export</h2>
+              <p className="mt-2 text-sm text-muted">
+                Export today&apos;s scheduled tasks as JSON (pomodoro estimates).
+              </p>
+              <button
+                type="button"
+                disabled={!userId || exporting}
+                className="mt-4 flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-40"
+                onClick={() => void downloadFocus()}
+              >
+                <Download size={14} />
+                {exporting ? "Exporting…" : "Download export"}
+              </button>
+              <p className="mt-3 text-xs text-muted">
+                Import from Focus is stubbed on POST /api/focus/import.
+              </p>
+            </div>
           </section>
         )}
 
@@ -413,6 +560,18 @@ export default function SettingsPage() {
               <code className="rounded bg-background px-1">OPENAI_SMART_MODEL</code> (default{" "}
               <code className="text-foreground">gpt-4o-mini</code>).
             </p>
+            {aiConfigQ.isPending && (
+              <div className="mt-3 space-y-2">
+                <Skeleton className="h-10 w-full max-w-md rounded-lg" />
+                <Skeleton className="h-9 w-full max-w-xs rounded-lg" />
+              </div>
+            )}
+            {aiConfigQ.isError && (
+              <p className="mt-3 text-xs text-red-300">
+                Could not load AI config. Is the API running?{" "}
+                {aiConfigQ.error instanceof Error ? aiConfigQ.error.message : String(aiConfigQ.error)}
+              </p>
+            )}
             {aiConfigQ.data && (
               <div
                 className={cn(
@@ -427,13 +586,70 @@ export default function SettingsPage() {
                   : "OpenAI API key is not set — chat will show a stub message until OPENAI_API_KEY is set."}
               </div>
             )}
+            <div className="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-[11px] text-amber-100/90">
+              Never paste <code className="rounded bg-black/20 px-1">OPENAI_API_KEY</code> into the browser or
+              client-side settings — it would be exposed to anyone with access to this device. Configure keys only
+              in the API server <code className="rounded bg-black/20 px-1">.env</code>.
+            </div>
+            <div className="mt-4 space-y-3">
+              <label className="block text-[11px] text-muted">
+                Chat model (synced with AI dock)
+                {aiConfigQ.isPending ? (
+                  <Skeleton className="mt-1 h-9 w-full max-w-xs rounded-lg" />
+                ) : (
+                  <select
+                    className="mt-1 w-full max-w-xs rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                    value={
+                      aiModel ||
+                      aiConfigQ.data?.defaultChatModel ||
+                      "gpt-4o-mini"
+                    }
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setAiModel(v);
+                      localStorage.setItem(LS_CHAT_MODEL, v);
+                    }}
+                  >
+                    {(aiConfigQ.data?.allowedChatModels ?? ["gpt-4o-mini", "gpt-4o"]).map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-[11px] text-foreground">
+                <input
+                  type="checkbox"
+                  className="rounded"
+                  checked={aiBudget}
+                  onChange={(e) => {
+                    setAiBudget(e.target.checked);
+                    localStorage.setItem(LS_AI_BUDGET, e.target.checked ? "1" : "0");
+                  }}
+                />
+                Add daily budget reminder to AI messages (work/personal caps in prompts)
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-[11px] text-foreground">
+                <input
+                  type="checkbox"
+                  className="rounded"
+                  checked={aiEnergySuggest}
+                  onChange={(e) => {
+                    setAiEnergySuggest(e.target.checked);
+                    localStorage.setItem(LS_AI_ENERGY_SUGGEST, e.target.checked ? "1" : "0");
+                  }}
+                />
+                Send current physical energy to AI (from Now page / shared preference)
+              </label>
+            </div>
             <p className="mt-3 text-xs text-muted">
-              <strong className="text-foreground">Model &amp; tools</strong> are chosen in the floating AI panel (model list + “task tools” toggle). Task tools let the assistant list, create, update, delete, and reschedule tasks.
+              <strong className="text-foreground">Task tools</strong> live in the floating AI panel. They let the
+              assistant list, create, update, delete, and reschedule tasks.
             </p>
           </div>
           <section className="rounded-xl border border-white/10 bg-surface p-5">
             <h2 className="text-sm font-semibold text-foreground">AI cost log</h2>
-            {!userId && <p className="mt-2 text-sm text-muted">Set user ID to load logs.</p>}
             {logsQ.isLoading && (
               <div className="mt-3 space-y-2">
                 <Skeleton className="h-8 w-full rounded" />

@@ -37,6 +37,12 @@ export const taskPriorityEnum = pgEnum("task_priority", ["urgent", "high", "norm
 
 export const energyLevelEnum = pgEnum("energy_level", ["deep_work", "shallow", "admin", "quick_win"]);
 
+/** Cognitive load / focus depth (separate from physical energy). */
+export const workDepthEnum = pgEnum("work_depth", ["shallow", "normal", "deep"]);
+
+/** Physical energy available for the task (separate from work depth). */
+export const physicalEnergyEnum = pgEnum("physical_energy", ["low", "medium", "high"]);
+
 export const taskTypeEnum = pgEnum("task_type", ["main", "subtask"]);
 
 export const sprintStatusEnum = pgEnum("sprint_status", ["planned", "active", "completed"]);
@@ -130,6 +136,8 @@ export const tasks = pgTable(
     status: taskStatusEnum("status").notNull().default("todo"),
     priority: taskPriorityEnum("priority").notNull().default("normal"),
     energyLevel: energyLevelEnum("energy_level").notNull().default("shallow"),
+    workDepth: workDepthEnum("work_depth"),
+    physicalEnergy: physicalEnergyEnum("physical_energy"),
     taskType: taskTypeEnum("task_type").notNull().default("main"),
     parentTaskId: uuid("parent_task_id").references((): AnyPgColumn => tasks.id, { onDelete: "cascade" }),
     estimatedMinutes: integer("estimated_minutes"),

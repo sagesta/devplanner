@@ -2,6 +2,43 @@
 
 Monorepo for the **DevPlanner** spec (`../DEVPLANNER_BUILD_FLOW.md`). **Excluded:** native mobile (Expo) from the original prompt — web-only here.
 
+## Self-Hosting
+
+### Prerequisites
+
+- Docker + Docker Compose v2
+- A domain pointed at your server (or localhost for dev)
+- Google Cloud project with a Web OAuth 2.0 client
+
+### Quick start
+
+```bash
+git clone https://github.com/sagesta/devplanner.git
+cd devplanner
+./setup.sh          # creates .env from .env.example
+# Edit .env — fill in every blank value
+docker compose up -d --build
+```
+
+### Required `.env` values
+
+| Variable | Where to get it |
+|---|---|
+| `GOOGLE_CLIENT_ID` | Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client (Web) |
+| `GOOGLE_CLIENT_SECRET` | Same as above |
+| `NEXTAUTH_SECRET` | Run: `openssl rand -base64 32` |
+| `ALLOWED_EMAILS` | Your Gmail address(es), comma-separated |
+| `OPENAI_API_KEY` | https://platform.openai.com |
+| `DATABASE_URL` | Already set for Docker Compose default — change only for external DB |
+
+### Google OAuth setup
+
+1. Go to https://console.cloud.google.com → APIs & Services → Credentials
+2. Create OAuth client → Web application
+3. **Authorized JavaScript origins:** `https://yourdomain.com`
+4. **Authorized redirect URIs:** `https://yourdomain.com/api/auth/callback/google` (NextAuth). Add your API origin + `/api/sync/google/callback` for Calendar sync if you use it.
+5. Paste Client ID + Secret into `.env` (same values are used by the Next.js app and the API)
+
 ## Stack
 
 - **Web:** Next.js 14 (`apps/web`) — Board (dnd-kit), Now, Table, Backlog, Sprints, Review, Settings, brain dump, Ctrl/Cmd+K palette, AI dock, SSE idle banner, light/dark.
@@ -12,7 +49,7 @@ Monorepo for the **DevPlanner** spec (`../DEVPLANNER_BUILD_FLOW.md`). **Excluded
 
 ```bash
 cd devplanner
-cp .env.example .env
+./setup.sh
 cp apps/web/.env.local.example apps/web/.env.local
 npm run docker:infra          # DB + Redis + Radicale only (not the app images)
 npm install
@@ -26,12 +63,7 @@ If Postgres is **not** from this Compose file, connect as a superuser and run `C
 
 **Environment variables** are documented in **`.env.example`** (API + worker + Docker build args). Browser-facing `NEXT_PUBLIC_*` vars also belong in **`apps/web/.env.local`** for local Next dev — see **`apps/web/.env.local.example`**.
 
-Edit `apps/web/.env.local` (from `.env.local.example`) — set the printed UUID:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:3001
-NEXT_PUBLIC_DEV_USER_ID=<uuid>
-```
+Edit **`apps/web/.env.local`** (from `.env.local.example`) with the same auth and database values as root `.env`: `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAILS`, `DATABASE_URL`, and `NEXT_PUBLIC_API_URL`.
 
 Optional AI:
 
@@ -100,7 +132,7 @@ docker compose up -d --build
 
 Plain **`docker compose up -d`** uses existing images; add **`--build`** when Dockerfiles or app code changed.
 
-Set in **`.env`** at least: `CORS_ORIGIN`, `WEB_APP_URL`, **`NEXT_PUBLIC_API_URL`** (browser → API, e.g. `http://YOUR_SERVER:3001`), and optional **`NEXT_PUBLIC_DEV_USER_ID`**. Compose passes the `NEXT_PUBLIC_*` values into the **web** image at **build** time.
+Set in **`.env`** at least: `CORS_ORIGIN`, `WEB_APP_URL`, **`NEXT_PUBLIC_API_URL`** (browser → API), **`NEXTAUTH_SECRET`**, **`NEXTAUTH_URL`**, **`ALLOWED_EMAILS`**, **`GOOGLE_CLIENT_ID`**, **`GOOGLE_CLIENT_SECRET`**, **`DATABASE_URL`**, **`REDIS_URL`**. Compose passes `NEXT_PUBLIC_API_URL` into the **web** image at **build** time; the **web** container also receives `DATABASE_URL` and auth vars for NextAuth.
 
 **Infra only** (for **`npm run dev`** on the host — no API/web/worker images):
 

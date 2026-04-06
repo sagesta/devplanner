@@ -1,5 +1,14 @@
 /** Timeline helpers — calendar dates as `YYYY-MM-DD` (same as API task fields). */
 
+/** stress-test-fix: API may return ISO timestamps; timeline comparisons need plain YMD. */
+export function normalizeYmd(d: string | null | undefined): string | null {
+  if (d == null || d === "") return null;
+  const s = String(d);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 10);
+  return s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : null;
+}
+
 export function toYMD(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -56,6 +65,14 @@ function parseTimeToMinutes(t: string | null): number | null {
   return h * 60 + m;
 }
 
+function ymdMax(a: string, b: string): string {
+  return a.localeCompare(b) >= 0 ? a : b;
+}
+
+function ymdMin(a: string, b: string): string {
+  return a.localeCompare(b) <= 0 ? a : b;
+}
+
 export type BarLayout = {
   startIdx: number;
   spanDays: number;
@@ -63,6 +80,10 @@ export type BarLayout = {
   endFrac: number;
 };
 
+/**
+ * stress-test-fix: bar visible if scheduled/due range overlaps the timeline window
+ * (not only when anchor start falls inside the window).
+ */
 export function layoutTaskBar(
   scheduledDate: string | null,
   dueDate: string | null,
@@ -72,30 +93,51 @@ export function layoutTaskBar(
   rangeStart: string,
   numDays: number
 ): { inView: true; layout: BarLayout } | { inView: false } {
-  const anchor = scheduledDate ?? dueDate;
-  if (!anchor) return { inView: false };
+  const sd = normalizeYmd(scheduledDate);
+  const dd = normalizeYmd(dueDate);
+  const anchorStart = sd ?? dd;
+  if (!anchorStart) return { inView: false };
 
-  const idx = dayIndexInRange(anchor, rangeStart, numDays);
+  const rangeEnd = addDaysYMD(rangeStart, numDays - 1);
+  const rawEnd = dd && sd ? ymdMax(dd, sd) : (dd ?? sd ?? anchorStart);
+  const anchorEnd = rawEnd;
+
+  if (anchorStart.localeCompare(rangeEnd) > 0 || anchorEnd.localeCompare(rangeStart) < 0) {
+    return { inView: false };
+  }
+
+  const visibleStart = ymdMax(anchorStart, rangeStart);
+  const visibleEnd = ymdMin(anchorEnd, rangeEnd);
+
+  const idx = dayIndexInRange(visibleStart, rangeStart, numDays);
   if (idx === null) return { inView: false };
+
+  const endIdx = dayIndexInRange(visibleEnd, rangeStart, numDays);
+  if (endIdx === null) return { inView: false };
+
+  let spanDays = Math.max(1, endIdx - idx + 1);
+  spanDays = Math.min(spanDays, Math.max(1, numDays - idx));
 
   let startFrac = 0;
   let endFrac = 1;
-  let spanDays = 1;
 
   const startM = parseTimeToMinutes(scheduledStartTime);
   const endM = parseTimeToMinutes(scheduledEndTime);
+  const sameDayAsScheduled =
+    sd &&
+    visibleStart === sd &&
+    sd.localeCompare(rangeStart) >= 0 &&
+    sd.localeCompare(rangeEnd) <= 0;
 
-  if (scheduledDate && startM != null && endM != null && endM > startM) {
+  if (sameDayAsScheduled && startM != null && endM != null && endM > startM) {
     startFrac = startM / (24 * 60);
     endFrac = endM / (24 * 60);
-    spanDays = 1;
+    spanDays = Math.min(spanDays, 1);
   } else if (estimatedMinutes != null && estimatedMinutes > 0) {
-    spanDays = Math.max(1, Math.min(7, Math.ceil(estimatedMinutes / 360)));
+    spanDays = Math.max(1, Math.min(spanDays, Math.ceil(estimatedMinutes / 360)));
     const dayPortion = Math.min(1, estimatedMinutes / (8 * 60));
     endFrac = spanDays === 1 ? Math.max(0.12, dayPortion) : 1;
   }
-
-  spanDays = Math.min(spanDays, Math.max(1, numDays - idx));
 
   return {
     inView: true,

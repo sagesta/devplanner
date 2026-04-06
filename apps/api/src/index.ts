@@ -3,6 +3,9 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { pool } from "./db/client.js";
+import { validateEnv } from "./lib/validateEnv.js";
+import { aiRateLimit } from "./middleware/aiRateLimit.js";
+import { requireAuth } from "./middleware/requireAuth.js";
 import { aiRoutes } from "./routes/ai.js";
 import { areaRoutes } from "./routes/areas.js";
 import { eventRoutes } from "./routes/events.js";
@@ -11,8 +14,11 @@ import { projectRoutes } from "./routes/projects.js";
 import { sprintRoutes } from "./routes/sprints.js";
 import { syncRoutes } from "./routes/sync.js";
 import { taskRoutes } from "./routes/tasks.js";
+import type { AppEnv } from "./types.js";
 
-const app = new Hono();
+validateEnv();
+
+const app = new Hono<AppEnv>();
 
 // ─── Middleware ────────────────────────────────────────────────────
 app.use("*", logger());
@@ -20,11 +26,20 @@ app.use("*", logger());
 app.use(
   "*",
   cors({
-    origin: process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:3000"],
+    origin: (origin) => {
+      const raw = process.env.CORS_ORIGIN ?? "http://localhost:3000";
+      const list = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      if (!origin) return list[0] ?? "http://localhost:3000";
+      return list.includes(origin) ? origin : null;
+    },
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type"],
+    allowHeaders: ["Content-Type", "Cookie"],
+    credentials: true,
   })
 );
+
+app.use("*", requireAuth);
+app.use("*", aiRateLimit);
 
 // Request timing
 app.use("*", async (c, next) => {
@@ -58,6 +73,8 @@ app.get("/", (c) =>
 );
 
 app.get("/health", (c) => c.json({ ok: true, uptime: process.uptime() }));
+
+app.get("/api/health", (c) => c.json({ ok: true, uptime: process.uptime() }));
 
 app.get("/health/db", async (c) => {
   try {

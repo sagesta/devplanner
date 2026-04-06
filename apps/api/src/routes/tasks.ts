@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/client.js";
@@ -12,7 +12,6 @@ const uuidParam = z.string().uuid();
 const createBody = z.object({
   title: z.string().min(1).max(500),
   areaId: z.string().uuid(),
-  userId: z.string().uuid(),
   projectId: z.string().uuid().optional().nullable(),
   sprintId: z.string().uuid().optional().nullable(),
   parentTaskId: z.string().uuid().optional().nullable(),
@@ -30,12 +29,33 @@ const createBody = z.object({
   dueDate: z.string().optional().nullable(),
   recurrenceRule: z.string().optional().nullable(),
   tags: z.array(z.string()).optional().nullable(),
+  workDepth: z.enum(["shallow", "normal", "deep"]).optional().nullable(),
+  physicalEnergy: z.enum(["low", "medium", "high"]).optional().nullable(),
 });
 
-const patchBody = createBody.partial().omit({ userId: true });
+const patchBody = createBody.partial();
+
+/** stress-test-fix: reject calendar dates absurdly far in the future (bad imports / typos). */
+function assertSaneCalendarDate(field: string, value: string | null | undefined): void {
+  if (value == null || value === "") return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`Invalid ${field}`);
+  }
+  const y = Number(value.slice(0, 4));
+  const maxY = new Date().getUTCFullYear() + 2;
+  if (y > maxY) {
+    throw new Error(`${field} cannot be more than 2 years in the future`);
+  }
+}
+
+function withTaskApiFields<T extends { recurrenceRule: string | null }>(t: T) {
+  return {
+    ...t,
+    recurring: Boolean(t.recurrenceRule?.trim()),
+  };
+}
 
 const brainDumpBody = z.object({
-  userId: z.string().uuid(),
   areaId: z.string().uuid(),
   lines: z.union([z.array(z.string()), z.string()]),
   scheduledDate: z.string().optional().nullable(),
@@ -45,7 +65,6 @@ const brainDumpBody = z.object({
 });
 
 const bulkStatusBody = z.object({
-  userId: z.string().uuid(),
   taskIds: z.array(z.string().uuid()).min(1),
   status: z.enum(["backlog", "todo", "in_progress", "done", "cancelled", "blocked"]),
 });
@@ -53,17 +72,14 @@ const bulkStatusBody = z.object({
 // Allowlist of patchable fields for cleaner update logic
 const PATCH_FIELDS = [
   "title", "description", "projectId", "sprintId", "parentTaskId", "areaId",
-  "priority", "energyLevel", "taskType", "scheduledDate",
+  "priority", "energyLevel", "workDepth", "physicalEnergy", "taskType", "scheduledDate",
   "scheduledStartTime", "scheduledEndTime", "estimatedMinutes", "dueDate",
   "recurrenceRule", "tags",
 ] as const;
 
 export const taskRoutes = new Hono<AppEnv>()
   .get("/", async (c) => {
-    const userId = c.req.query("userId");
-    if (!userId) {
-      return c.json({ error: "userId query required" }, 400);
-    }
+    const userId = c.get("userId");
     const sprintId = c.req.query("sprintId");
     const whereClause =
       sprintId != null && sprintId !== ""
@@ -100,7 +116,7 @@ export const taskRoutes = new Hono<AppEnv>()
     const enriched = rows.map((t) => {
       const progress = subtaskMap[t.id];
       return {
-        ...t,
+        ...withTaskApiFields(t),
         _subtasksDone: progress?.done ?? 0,
         _subtasksTotal: progress?.total ?? 0,
       };
@@ -109,38 +125,49 @@ export const taskRoutes = new Hono<AppEnv>()
     return c.json({ tasks: enriched });
   })
   .get("/today", async (c) => {
-    const userId = c.req.query("userId");
-    if (!userId) {
-      return c.json({ error: "userId query required" }, 400);
-    }
+    const userId = c.get("userId");
     const dateParam = c.req.query("date");
     const today =
       dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
         ? dateParam
         : new Date().toISOString().slice(0, 10);
+    // stress-test-fix: today = scheduled_date OR due_date (include subtasks with slots on this day).
     const rows = await db.query.tasks.findMany({
-      where: and(eq(tasks.userId, userId), eq(tasks.scheduledDate, today)),
-      orderBy: (t, { desc: descFn, asc: ascFn }) => [descFn(t.priority), ascFn(t.scheduledStartTime)],
+      where: and(
+        eq(tasks.userId, userId),
+        or(eq(tasks.scheduledDate, today), eq(tasks.dueDate, today))
+      ),
+      orderBy: [
+        sql`${tasks.scheduledStartTime} ASC NULLS LAST`,
+        desc(tasks.priority),
+        sql`${tasks.createdAt} ASC`,
+      ],
     });
-    return c.json({ tasks: rows, date: today });
+    return c.json({
+      tasks: rows.map((t) => withTaskApiFields(t)),
+      date: today,
+    });
   })
   .get("/backlog", async (c) => {
-    const userId = c.req.query("userId");
-    if (!userId) {
-      return c.json({ error: "userId query required" }, 400);
-    }
+    const userId = c.get("userId");
     const rows = await db.query.tasks.findMany({
       where: and(eq(tasks.userId, userId), isNull(tasks.sprintId), isNull(tasks.parentTaskId)),
       orderBy: (t, { asc: ascFn }) => [ascFn(t.sortOrder), ascFn(t.createdAt)],
     });
-    return c.json({ tasks: rows });
+    return c.json({ tasks: rows.map((t) => withTaskApiFields(t)) });
   })
   .post("/brain-dump", async (c) => {
     const parsed = brainDumpBody.safeParse(await c.req.json());
     if (!parsed.success) {
       return c.json({ error: parsed.error.flatten() }, 422);
     }
-    const { userId, areaId } = parsed.data;
+    const userId = c.get("userId");
+    const { areaId } = parsed.data;
+    try {
+      assertSaneCalendarDate("scheduledDate", parsed.data.scheduledDate ?? undefined);
+    } catch (e) {
+      return c.json({ error: String(e) }, 422);
+    }
     const areaOk = await db
       .select({ id: areas.id })
       .from(areas)
@@ -187,14 +214,18 @@ export const taskRoutes = new Hono<AppEnv>()
         action: "create",
       }).catch(() => {});
     }
-    return c.json({ tasks: inserted, count: inserted.length }, 201);
+    return c.json(
+      { tasks: inserted.map((t) => withTaskApiFields(t)), count: inserted.length },
+      201
+    );
   })
   .post("/bulk-status", async (c) => {
     const parsed = bulkStatusBody.safeParse(await c.req.json());
     if (!parsed.success) {
       return c.json({ error: parsed.error.flatten() }, 422);
     }
-    const { userId, taskIds, status } = parsed.data;
+    const userId = c.get("userId");
+    const { taskIds, status } = parsed.data;
     const completedAt = status === "done" ? new Date() : null;
     const updated = await db
       .update(tasks)
@@ -224,10 +255,7 @@ export const taskRoutes = new Hono<AppEnv>()
       return c.json({ error: "invalid id" }, 400);
     }
     const id = idParsed.data;
-    const userId = c.req.query("userId");
-    if (!userId) {
-      return c.json({ error: "userId query required" }, 400);
-    }
+    const userId = c.get("userId");
     const task = await db.query.tasks.findFirst({
       where: and(eq(tasks.id, id), eq(tasks.userId, userId)),
     });
@@ -240,7 +268,7 @@ export const taskRoutes = new Hono<AppEnv>()
     });
     const subtasksDone = subtasks.filter((s) => s.status === "done").length;
     return c.json({
-      task,
+      task: withTaskApiFields(task),
       subtasks,
       subtaskProgress: subtasks.length ? { done: subtasksDone, total: subtasks.length } : null,
     });
@@ -251,10 +279,17 @@ export const taskRoutes = new Hono<AppEnv>()
       return c.json({ error: parsed.error.flatten() }, 422);
     }
     const v = parsed.data;
+    const userId = c.get("userId");
+    try {
+      assertSaneCalendarDate("scheduledDate", v.scheduledDate ?? undefined);
+      assertSaneCalendarDate("dueDate", v.dueDate ?? undefined);
+    } catch (e) {
+      return c.json({ error: String(e) }, 422);
+    }
     const [row] = await db
       .insert(tasks)
       .values({
-        userId: v.userId,
+        userId,
         areaId: v.areaId,
         title: v.title,
         projectId: v.projectId ?? null,
@@ -263,6 +298,8 @@ export const taskRoutes = new Hono<AppEnv>()
         status: v.status ?? "todo",
         priority: v.priority ?? "normal",
         energyLevel: v.energyLevel ?? "shallow",
+        workDepth: v.workDepth ?? "normal",
+        physicalEnergy: v.physicalEnergy ?? "medium",
         taskType: v.parentTaskId ? "subtask" : (v.taskType ?? "main"),
         scheduledDate: v.scheduledDate ?? null,
         scheduledStartTime: v.scheduledStartTime ?? null,
@@ -285,7 +322,7 @@ export const taskRoutes = new Hono<AppEnv>()
       googleEventId: row.googleEventId,
       action: "create",
     }).catch(() => {});
-    return c.json({ task: row }, 201);
+    return c.json({ task: withTaskApiFields(row) }, 201);
   })
   .patch("/:id", async (c) => {
     const idParsed = uuidParam.safeParse(c.req.param("id"));
@@ -298,6 +335,12 @@ export const taskRoutes = new Hono<AppEnv>()
       return c.json({ error: parsed.error.flatten() }, 422);
     }
     const v = parsed.data;
+    try {
+      if (v.scheduledDate !== undefined) assertSaneCalendarDate("scheduledDate", v.scheduledDate);
+      if (v.dueDate !== undefined) assertSaneCalendarDate("dueDate", v.dueDate);
+    } catch (e) {
+      return c.json({ error: String(e) }, 422);
+    }
     const updates: Partial<typeof tasks.$inferInsert> = {
       updatedAt: new Date(),
     };
@@ -317,7 +360,12 @@ export const taskRoutes = new Hono<AppEnv>()
         updates.idleFlaggedAt = null;
       }
     }
-    const [row] = await db.update(tasks).set(updates).where(eq(tasks.id, id)).returning();
+    const userId = c.get("userId");
+    const [row] = await db
+      .update(tasks)
+      .set(updates)
+      .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+      .returning();
     if (!row) {
       return c.json({ error: "not found" }, 404);
     }
@@ -332,7 +380,7 @@ export const taskRoutes = new Hono<AppEnv>()
       googleEventId: row.googleEventId,
       action: "update",
     }).catch(() => {});
-    return c.json({ task: row });
+    return c.json({ task: withTaskApiFields(row) });
   })
   .delete("/:id", async (c) => {
     const idParsed = uuidParam.safeParse(c.req.param("id"));
@@ -340,13 +388,11 @@ export const taskRoutes = new Hono<AppEnv>()
       return c.json({ error: "invalid id" }, 400);
     }
     const id = idParsed.data;
-    const userId = c.req.query("userId");
-    // Security: scope delete to the requesting user if userId is provided
-    const whereClause = userId
-      ? and(eq(tasks.id, id), eq(tasks.userId, userId))
-      : eq(tasks.id, id);
-
-    const [row] = await db.delete(tasks).where(whereClause).returning();
+    const userId = c.get("userId");
+    const [row] = await db
+      .delete(tasks)
+      .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+      .returning();
     if (!row) {
       return c.json({ error: "not found" }, 404);
     }

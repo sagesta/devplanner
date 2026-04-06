@@ -1,5 +1,7 @@
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
-import { z } from "zod";
+import { db } from "../db/client.js";
+import { googleCalendarLinks, tasks } from "../db/schema.js";
 import { caldavEnabled } from "../caldav/config.js";
 import { runCaldavPullForUser } from "../caldav/pull-sync.js";
 import { ensureCalendarCollection } from "../caldav/radicale-client.js";
@@ -16,10 +18,6 @@ import { runGooglePullForUser } from "../google/sync-engine.js";
 import { enqueueCaldavPull, enqueueGoogleCalendarPull } from "../queues/definitions.js";
 import type { AppEnv } from "../types.js";
 
-const userBody = z.object({
-  userId: z.string().uuid(),
-});
-
 function webAppOrigin(): string {
   const u = process.env.WEB_APP_URL?.trim();
   if (u) return u.replace(/\/$/, "");
@@ -30,18 +28,14 @@ function webAppOrigin(): string {
 
 export const syncRoutes = new Hono<AppEnv>()
   .get("/google/start", (c) => {
-    const userId = c.req.query("userId");
-    const uidOk = userId ? z.string().uuid().safeParse(userId).success : false;
-    if (!uidOk) {
-      return c.json({ error: "userId query (uuid) required" }, 400);
-    }
+    const userId = c.get("userId");
     if (!googleCalendarConfigured()) {
       return c.json(
         { error: "Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_OAUTH_REDIRECT_URI in API .env" },
         503
       );
     }
-    const url = buildGoogleAuthorizeUrl(userId!);
+    const url = buildGoogleAuthorizeUrl(userId);
     if (!url) return c.json({ error: "Google OAuth not configured" }, 503);
     return c.redirect(url, 302);
   })
@@ -75,35 +69,37 @@ export const syncRoutes = new Hono<AppEnv>()
     return c.redirect(`${origin}/settings?tab=calendar&google=connected`, 302);
   })
   .get("/google/status", async (c) => {
-    const userId = c.req.query("userId");
-    if (!userId || !z.string().uuid().safeParse(userId).success) {
-      return c.json({ error: "userId query (uuid) required" }, 400);
-    }
+    const userId = c.get("userId");
     const connected = await userHasGoogleLink(userId);
-    return c.json({ ok: true, connected, oauthConfigured: googleCalendarConfigured() });
+    const link = connected
+      ? await db.query.googleCalendarLinks.findFirst({
+          where: eq(googleCalendarLinks.userId, userId),
+          columns: { calendarId: true, updatedAt: true },
+        })
+      : null;
+    const [pullAgg] = await db
+      .select({ last: sql<Date | null>`max(${tasks.googleLastPullAt})` })
+      .from(tasks)
+      .where(and(eq(tasks.userId, userId), isNotNull(tasks.googleLastPullAt)));
+    return c.json({
+      ok: true,
+      connected,
+      oauthConfigured: googleCalendarConfigured(),
+      calendarId: link?.calendarId ?? null,
+      linkUpdatedAt: link?.updatedAt?.toISOString() ?? null,
+      lastGooglePullAt: pullAgg?.last ? new Date(pullAgg.last).toISOString() : null,
+    });
   })
   .post("/google/disconnect", async (c) => {
-    const parsed = userBody.safeParse(await c.req.json());
-    if (!parsed.success) {
-      return c.json({ error: parsed.error.flatten() }, 422);
-    }
-    await disconnectGoogle(parsed.data.userId);
+    await disconnectGoogle(c.get("userId"));
     return c.json({ ok: true });
   })
   .post("/google/pull", async (c) => {
-    const parsed = userBody.safeParse(await c.req.json());
-    if (!parsed.success) {
-      return c.json({ error: parsed.error.flatten() }, 422);
-    }
-    await enqueueGoogleCalendarPull({ userId: parsed.data.userId });
+    await enqueueGoogleCalendarPull({ userId: c.get("userId") });
     return c.json({ ok: true, queued: true });
   })
   .post("/google/pull-now", async (c) => {
-    const parsed = userBody.safeParse(await c.req.json());
-    if (!parsed.success) {
-      return c.json({ error: parsed.error.flatten() }, 422);
-    }
-    const stats = await runGooglePullForUser(parsed.data.userId);
+    const stats = await runGooglePullForUser(c.get("userId"));
     return c.json({ ok: true, stats });
   })
   .post("/caldav", (c) => {
@@ -124,25 +120,17 @@ export const syncRoutes = new Hono<AppEnv>()
     return c.json({ ok: true, message: "Collection path exists or was created." });
   })
   .post("/caldav/pull", async (c) => {
-    const parsed = userBody.safeParse(await c.req.json());
-    if (!parsed.success) {
-      return c.json({ error: parsed.error.flatten() }, 422);
-    }
     if (!caldavEnabled()) {
       return c.json({ ok: false, error: "Set CALDAV_CALENDAR_URL and CALDAV_USER" }, 400);
     }
-    await enqueueCaldavPull({ userId: parsed.data.userId });
+    await enqueueCaldavPull({ userId: c.get("userId") });
     return c.json({ ok: true, queued: true });
   })
   /** Synchronous pull for ops / when Redis is down (can take several seconds). */
   .post("/caldav/pull-now", async (c) => {
-    const parsed = userBody.safeParse(await c.req.json());
-    if (!parsed.success) {
-      return c.json({ error: parsed.error.flatten() }, 422);
-    }
     if (!caldavEnabled()) {
       return c.json({ ok: false, error: "Set CALDAV_CALENDAR_URL and CALDAV_USER" }, 400);
     }
-    const stats = await runCaldavPullForUser(parsed.data.userId);
+    const stats = await runCaldavPullForUser(c.get("userId"));
     return c.json({ ok: true, stats });
   });

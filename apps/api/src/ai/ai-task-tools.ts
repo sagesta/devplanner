@@ -53,7 +53,10 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
           energyLevel: {
             type: "string",
             enum: ["deep_work", "shallow", "admin", "quick_win"],
+            description: "Cognitive / focus type (legacy field)",
           },
+          workDepth: { type: "string", enum: ["shallow", "normal", "deep"] },
+          physicalEnergy: { type: "string", enum: ["low", "medium", "high"] },
           scheduledDate: { type: "string" },
           scheduledStartTime: { type: "string", description: "HH:MM or HH:MM:SS" },
           scheduledEndTime: { type: "string" },
@@ -82,6 +85,8 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
             type: "string",
             enum: ["deep_work", "shallow", "admin", "quick_win"],
           },
+          workDepth: { type: "string", enum: ["shallow", "normal", "deep"] },
+          physicalEnergy: { type: "string", enum: ["low", "medium", "high"] },
           scheduledDate: { type: "string", description: "YYYY-MM-DD or empty to clear" },
           scheduledStartTime: { type: "string" },
           scheduledEndTime: { type: "string" },
@@ -154,9 +159,14 @@ export async function executePlannerTool(
           title: t.title,
           status: t.status,
           priority: t.priority,
+          energyLevel: t.energyLevel,
+          workDepth: t.workDepth,
+          physicalEnergy: t.physicalEnergy,
           scheduledDate: t.scheduledDate,
+          dueDate: t.dueDate,
           scheduledStartTime: t.scheduledStartTime,
           scheduledEndTime: t.scheduledEndTime,
+          recurring: Boolean(t.recurrenceRule?.trim()),
           areaId: t.areaId,
         })),
       };
@@ -206,7 +216,15 @@ export async function executePlannerTool(
             obj.energyLevel === "admin" ||
             obj.energyLevel === "quick_win"
               ? obj.energyLevel
-              : "shallow",
+              : "admin",
+          workDepth:
+            obj.workDepth === "shallow" || obj.workDepth === "normal" || obj.workDepth === "deep"
+              ? obj.workDepth
+              : "normal",
+          physicalEnergy:
+            obj.physicalEnergy === "low" || obj.physicalEnergy === "medium" || obj.physicalEnergy === "high"
+              ? obj.physicalEnergy
+              : "medium",
           taskType: "main",
           scheduledDate: typeof obj.scheduledDate === "string" ? obj.scheduledDate : null,
           scheduledStartTime: typeof obj.scheduledStartTime === "string" ? obj.scheduledStartTime : null,
@@ -259,6 +277,16 @@ export async function executePlannerTool(
         obj.energyLevel === "quick_win"
       ) {
         updates.energyLevel = obj.energyLevel;
+      }
+      if (obj.workDepth === "shallow" || obj.workDepth === "normal" || obj.workDepth === "deep") {
+        updates.workDepth = obj.workDepth;
+      }
+      if (
+        obj.physicalEnergy === "low" ||
+        obj.physicalEnergy === "medium" ||
+        obj.physicalEnergy === "high"
+      ) {
+        updates.physicalEnergy = obj.physicalEnergy;
       }
       const setStr = (k: keyof typeof tasks.$inferInsert, v: unknown) => {
         if (v === undefined) return;

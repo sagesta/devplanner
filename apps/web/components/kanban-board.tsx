@@ -11,22 +11,23 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useAppUserId } from "@/hooks/use-app-user-id";
 import {
   createTask,
   deleteTask,
   fetchAreas,
   fetchTaskDetail,
   fetchTasks,
-  getDevUserId,
   patchTask,
   type AreaRow,
   type TaskRow,
 } from "@/lib/api";
 import { SkeletonCard } from "@/lib/skeleton";
-import { cn } from "@/lib/utils";
+import { cn, displayPhysicalEnergy, displayWorkDepth, isTaskOverdue } from "@/lib/utils";
 import { StatusDot, SubtaskBar, TaskCard } from "./task-card";
 
 const COLS = [
@@ -70,21 +71,22 @@ function DroppableColumn({
   count,
   children,
   onAdd,
-  emptyHint,
+  showColumnEmpty,
 }: {
   id: string;
   title: string;
   count: number;
   children: React.ReactNode;
   onAdd: () => void;
-  emptyHint?: boolean;
+  /** stress-test-fix: designed empty column state */
+  showColumnEmpty?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <section
       ref={setNodeRef}
       className={cn(
-        "min-h-[240px] rounded-xl border border-white/10 bg-surface p-3 transition-all duration-200",
+        "min-h-[260px] rounded-xl border border-white/10 bg-surface p-3 transition-all duration-200",
         isOver && "ring-2 ring-primary/50 border-primary/30 bg-surface/80"
       )}
     >
@@ -104,12 +106,22 @@ function DroppableColumn({
           <Plus size={14} />
         </button>
       </div>
-      <div className="space-y-2 stagger-list">{children}</div>
-      {emptyHint && (
-        <p className="mt-2 text-center text-[11px] text-muted/50 py-4 border border-dashed border-white/5 rounded-lg">
-          Drop tasks here or add one
-        </p>
-      )}
+      <div className="flex min-h-[200px] flex-col">
+        <div className="flex-1 space-y-2 stagger-list">{children}</div>
+        {showColumnEmpty && (
+          <div className="mt-2 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/12 bg-white/[0.02] px-4 py-10 text-center">
+            <p className="text-[11px] text-muted">No tasks here yet</p>
+            <button
+              type="button"
+              className="mt-3 text-xs font-medium text-primary hover:underline"
+              onClick={onAdd}
+            >
+              + Add task
+            </button>
+            <p className="mt-2 text-[10px] text-muted/50">Or drop a card from another column</p>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -149,7 +161,6 @@ function InlineAddTask({
   const m = useMutation({
     mutationFn: () =>
       createTask({
-        userId,
         areaId,
         title: title.trim(),
         status,
@@ -253,22 +264,31 @@ function InlineAddTask({
   );
 }
 
+function localISODate(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function KanbanBoard() {
-  const userId = getDevUserId();
+  const { status } = useSession();
+  const userId = useAppUserId();
   const qc = useQueryClient();
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [addingCol, setAddingCol] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const todayYmd = useMemo(() => localISODate(), []);
 
   const areasQ = useQuery({
     queryKey: ["areas", userId],
-    queryFn: () => fetchAreas(userId),
+    queryFn: () => fetchAreas(),
     enabled: Boolean(userId),
   });
 
   const q = useQuery({
     queryKey: ["tasks", userId],
-    queryFn: () => fetchTasks(userId),
+    queryFn: () => fetchTasks(),
     enabled: Boolean(userId),
   });
 
@@ -276,6 +296,12 @@ export function KanbanBoard() {
 
   const m = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => patchTask(id, { status }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["tasks", userId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const priMut = useMutation({
+    mutationFn: ({ id, priority }: { id: string; priority: string }) => patchTask(id, { priority }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["tasks", userId] }),
     onError: (e: Error) => toast.error(e.message),
   });
@@ -297,9 +323,10 @@ export function KanbanBoard() {
   const defaultAreaId = areasQ.data?.[0]?.id ?? "";
   const draggedTask = dragId ? roots.find((t) => t.id === dragId) : null;
 
-  if (!userId) {
-    return <p className="text-muted">Set NEXT_PUBLIC_DEV_USER_ID in .env.local</p>;
+  if (status === "loading") {
+    return <p className="text-muted">Loading…</p>;
   }
+  if (!userId) return null;
 
   return (
     <>
@@ -318,7 +345,7 @@ export function KanbanBoard() {
                 id={key}
                 title={label}
                 count={colTasks.length}
-                emptyHint={!q.isLoading && colTasks.length === 0 && addingCol !== key}
+                showColumnEmpty={!q.isLoading && colTasks.length === 0 && addingCol !== key}
                 onAdd={() => setAddingCol(addingCol === key ? null : key)}
               >
                 {q.isLoading && (
@@ -345,6 +372,10 @@ export function KanbanBoard() {
                           scheduledEndTime={t.scheduledEndTime}
                           subtasksDone={t._subtasksDone}
                           subtasksTotal={t._subtasksTotal}
+                          overdue={isTaskOverdue(t, todayYmd)}
+                          depthLabel={displayWorkDepth(t)}
+                          energyLabel={displayPhysicalEnergy(t)}
+                          onPriorityChange={(priority) => priMut.mutate({ id: t.id, priority })}
                           onStatusCycle={() => {
                             const next = STATUS_CYCLE[t.status] ?? "todo";
                             m.mutate({ id: t.id, status: next });
@@ -367,7 +398,7 @@ export function KanbanBoard() {
                             if (!confirm(`Delete “${t.title}”?`)) return;
                             void (async () => {
                               try {
-                                await deleteTask(t.id, userId);
+                                await deleteTask(t.id);
                                 toast.success("Task deleted");
                                 void qc.invalidateQueries({ queryKey: ["tasks", userId] });
                                 void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
@@ -404,6 +435,10 @@ export function KanbanBoard() {
                 priority={draggedTask.priority}
                 energyLevel={draggedTask.energyLevel}
                 areaColor={areaMap.get(draggedTask.areaId)?.color}
+                overdue={isTaskOverdue(draggedTask, todayYmd)}
+                depthLabel={displayWorkDepth(draggedTask)}
+                energyLabel={displayPhysicalEnergy(draggedTask)}
+                showStatusAdvance={false}
               />
             </div>
           )}
@@ -428,12 +463,12 @@ function TaskDrawer({
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["task", taskId],
-    queryFn: () => fetchTaskDetail(userId, taskId),
+    queryFn: () => fetchTaskDetail(taskId),
   });
 
   const areasQ = useQuery({
     queryKey: ["areas", userId],
-    queryFn: () => fetchAreas(userId),
+    queryFn: () => fetchAreas(),
     enabled: Boolean(userId),
   });
 
@@ -443,6 +478,9 @@ function TaskDrawer({
   const [endT, setEndT] = useState("");
   const [recurrence, setRecurrence] = useState("");
   const [areaId, setAreaId] = useState("");
+  const [priority, setPriority] = useState("normal");
+  const [workDepth, setWorkDepth] = useState<string>("normal");
+  const [physicalEnergy, setPhysicalEnergy] = useState<string>("medium");
 
   useEffect(() => {
     const t = q.data?.task;
@@ -455,13 +493,15 @@ function TaskDrawer({
     else if (RECURRENCE_PRESETS.some((p) => p.value === rr)) setRecurrence(rr);
     else setRecurrence("__custom");
     setAreaId(t.areaId);
+    setPriority(t.priority ?? "normal");
+    setWorkDepth(t.workDepth ?? "normal");
+    setPhysicalEnergy(t.physicalEnergy ?? "medium");
   }, [q.data?.task]);
 
   const addSub = useMutation({
     mutationFn: async () => {
       if (!title.trim() || !q.data) return null;
       return createTask({
-        userId,
         areaId: q.data.task.areaId,
         title: title.trim(),
         parentTaskId: taskId,
@@ -500,6 +540,9 @@ function TaskDrawer({
         scheduledEndTime: toPgTime(endT),
         recurrenceRule,
         areaId: areaId || q.data.task.areaId,
+        priority: priority as "urgent" | "high" | "normal" | "low",
+        workDepth: workDepth as "shallow" | "normal" | "deep",
+        physicalEnergy: physicalEnergy as "low" | "medium" | "high",
       });
     },
     onSuccess: () => {
@@ -513,7 +556,7 @@ function TaskDrawer({
   });
 
   const delTask = useMutation({
-    mutationFn: () => deleteTask(taskId, userId),
+    mutationFn: () => deleteTask(taskId),
     onSuccess: () => {
       toast.success("Task deleted");
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
@@ -575,7 +618,51 @@ function TaskDrawer({
             </div>
 
             <div className="mt-4 space-y-3 rounded-xl border border-white/10 bg-background/30 p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Schedule</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Schedule &amp; fields</p>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block text-[11px] text-muted">
+                  Priority
+                  <select
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value)}
+                  >
+                    {(["urgent", "high", "normal", "low"] as const).map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-[11px] text-muted">
+                  Depth
+                  <select
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                    value={workDepth}
+                    onChange={(e) => setWorkDepth(e.target.value)}
+                  >
+                    {(["shallow", "normal", "deep"] as const).map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="col-span-2 block text-[11px] text-muted">
+                  Physical energy
+                  <select
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                    value={physicalEnergy}
+                    onChange={(e) => setPhysicalEnergy(e.target.value)}
+                  >
+                    {(["low", "medium", "high"] as const).map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <label className="block text-[11px] text-muted">
                 Area
                 <select
@@ -644,7 +731,7 @@ function TaskDrawer({
                 className="w-full rounded-lg bg-primary py-2 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
                 onClick={() => saveMeta.mutate()}
               >
-                {saveMeta.isPending ? "Saving…" : "Save schedule & area"}
+                {saveMeta.isPending ? "Saving…" : "Save schedule & details"}
               </button>
             </div>
 

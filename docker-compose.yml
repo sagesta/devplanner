@@ -73,12 +73,16 @@ services:
       dockerfile: docker/Dockerfile.web
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
-        NEXT_PUBLIC_DEV_USER_ID: ${NEXT_PUBLIC_DEV_USER_ID:-}
     ports:
       - "${WEB_PORT:-3000}:3000"
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
+      DATABASE_URL: postgresql://devplanner:${DB_PASSWORD:-devplanner}@devplanner-db:5432/devplanner
     depends_on:
+      devplanner-db:
+        condition: service_healthy
       api:
         condition: service_healthy
     restart: unless-stopped

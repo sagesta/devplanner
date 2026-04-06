@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/client.js";
@@ -6,7 +6,6 @@ import { sprints, tasks, users } from "../db/schema.js";
 import type { AppEnv } from "../types.js";
 
 const createBody = z.object({
-  userId: z.string().uuid(),
   name: z.string().min(1).max(255),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -26,10 +25,7 @@ const patchBody = z.object({
 
 export const sprintRoutes = new Hono<AppEnv>()
   .get("/", async (c) => {
-    const userId = c.req.query("userId");
-    if (!userId) {
-      return c.json({ error: "userId query required" }, 400);
-    }
+    const userId = c.get("userId");
     // Fetch sprints with task counts
     const rows = await db
       .select()
@@ -62,8 +58,9 @@ export const sprintRoutes = new Hono<AppEnv>()
   })
   .get("/:id", async (c) => {
     const id = c.req.param("id");
+    const userId = c.get("userId");
     const row = await db.query.sprints.findFirst({
-      where: eq(sprints.id, id),
+      where: and(eq(sprints.id, id), eq(sprints.userId, userId)),
     });
     if (!row) {
       return c.json({ error: "not found" }, 404);
@@ -82,7 +79,8 @@ export const sprintRoutes = new Hono<AppEnv>()
       return c.json({ error: parsed.error.flatten() }, 422);
     }
     const v = parsed.data;
-    const owner = await db.select({ id: users.id }).from(users).where(eq(users.id, v.userId)).limit(1);
+    const userId = c.get("userId");
+    const owner = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
     if (!owner.length) {
       return c.json({ error: "user not found" }, 404);
     }
@@ -92,7 +90,7 @@ export const sprintRoutes = new Hono<AppEnv>()
     const [row] = await db
       .insert(sprints)
       .values({
-        userId: v.userId,
+        userId,
         name: v.name.trim(),
         startDate: v.startDate,
         endDate: v.endDate,
@@ -121,7 +119,12 @@ export const sprintRoutes = new Hono<AppEnv>()
     if (Object.keys(updates).length === 0) {
       return c.json({ error: "no fields to update" }, 422);
     }
-    const [row] = await db.update(sprints).set(updates).where(eq(sprints.id, id)).returning();
+    const userId = c.get("userId");
+    const [row] = await db
+      .update(sprints)
+      .set(updates)
+      .where(and(eq(sprints.id, id), eq(sprints.userId, userId)))
+      .returning();
     if (!row) {
       return c.json({ error: "not found" }, 404);
     }

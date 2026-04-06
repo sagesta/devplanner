@@ -4,8 +4,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Bot, Send, Wrench, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useAppUserId } from "@/hooks/use-app-user-id";
 import { fetchAiConfig, type AiConfigResponse } from "@/lib/api";
-import { getApiBase, getDevUserId } from "@/lib/env";
+import { getApiBase } from "@/lib/env";
+import {
+  LS_AI_BUDGET,
+  LS_AI_ENERGY_SUGGEST,
+  LS_CHAT_MODEL,
+  LS_PHYSICAL_ENERGY,
+  type PhysicalEnergyLevel,
+} from "@/lib/planner-prefs";
 import { cn } from "@/lib/utils";
 
 type Message = {
@@ -13,7 +21,6 @@ type Message = {
   content: string;
 };
 
-const LS_MODEL = "devplanner.chatModel";
 const LS_TOOLS = "devplanner.aiToolsEnabled";
 
 const SUGGESTED_PROMPTS = [
@@ -24,7 +31,7 @@ const SUGGESTED_PROMPTS = [
 ];
 
 export function AiChatDock() {
-  const userId = getDevUserId();
+  const userId = useAppUserId();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [msg, setMsg] = useState("");
@@ -38,7 +45,7 @@ export function AiChatDock() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const m = localStorage.getItem(LS_MODEL);
+    const m = localStorage.getItem(LS_CHAT_MODEL);
     if (m) setModel(m);
     setToolsEnabled(localStorage.getItem(LS_TOOLS) !== "0");
   }, []);
@@ -65,7 +72,7 @@ export function AiChatDock() {
 
   function persistModel(next: string) {
     setModel(next);
-    if (typeof window !== "undefined") localStorage.setItem(LS_MODEL, next);
+    if (typeof window !== "undefined") localStorage.setItem(LS_CHAT_MODEL, next);
   }
 
   function persistTools(on: boolean) {
@@ -75,21 +82,35 @@ export function AiChatDock() {
 
   async function send() {
     if (!userId || !msg.trim()) return;
-    const userMsg = msg.trim();
+    const displayMsg = msg.trim();
+    let apiMessage = displayMsg;
+    if (typeof window !== "undefined" && localStorage.getItem(LS_AI_BUDGET) === "1") {
+      apiMessage =
+        "[User preference: respect daily work/personal time budgets when planning.]\n" + apiMessage;
+    }
     setMsg("");
-    setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
+    setMessages((prev) => [...prev, { role: "user", content: displayMsg }]);
     setLoading(true);
     scrollToBottom();
+
+    const energySuggestOn =
+      typeof window === "undefined" || localStorage.getItem(LS_AI_ENERGY_SUGGEST) !== "0";
+    const physicalEnergy = (() => {
+      if (!energySuggestOn) return undefined;
+      const v = typeof window !== "undefined" ? localStorage.getItem(LS_PHYSICAL_ENERGY) : null;
+      return v === "low" || v === "medium" || v === "high" ? (v as PhysicalEnergyLevel) : undefined;
+    })();
 
     try {
       const res = await fetch(`${getApiBase()}/api/ai/chat`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId,
-          message: userMsg,
+          message: apiMessage,
           model: effectiveModel,
           enableTools: toolsEnabled,
+          currentPhysicalEnergy: physicalEnergy,
         }),
       });
 

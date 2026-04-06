@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { streamText } from "hono/streaming";
 import OpenAI from "openai";
@@ -11,21 +11,20 @@ import { aiCallLog, tasks } from "../db/schema.js";
 import type { AppEnv } from "../types.js";
 
 const parseDumpBody = z.object({
-  userId: z.string().uuid(),
   raw: z.string().min(1),
 });
 
 const breakdownBody = z.object({
-  userId: z.string().uuid(),
   title: z.string().min(1),
   context: z.string().optional(),
 });
 
 const chatBody = z.object({
-  userId: z.string().uuid(),
   message: z.string().min(1),
   model: z.string().optional(),
   enableTools: z.boolean().optional(),
+  /** stress-test-fix: user's current physical energy for task suggestions */
+  currentPhysicalEnergy: z.enum(["low", "medium", "high"]).optional(),
 });
 
 const ALLOWED_CHAT_MODELS = new Set(["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4"]);
@@ -40,8 +39,12 @@ async function runPlannerToolLoop(
   client: OpenAI,
   model: string,
   userId: string,
-  userMessage: string
+  userMessage: string,
+  opts?: { currentPhysicalEnergy?: "low" | "medium" | "high" }
 ): Promise<{ text: string; approxChars: number }> {
+  const energyHint = opts?.currentPhysicalEnergy
+    ? ` User context: they report physical energy right now as "${opts.currentPhysicalEnergy}"; when listing or suggesting tasks, prefer matching tasks.physicalEnergy when those fields are set.`
+    : "";
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     {
       role: "system",
@@ -50,7 +53,8 @@ async function runPlannerToolLoop(
         "When asked to list, create, update, delete, or reschedule tasks, call the appropriate tools. " +
         "For bulk deletes (e.g. all done tasks), call listTasks with status filter first, then deleteTask for each id. " +
         "After tools finish, reply in one or two short sentences confirming what changed (counts, titles). " +
-        "Be concise and ADHD-friendly.",
+        "Be concise and ADHD-friendly." +
+        energyHint,
     },
     { role: "user", content: userMessage.slice(0, 8000) },
   ];
@@ -100,16 +104,14 @@ async function runPlannerToolLoop(
 
 export const aiRoutes = new Hono<AppEnv>()
   .get("/logs", async (c) => {
-    const userId = c.req.query("userId");
+    const userId = c.get("userId");
     const limit = Math.min(100, Math.max(1, Number(c.req.query("limit") ?? "30")));
-    const rows = userId
-      ? await db
-          .select()
-          .from(aiCallLog)
-          .where(eq(aiCallLog.userId, userId))
-          .orderBy(desc(aiCallLog.createdAt))
-          .limit(limit)
-      : await db.select().from(aiCallLog).orderBy(desc(aiCallLog.createdAt)).limit(limit);
+    const rows = await db
+      .select()
+      .from(aiCallLog)
+      .where(eq(aiCallLog.userId, userId))
+      .orderBy(desc(aiCallLog.createdAt))
+      .limit(limit);
     return c.json({ logs: rows });
   })
   .post("/parse-dump", async (c) => {
@@ -117,7 +119,8 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!parsed.success) {
       return c.json({ error: parsed.error.flatten() }, 422);
     }
-    const { userId, raw } = parsed.data;
+    const userId = c.get("userId");
+    const { raw } = parsed.data;
     const model = process.env.OPENAI_FAST_MODEL ?? "gpt-4o-mini";
     try {
       const { raw: text } = await openaiJsonCompletion({
@@ -125,7 +128,7 @@ export const aiRoutes = new Hono<AppEnv>()
         jobType: "parse_dump",
         model,
         system:
-          'Return JSON: {"items":[{"title":string,"energy":"deep_work"|"shallow"|"admin"|"quick_win","priority":"urgent"|"high"|"normal"|"low","estimated_minutes":number}]}. One item per line of input.',
+          'Return JSON: {"items":[{"title":string,"energy":"deep_work"|"shallow"|"admin"|"quick_win","priority":"urgent"|"high"|"normal"|"low","estimated_minutes":number}]}. One item per line of input. Do not invent calendar dates; omit any date field unless explicitly present in input.',
         user: raw.slice(0, 12_000),
       });
       const data = JSON.parse(text) as { items?: unknown };
@@ -153,7 +156,8 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!parsed.success) {
       return c.json({ error: parsed.error.flatten() }, 422);
     }
-    const { userId, title, context } = parsed.data;
+    const userId = c.get("userId");
+    const { title, context } = parsed.data;
     const model = process.env.OPENAI_SMART_MODEL ?? "gpt-4o-mini";
     try {
       const { raw: text } = await openaiJsonCompletion({
@@ -177,23 +181,14 @@ export const aiRoutes = new Hono<AppEnv>()
     }
   })
   .post("/briefing", async (c) => {
-    let userId: string | undefined;
-    const ct = c.req.header("content-type") ?? "";
-    if (ct.includes("application/json")) {
-      const j = (await c.req.json().catch(() => null)) as { userId?: string } | null;
-      userId = j?.userId;
-    }
-    userId = userId ?? c.req.query("userId") ?? undefined;
-    const parsed = z.string().uuid().safeParse(userId);
-    if (!parsed.success) {
-      return c.json({ error: "userId required" }, 400);
-    }
-    const uid = parsed.data;
+    const uid = c.get("userId");
     const today = new Date().toISOString().slice(0, 10);
-    const openToday = await db
-      .select()
-      .from(tasks)
-      .where(and(eq(tasks.userId, uid), eq(tasks.scheduledDate, today)));
+    const openToday = await db.query.tasks.findMany({
+      where: and(
+        eq(tasks.userId, uid),
+        or(eq(tasks.scheduledDate, today), eq(tasks.dueDate, today))
+      ),
+    });
     return c.json({
       date: today,
       summary: `You have ${openToday.length} task(s) scheduled today.`,
@@ -214,6 +209,7 @@ export const aiRoutes = new Hono<AppEnv>()
       return c.json({ error: parsed.error.flatten() }, 422);
     }
     const body = parsed.data;
+    const userId = c.get("userId");
     const key = process.env.OPENAI_API_KEY?.trim();
     const client = key ? new OpenAI({ apiKey: key }) : null;
     const model = resolveChatModel(body.model);
@@ -228,14 +224,16 @@ export const aiRoutes = new Hono<AppEnv>()
         }
 
         if (useTools) {
-          const { text, approxChars } = await runPlannerToolLoop(client, model, body.userId, body.message);
+          const { text, approxChars } = await runPlannerToolLoop(client, model, userId, body.message, {
+            currentPhysicalEnergy: body.currentPhysicalEnergy,
+          });
           const chunkSize = 24;
           for (let i = 0; i < text.length; i += chunkSize) {
             await stream.write(text.slice(i, i + chunkSize));
           }
           const latencyMs = Date.now() - started;
           await logAiCall({
-            userId: body.userId,
+            userId,
             jobType: "chat_tools",
             model,
             provider: "openai",
@@ -269,7 +267,7 @@ export const aiRoutes = new Hono<AppEnv>()
         }
         const latencyMs = Date.now() - started;
         await logAiCall({
-          userId: body.userId,
+          userId,
           jobType: "chat",
           model,
           provider: "openai",

@@ -1,9 +1,11 @@
 "use client";
 
 import { CheckCircle2, Circle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+const REVIEW_LS = "devplanner.weeklyReview.v1";
 
 const STEPS = [
   { title: "Last week — review completions", hint: "What did you complete? Any wins worth celebrating?" },
@@ -16,6 +18,30 @@ const STEPS = [
 export default function ReviewPage() {
   const [step, setStep] = useState(0);
   const [notes, setNotes] = useState<string[]>(["", "", "", "", ""]);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(REVIEW_LS);
+      if (raw) {
+        const j = JSON.parse(raw) as { step?: number; notes?: string[] };
+        if (typeof j.step === "number" && j.step >= 0 && j.step < 5) setStep(j.step);
+        if (Array.isArray(j.notes) && j.notes.length === 5) setNotes(j.notes.map((x) => String(x ?? "")));
+      }
+    } catch {
+      /* ignore */
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(REVIEW_LS, JSON.stringify({ step, notes }));
+    } catch {
+      /* ignore */
+    }
+  }, [step, notes, hydrated]);
 
   return (
     <div className="max-w-xl">
@@ -73,20 +99,17 @@ export default function ReviewPage() {
           placeholder="Jot notes…"
         />
         <div className="mt-4 flex justify-between gap-2">
-          <button
-            type="button"
-            className={cn(
-              "rounded-lg px-3 py-2 text-sm transition-colors",
-              step === 0
-                ? "cursor-not-allowed text-muted/25"
-                : "text-muted hover:bg-white/5"
-            )}
-            disabled={step === 0}
-            aria-disabled={step === 0}
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
-          >
-            ← Back
-          </button>
+          {step > 0 ? (
+            <button
+              type="button"
+              className="rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-white/5"
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
+            >
+              ← Back
+            </button>
+          ) : (
+            <span />
+          )}
           {step < STEPS.length - 1 ? (
             <button
               type="button"

@@ -1,12 +1,15 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { Clock, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { fetchToday, getDevUserId, patchTask, type TaskRow } from "@/lib/api";
+import { useAppUserId } from "@/hooks/use-app-user-id";
+import { fetchToday, patchTask } from "@/lib/api";
+import { LS_PHYSICAL_ENERGY, type PhysicalEnergyLevel } from "@/lib/planner-prefs";
 import { SkeletonListItem } from "@/lib/skeleton";
-import { cn } from "@/lib/utils";
+import { cn, displayPhysicalEnergy, isTaskOverdue } from "@/lib/utils";
 
 function localISODate(d = new Date()) {
   const y = d.getFullYear();
@@ -16,14 +19,21 @@ function localISODate(d = new Date()) {
 }
 
 export default function NowPage() {
-  const userId = getDevUserId();
+  const { status } = useSession();
+  const userId = useAppUserId();
   const qc = useQueryClient();
   const [doneId, setDoneId] = useState<string | null>(null);
+  const [energyFilter, setEnergyFilter] = useState<PhysicalEnergyLevel | "">("");
   const todayLocal = useMemo(() => localISODate(), []);
+
+  useEffect(() => {
+    const v = localStorage.getItem(LS_PHYSICAL_ENERGY);
+    if (v === "low" || v === "medium" || v === "high") setEnergyFilter(v);
+  }, []);
 
   const q = useQuery({
     queryKey: ["tasks-today", userId, todayLocal],
-    queryFn: () => fetchToday(userId, todayLocal),
+    queryFn: () => fetchToday(todayLocal),
     enabled: Boolean(userId),
   });
 
@@ -46,16 +56,45 @@ export default function NowPage() {
     },
   });
 
-  if (!userId) {
-    return <p className="text-muted">Set NEXT_PUBLIC_DEV_USER_ID</p>;
+  const tasks = useMemo(() => {
+    const raw = q.data?.tasks ?? [];
+    let list = [...raw];
+    if (energyFilter) {
+      list = list.filter((t) => displayPhysicalEnergy(t) === energyFilter);
+    }
+    list.sort((a, b) => {
+      const ta = a.scheduledStartTime ?? "";
+      const tb = b.scheduledStartTime ?? "";
+      if (ta && tb) return ta.localeCompare(tb);
+      if (ta) return -1;
+      if (tb) return 1;
+      return a.title.localeCompare(b.title);
+    });
+    return list;
+  }, [q.data?.tasks, energyFilter]);
+
+  if (status === "loading") {
+    return (
+      <div className="space-y-2">
+        <SkeletonListItem />
+        <SkeletonListItem />
+      </div>
+    );
+  }
+  if (!userId) return null;
+
+  function persistEnergy(next: PhysicalEnergyLevel | "") {
+    setEnergyFilter(next);
+    if (typeof window === "undefined") return;
+    if (next) localStorage.setItem(LS_PHYSICAL_ENERGY, next);
+    else localStorage.removeItem(LS_PHYSICAL_ENERGY);
   }
 
-  const tasks = q.data?.tasks ?? [];
   const totalMinutes = tasks.reduce((sum, t) => sum + (t.estimatedMinutes ?? 0), 0);
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="font-display text-2xl text-foreground">Now</h1>
           <p className="mt-1 text-sm text-muted">
@@ -74,6 +113,25 @@ export default function NowPage() {
               </span>
             )}
           </p>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-medium uppercase tracking-wide text-muted">
+            Match my energy
+          </label>
+          <select
+            className="rounded-lg border border-white/10 bg-surface px-2 py-1.5 text-xs text-foreground"
+            value={energyFilter}
+            onChange={(e) =>
+              persistEnergy(
+                e.target.value === "" ? "" : (e.target.value as PhysicalEnergyLevel)
+              )
+            }
+          >
+            <option value="">All tasks</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
         </div>
       </div>
 
@@ -101,12 +159,20 @@ export default function NowPage() {
                 "flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-surface px-4 py-3 transition-all",
                 "hover:border-white/15 hover:shadow-md",
                 doneId === t.id && "animate-done-flash",
-                t.status === "done" && "opacity-50"
+                t.status === "done" && "opacity-50",
+                isTaskOverdue(t, todayLocal) && "border-red-500/30 ring-1 ring-red-500/10"
               )}
             >
               <div className="min-w-0 flex-1">
-                <span className="text-foreground">{t.title}</span>
-                <div className="mt-1 flex items-center gap-2 text-[11px] text-muted">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-foreground">{t.title}</span>
+                  {isTaskOverdue(t, todayLocal) && (
+                    <span className="rounded-full bg-red-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-red-200">
+                      Overdue
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted">
                   {timeBlock && (
                     <span className="flex items-center gap-1 font-mono">
                       <Clock size={10} />
@@ -116,7 +182,10 @@ export default function NowPage() {
                   {t.estimatedMinutes && (
                     <span>{t.estimatedMinutes}min</span>
                   )}
-                  <span className="capitalize">{t.energyLevel.replace("_", " ")}</span>
+                  <span title="Physical energy">E:{displayPhysicalEnergy(t)}</span>
+                  <span title="Cognitive / focus type" className="capitalize">
+                    {t.energyLevel.replace("_", " ")}
+                  </span>
                 </div>
               </div>
               <button

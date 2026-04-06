@@ -45,7 +45,8 @@ async function main() {
   }
 
   console.log("\nSet in apps/web .env.local:");
-  console.log(`NEXT_PUBLIC_DEV_USER_ID=${userId}`);
+  console.log(`Seeded user id (internal): ${userId}`);
+  console.log("Sign in with Google using this email (must be listed in ALLOWED_EMAILS).");
   console.log("\nOr pass ?userId=${userId} to API during development.");
 }
 

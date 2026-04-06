@@ -12,6 +12,8 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
+import { useAppUserId } from "@/hooks/use-app-user-id";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -21,7 +23,6 @@ import {
   fetchSprints,
   fetchTaskDetail,
   fetchTasks,
-  getDevUserId,
   patchTask,
   type AreaRow,
   type SprintRow,
@@ -32,6 +33,7 @@ import {
   barPixels,
   eachDayFrom,
   layoutTaskBar,
+  normalizeYmd,
   startOfWeekMonday,
   toYMD,
   type BarLayout,
@@ -221,7 +223,8 @@ function TimelineBar({
 }
 
 export function TimelineBoard() {
-  const userId = getDevUserId();
+  const { status } = useSession();
+  const userId = useAppUserId();
   const qc = useQueryClient();
   const [weekStart, setWeekStart] = useState(() => startOfWeekMonday(new Date()));
   const [sprintId, setSprintId] = useState<string>("");
@@ -233,19 +236,19 @@ export function TimelineBoard() {
 
   const areasQ = useQuery({
     queryKey: ["areas", userId],
-    queryFn: () => fetchAreas(userId),
+    queryFn: () => fetchAreas(),
     enabled: Boolean(userId),
   });
 
   const sprintsQ = useQuery({
     queryKey: ["sprints", userId],
-    queryFn: () => fetchSprints(userId),
+    queryFn: () => fetchSprints(),
     enabled: Boolean(userId),
   });
 
   const tasksQ = useQuery({
     queryKey: ["tasks", userId, sprintId || "all"],
-    queryFn: () => fetchTasks(userId, sprintId || undefined),
+    queryFn: () => fetchTasks(sprintId || undefined),
     enabled: Boolean(userId),
   });
 
@@ -281,8 +284,8 @@ export function TimelineBoard() {
       }
     }
     scheduled.sort((a, b) => {
-      const da = a.task.scheduledDate ?? a.task.dueDate ?? "";
-      const db = b.task.scheduledDate ?? b.task.dueDate ?? "";
+      const da = normalizeYmd(a.task.scheduledDate) ?? normalizeYmd(a.task.dueDate) ?? "";
+      const db = normalizeYmd(b.task.scheduledDate) ?? normalizeYmd(b.task.dueDate) ?? "";
       return da.localeCompare(db) || a.task.title.localeCompare(b.task.title);
     });
     return { scheduledRows: scheduled, unscheduled: unsched };
@@ -336,9 +339,10 @@ export function TimelineBoard() {
 
   const draggedUnsched = dragUnschedId ? unscheduled.find((t) => t.id === dragUnschedId) : null;
 
-  if (!userId) {
-    return <p className="text-muted">Set NEXT_PUBLIC_DEV_USER_ID in .env.local</p>;
+  if (status === "loading") {
+    return <p className="text-muted">Loading…</p>;
   }
+  if (!userId) return null;
 
   return (
     <div className="space-y-4">
@@ -516,7 +520,7 @@ function TaskDetailModal({
 }) {
   const q = useQuery({
     queryKey: ["task", taskId],
-    queryFn: () => fetchTaskDetail(userId, taskId),
+    queryFn: () => fetchTaskDetail(taskId),
   });
 
   return (

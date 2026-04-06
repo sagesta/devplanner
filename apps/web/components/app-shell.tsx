@@ -2,6 +2,7 @@
 
 import {
   BarChart3,
+  Bell,
   CalendarCheck,
   ChartGantt,
   Inbox,
@@ -15,12 +16,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { AiChatDock } from "@/components/ai-chat-dock";
 import { BrainDumpModal } from "@/components/brain-dump-modal";
 import { CommandMenu } from "@/components/command-menu";
+import { NotificationsTray } from "@/components/notifications-tray";
 import { IdleBanner } from "@/components/idle-banner";
-import { getDevUserId } from "@/lib/env";
+import { useAppUserId } from "@/hooks/use-app-user-id";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -37,6 +40,7 @@ const NAV = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [brainOpen, setBrainOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   useEffect(() => {
@@ -49,7 +53,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.setItem("devplanner-theme", theme);
   }, [theme]);
 
-  const userId = getDevUserId();
+  // stress-test-fix: Alt+T notifications tray
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === "t" || e.key === "T")) {
+        e.preventDefault();
+        setNotificationsOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const { data: session } = useSession();
+  const userId = useAppUserId();
 
   return (
     <div className="min-h-screen">
@@ -63,7 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <nav className="flex flex-1 flex-col gap-0.5 px-3 pb-4">
             {NAV.map(([href, label, Icon]) => {
-              const active = pathname === href;
+              const active = pathname === href || pathname.startsWith(`${href}/`);
               return (
                 <Link
                   key={href}
@@ -97,10 +114,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {theme === "dark" ? <Sun size={12} /> : <Moon size={12} />}
                 {theme === "dark" ? "Light" : "Dark"}
               </button>
-              <span className="text-[10px] text-muted/60">
-                {userId ? "✓ connected" : "⚠ no user"}
+              <span className="text-[10px] text-muted/60 truncate max-w-[120px]" title={session?.user?.email ?? ""}>
+                {session?.user?.email ?? (userId ? "✓ signed in" : "…")}
               </span>
             </div>
+            <button
+              type="button"
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2 text-[11px] text-muted hover:bg-white/5 hover:text-foreground transition-colors"
+              onClick={() => void signOut({ callbackUrl: "/login" })}
+            >
+              Sign out
+            </button>
             <button
               type="button"
               className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary/80 py-2 text-[11px] font-medium text-white hover:bg-primary transition-colors"
@@ -108,6 +132,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Lightbulb size={12} />
               Brain dump
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2 text-[11px] text-muted hover:bg-white/5 hover:text-foreground transition-colors"
+              onClick={() => setNotificationsOpen(true)}
+              title="Notifications (Alt+T)"
+            >
+              <Bell size={12} />
+              Alerts
             </button>
           </div>
         </aside>
@@ -132,7 +165,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label="Main"
             >
               {NAV.map(([href, label, Icon]) => {
-                const active = pathname === href;
+                const active = pathname === href || pathname.startsWith(`${href}/`);
                 return (
                   <Link
                     key={href}
@@ -155,6 +188,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       <BrainDumpModal open={brainOpen} onClose={() => setBrainOpen(false)} />
+      <NotificationsTray open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
       <CommandMenu onBrainDump={() => setBrainOpen(true)} />
       <AiChatDock />
     </div>

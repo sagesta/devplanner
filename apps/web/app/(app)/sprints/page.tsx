@@ -1,10 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { CalendarCheck, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { createSprint, fetchSprints, getDevUserId, patchSprint, type SprintRow } from "@/lib/api";
+import { useAppUserId } from "@/hooks/use-app-user-id";
+import { createSprint, fetchSprints, patchSprint, type SprintRow } from "@/lib/api";
 import { Skeleton } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +17,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function SprintsPage() {
-  const userId = getDevUserId();
+  const { status } = useSession();
+  const userId = useAppUserId();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
@@ -25,7 +28,7 @@ export default function SprintsPage() {
 
   const q = useQuery({
     queryKey: ["sprints", userId],
-    queryFn: () => fetchSprints(userId),
+    queryFn: () => fetchSprints(),
     enabled: Boolean(userId),
   });
 
@@ -39,7 +42,6 @@ export default function SprintsPage() {
   const createMut = useMutation({
     mutationFn: () =>
       createSprint({
-        userId,
         name: name.trim(),
         startDate,
         endDate,
@@ -58,7 +60,10 @@ export default function SprintsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (!userId) return <p className="text-muted">Set NEXT_PUBLIC_DEV_USER_ID</p>;
+  if (status === "loading") {
+    return <Skeleton className="h-24 w-full rounded-xl" />;
+  }
+  if (!userId) return null;
 
   return (
     <div>

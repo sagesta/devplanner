@@ -1,3 +1,12 @@
+import path from "path";
+import { fileURLToPath } from "url";
+import nextEnv from "@next/env";
+
+// Monorepo: load repo-root `.env` / `.env.local` so NextAuth + DB match the API (Next only reads `apps/web/.env*` by default).
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, "../..");
+nextEnv.loadEnvConfig(repoRoot);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,

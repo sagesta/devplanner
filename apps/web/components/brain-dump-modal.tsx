@@ -5,7 +5,7 @@ import { ChevronDown, ChevronUp, Lightbulb, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { fetchAreas, postBrainDumpLines } from "@/lib/api";
-import { getDevUserId } from "@/lib/env";
+import { useAppUserId } from "@/hooks/use-app-user-id";
 
 export function BrainDumpModal({
   open,
@@ -14,7 +14,7 @@ export function BrainDumpModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const userId = getDevUserId();
+  const userId = useAppUserId();
   const qc = useQueryClient();
   const [text, setText] = useState("");
   const [moreSchedule, setMoreSchedule] = useState(false);
@@ -38,7 +38,7 @@ export function BrainDumpModal({
 
   const areasQ = useQuery({
     queryKey: ["areas", userId],
-    queryFn: () => fetchAreas(userId),
+    queryFn: () => fetchAreas(),
     enabled: open && Boolean(userId),
   });
 
@@ -65,16 +65,29 @@ export function BrainDumpModal({
   const m = useMutation({
     mutationFn: async () => {
       const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+      let safeDate: string | null = scheduledDate || null;
+      if (safeDate) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(safeDate)) {
+          toast.error("Invalid date — use the date picker.");
+          throw new Error("invalid date");
+        }
+        const y = Number(safeDate.slice(0, 4));
+        // stress-test-fix: reject absurd future dates (bad parsing / typos)
+        if (y > new Date().getFullYear() + 2) {
+          toast.error("That year looks wrong — please pick a date within the next 2 years.");
+          throw new Error("date too far");
+        }
+      }
       const schedule =
-        scheduledDate || startT || endT || recurrence
+        safeDate || startT || endT || recurrence
           ? {
-              scheduledDate: scheduledDate || null,
+              scheduledDate: safeDate,
               scheduledStartTime: toPgTime(startT),
               scheduledEndTime: toPgTime(endT),
               recurrenceRule: recurrence || null,
             }
           : undefined;
-      return postBrainDumpLines(userId, areaId, lines, schedule);
+      return postBrainDumpLines(areaId, lines, schedule);
     },
     onSuccess: (data) => {
       toast.success(`Added ${data.count} task(s) to backlog`);
@@ -123,10 +136,7 @@ export function BrainDumpModal({
         <label className="mt-4 block text-xs font-medium text-muted">Area</label>
         {!userId ? (
           <p className="mt-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200/90">
-            Set <code className="rounded bg-black/30 px-1">NEXT_PUBLIC_DEV_USER_ID</code> in{" "}
-            <code className="rounded bg-black/30 px-1">apps/web/.env.local</code> to the UUID from{" "}
-            <code className="rounded bg-black/30 px-1">npm run seed</code>, then restart{" "}
-            <code className="rounded bg-black/30 px-1">npm run dev</code>.
+            Sign in to capture tasks. If this persists, refresh the page.
           </p>
         ) : areasQ.isError ? (
           <p className="mt-1 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200/90">

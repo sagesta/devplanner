@@ -6,10 +6,7 @@ import type { AppEnv } from "../types.js";
 
 export const focusRoutes = new Hono<AppEnv>()
   .get("/export", async (c) => {
-    const userId = c.req.query("userId");
-    if (!userId) {
-      return c.json({ error: "userId query required" }, 400);
-    }
+    const userId = c.get("userId");
     const today = new Date().toISOString().slice(0, 10);
     const rows = await db
       .select({

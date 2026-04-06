@@ -1,8 +1,11 @@
 "use client";
 
-import { memo } from "react";
+import { ChevronRight } from "lucide-react";
+import { memo, useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
+
+const PRIORITY_OPTIONS = ["low", "normal", "high", "urgent"] as const;
 
 type TaskCardProps = {
   title: string;
@@ -18,6 +21,13 @@ type TaskCardProps = {
   subtasksTotal?: number;
   compact?: boolean;
   onStatusCycle?: () => void;
+  /** stress-test-fix: keyboard/mobile status advance */
+  showStatusAdvance?: boolean;
+  /** stress-test-fix: priority dropdown on board */
+  onPriorityChange?: (priority: string) => void;
+  overdue?: boolean;
+  depthLabel?: string;
+  energyLabel?: string;
   className?: string;
 };
 
@@ -120,13 +130,33 @@ export const TaskCard = memo(function TaskCard({
   subtasksTotal,
   compact = false,
   onStatusCycle,
+  showStatusAdvance = true,
+  onPriorityChange,
+  overdue,
+  depthLabel,
+  energyLabel,
   className,
 }: TaskCardProps) {
+  const [priOpen, setPriOpen] = useState(false);
+  const priRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!priOpen) return;
+    const close = (e: MouseEvent) => {
+      if (priRef.current && !priRef.current.contains(e.target as Node)) setPriOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [priOpen]);
+
   const hasSubtasks = subtasksTotal != null && subtasksTotal > 0;
   const timeBlock =
     scheduledStartTime && scheduledEndTime
       ? `${scheduledStartTime.slice(0, 5)}–${scheduledEndTime.slice(0, 5)}`
       : null;
+
+  const depth = depthLabel ?? "normal";
+  const energy = energyLabel ?? "medium";
 
   return (
     <div
@@ -134,6 +164,7 @@ export const TaskCard = memo(function TaskCard({
         "group rounded-md border border-white/5 bg-background/90 transition-all duration-200",
         "hover:border-white/15 hover:shadow-lg hover:shadow-black/10",
         compact ? "px-2 py-1.5" : "px-3 py-2.5",
+        overdue && "border-red-500/35 ring-1 ring-red-500/15",
         className
       )}
     >
@@ -145,7 +176,23 @@ export const TaskCard = memo(function TaskCard({
             title={areaName}
           />
         )}
-        <StatusDot status={status} onClick={onStatusCycle} className="mt-1.5" />
+        <div className="mt-1 flex shrink-0 flex-col items-center gap-0.5">
+          <StatusDot status={status} onClick={onStatusCycle} />
+          {showStatusAdvance && onStatusCycle && (
+            <button
+              type="button"
+              className="rounded p-0.5 text-muted hover:bg-white/10 hover:text-foreground"
+              title="Next status"
+              aria-label="Cycle status"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStatusCycle();
+              }}
+            >
+              <ChevronRight size={12} />
+            </button>
+          )}
+        </div>
         <div className="min-w-0 flex-1">
           <p className={cn(
             "text-foreground leading-snug",
@@ -155,16 +202,62 @@ export const TaskCard = memo(function TaskCard({
             {title}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <span
-              className={cn(
-                "inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider",
-                PRIORITY_COLORS[priority] ?? PRIORITY_COLORS.normal
+            {overdue && (
+              <span className="rounded-full bg-red-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-red-200">
+                Overdue
+              </span>
+            )}
+            <div className="relative" ref={priRef}>
+              {onPriorityChange ? (
+                <>
+                  <button
+                    type="button"
+                    className={cn(
+                      "inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider hover:ring-1 hover:ring-white/20",
+                      PRIORITY_COLORS[priority] ?? PRIORITY_COLORS.normal
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPriOpen((o) => !o);
+                    }}
+                  >
+                    {priority} ▾
+                  </button>
+                  {priOpen && (
+                    <div className="absolute left-0 top-full z-20 mt-1 min-w-[120px] rounded-lg border border-white/10 bg-surface py-1 shadow-xl">
+                      {PRIORITY_OPTIONS.map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          className="block w-full px-3 py-1.5 text-left text-xs capitalize hover:bg-white/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPriorityChange(p);
+                            setPriOpen(false);
+                          }}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <span
+                  className={cn(
+                    "inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider",
+                    PRIORITY_COLORS[priority] ?? PRIORITY_COLORS.normal
+                  )}
+                >
+                  {priority}
+                </span>
               )}
-            >
-              {priority}
+            </div>
+            <span className="text-[10px] text-muted" title="Work depth (focus load)">
+              D:{depth}
             </span>
-            <span className="text-[10px] text-muted">
-              {ENERGY_ICONS[energyLevel] ?? "·"} {ENERGY_LABELS[energyLevel] ?? energyLevel}
+            <span className="text-[10px] text-muted" title="Physical energy">
+              E:{energy}
             </span>
             {timeBlock && (
               <span className="text-[10px] font-mono text-muted">{timeBlock}</span>

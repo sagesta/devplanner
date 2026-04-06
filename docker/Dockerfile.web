@@ -9,9 +9,7 @@ RUN npm ci --no-audit --no-fund
 
 FROM deps AS build
 ARG NEXT_PUBLIC_API_URL=http://localhost:3001
-ARG NEXT_PUBLIC_DEV_USER_ID=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_DEV_USER_ID=$NEXT_PUBLIC_DEV_USER_ID
 COPY apps/web apps/web
 # Next.js allows no `public/` in repo; Docker COPY requires the path to exist in the build stage.
 RUN mkdir -p apps/web/public

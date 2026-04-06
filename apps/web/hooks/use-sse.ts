@@ -1,7 +1,8 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getApiBase, getDevUserId } from "@/lib/env";
+import { getApiBase } from "@/lib/env";
 
 type IdlePayload = { taskId: string; title: string; message: string };
 
@@ -9,10 +10,11 @@ export function useTaskSse(onIdle: (payload: IdlePayload) => void) {
   const onIdleRef = useRef(onIdle);
   onIdleRef.current = onIdle;
   const [connected, setConnected] = useState(false);
+  const { data: session, status } = useSession();
+  const userId = session?.user?.id;
 
   useEffect(() => {
-    const userId = getDevUserId();
-    if (!userId) return;
+    if (status !== "authenticated" || !userId) return;
 
     let es: EventSource | null = null;
     let retryCount = 0;
@@ -21,9 +23,8 @@ export function useTaskSse(onIdle: (payload: IdlePayload) => void) {
 
     function connect() {
       if (disposed) return;
-      const url = new URL(`${getApiBase()}/api/events/user`);
-      url.searchParams.set("userId", userId);
-      es = new EventSource(url.toString());
+      const url = `${getApiBase()}/api/events/user`;
+      es = new EventSource(url, { withCredentials: true });
 
       es.addEventListener("open", () => {
         retryCount = 0;
@@ -71,7 +72,7 @@ export function useTaskSse(onIdle: (payload: IdlePayload) => void) {
       es?.close();
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, []);
+  }, [status, userId]);
 
   return { connected };
 }

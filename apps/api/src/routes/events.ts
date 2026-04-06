@@ -4,10 +4,7 @@ import { userEventBus, type SsePayload } from "../lib/bus.js";
 import type { AppEnv } from "../types.js";
 
 export const eventRoutes = new Hono<AppEnv>().get("/user", async (c) => {
-  const userId = c.req.query("userId");
-  if (!userId) {
-    return c.json({ error: "userId query required" }, 400);
-  }
+  const userId = c.get("userId");
 
   return streamSSE(c, async (stream) => {
     const handler = (payload: SsePayload) => {
