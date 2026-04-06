@@ -100,7 +100,7 @@ OPENAI_SMART_MODEL=gpt-4o-mini
 1. Start Radicale (included in **`npm run docker:infra`**, or use the full compose stack — port **5232**).
 2. Set **`CALDAV_CALENDAR_URL`** (trailing `/`), **`CALDAV_USER`**, **`CALDAV_PASSWORD`** in **`devplanner/.env`**.
 3. Run **Redis**, **`npm run worker`**, and **`npm install`** (adds **`node-ical`** for pull). Run **`npm run db:push`** after pulling latest schema (new task columns).
-4. Optional **`CALDAV_IMPORT_AREA_ID`** — area for imported events; else first area by name.
+4. Optional **`CALDAV_IMPORT_AREA_ID`** — area for imported events; else first area by sort. If the user has no areas yet (e.g. Google sign-in without `npm run seed`), the API creates default **Work** / **Personal** areas on first Google or CalDAV import.
 5. On your phone, add the same **CalDAV** account to see and edit events.
 
 ### Google Calendar — setup checklist

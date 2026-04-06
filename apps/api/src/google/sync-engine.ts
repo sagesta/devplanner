@@ -2,7 +2,8 @@ import type { calendar_v3 } from "googleapis";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { DEVPLANNER_UID_RE, parseDevplannerCaldavUid } from "../caldav/parse-incoming.js";
 import { db } from "../db/client.js";
-import { areas, googleCalendarLinks, tasks, users } from "../db/schema.js";
+import { googleCalendarLinks, tasks, users } from "../db/schema.js";
+import { resolveOrCreateImportAreaId } from "../lib/importArea.js";
 import { getCalendarForUser } from "./auth.js";
 
 function pad(n: number): string {
@@ -239,21 +240,6 @@ export function taskToGoogleEvent(
   return body;
 }
 
-async function resolveImportAreaId(userId: string): Promise<string | null> {
-  const envArea = process.env.CALDAV_IMPORT_AREA_ID?.trim();
-  if (envArea) {
-    const row = await db.query.areas.findFirst({
-      where: and(eq(areas.id, envArea), eq(areas.userId, userId)),
-    });
-    if (row) return row.id;
-  }
-  const first = await db.query.areas.findFirst({
-    where: eq(areas.userId, userId),
-    orderBy: (a, { asc }) => [asc(a.sortOrder), asc(a.name)],
-  });
-  return first?.id ?? null;
-}
-
 export async function runGooglePushJob(input: {
   userId: string;
   taskId: string;
@@ -362,9 +348,9 @@ export async function runGooglePullForUser(userId: string): Promise<{
   }
 
   const { calendar, calendarId } = bundle;
-  const areaId = await resolveImportAreaId(userId);
+  const areaId = await resolveOrCreateImportAreaId(userId);
   if (!areaId) {
-    stats.errors.push("No area for imports — create an area or set CALDAV_IMPORT_AREA_ID");
+    stats.errors.push("User not found");
     return stats;
   }
 
