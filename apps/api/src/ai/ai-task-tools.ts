@@ -1,9 +1,10 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type OpenAI from "openai";
 import { db } from "../db/client.js";
 import { areas, tasks } from "../db/schema.js";
 import { enqueueTaskCalendarSync } from "../queues/definitions.js";
 import { rollupParentTaskStatus } from "../services/task-rollup.js";
+import { liftStaleScheduleYear } from "./schedule-date-normalize.js";
 
 const STATUS_ENUM = [
   "backlog",
@@ -19,6 +20,77 @@ function addDaysISO(iso: string, delta: number): string {
   const dt = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
   dt.setUTCDate(dt.getUTCDate() + delta);
   return dt.toISOString().slice(0, 10);
+}
+
+function normYmd(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
+function liftYmd(v: unknown): string | null {
+  const s = normYmd(v);
+  return s ? liftStaleScheduleYear(s) : null;
+}
+
+async function resolveAreaForUser(
+  userId: string,
+  areaId: unknown,
+  areaKind: unknown
+): Promise<{ id: string } | { error: string }> {
+  if (typeof areaId === "string" && areaId.trim()) {
+    const ok = await db
+      .select({ id: areas.id })
+      .from(areas)
+      .where(and(eq(areas.id, areaId.trim()), eq(areas.userId, userId)))
+      .limit(1);
+    if (!ok.length) return { error: "area not found for user" };
+    return { id: areaId.trim() };
+  }
+
+  const kind = typeof areaKind === "string" ? areaKind.trim().toLowerCase() : "";
+  const aliases: Record<string, string[]> = {
+    work: ["work"],
+    personal: ["personal"],
+    sidequest: ["sidequest", "side quest"],
+  };
+
+  if (kind && aliases[kind]) {
+    const names = aliases[kind]!;
+    const rows = await db.query.areas.findMany({
+      where: eq(areas.userId, userId),
+      orderBy: (a, { asc: aAsc }) => [aAsc(a.sortOrder), aAsc(a.name)],
+    });
+    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+    for (const n of names) {
+      const hit = rows.find((r) => norm(r.name) === norm(n));
+      if (hit) return { id: hit.id };
+    }
+    if (kind === "sidequest") {
+      const maxSort = rows.reduce((m, r) => Math.max(m, r.sortOrder ?? 0), -1);
+      const [ins] = await db
+        .insert(areas)
+        .values({
+          userId,
+          name: "Sidequest",
+          color: "#9333ea",
+          sortOrder: maxSort + 1,
+        })
+        .returning({ id: areas.id });
+      if (!ins) return { error: "could not create Sidequest area" };
+      return { id: ins.id };
+    }
+    return { error: `no "${names[0]}" area — create it or pass areaId` };
+  }
+
+  const [first] = await db
+    .select({ id: areas.id })
+    .from(areas)
+    .where(eq(areas.userId, userId))
+    .orderBy(asc(areas.sortOrder))
+    .limit(1);
+  if (!first) return { error: "no areas — seed the database" };
+  return { id: first.id };
 }
 
 export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
@@ -42,12 +114,18 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
     type: "function",
     function: {
       name: "createTask",
-      description: "Create a new task. Use default area if areaId omitted (first area by sort order).",
+      description:
+        "Create a new task. Prefer areaKind work|personal|sidequest for life buckets (matches area name; creates Sidequest if missing). Otherwise areaId or first area by sort.",
       parameters: {
         type: "object",
         properties: {
           title: { type: "string" },
           areaId: { type: "string", description: "UUID" },
+          areaKind: {
+            type: "string",
+            enum: ["work", "personal", "sidequest"],
+            description: "Maps to user's area by name (case-insensitive)",
+          },
           status: { type: "string", enum: [...STATUS_ENUM] },
           priority: { type: "string", enum: ["urgent", "high", "normal", "low"] },
           energyLevel: {
@@ -78,6 +156,12 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
         type: "object",
         properties: {
           taskId: { type: "string" },
+          areaId: { type: "string", description: "UUID — move task to this area" },
+          areaKind: {
+            type: "string",
+            enum: ["work", "personal", "sidequest"],
+            description: "Move task to area by name (creates Sidequest if missing)",
+          },
           title: { type: "string" },
           status: { type: "string", enum: [...STATUS_ENUM] },
           priority: { type: "string", enum: ["urgent", "high", "normal", "low"] },
@@ -140,7 +224,7 @@ export async function executePlannerTool(
   switch (name) {
     case "listTasks": {
       const limit = Math.min(Math.max(Number(obj.limit) || 50, 1), 100);
-      const conditions = [eq(tasks.userId, userId), isNull(tasks.parentTaskId)];
+      const conditions = [eq(tasks.userId, userId), isNull(tasks.parentTaskId), isNull(tasks.deletedAt)];
       if (typeof obj.status === "string" && STATUS_ENUM.includes(obj.status as (typeof STATUS_ENUM)[number])) {
         conditions.push(eq(tasks.status, obj.status as (typeof STATUS_ENUM)[number]));
       }
@@ -152,6 +236,14 @@ export async function executePlannerTool(
         orderBy: (t, { asc }) => [asc(t.sortOrder), asc(t.createdAt)],
         limit,
       });
+      const areaIds = [...new Set(rows.map((r) => r.areaId))];
+      const areaRows =
+        areaIds.length > 0
+          ? await db.query.areas.findMany({
+              where: and(eq(areas.userId, userId), inArray(areas.id, areaIds)),
+            })
+          : [];
+      const areaNameById = new Map(areaRows.map((a) => [a.id, a.name]));
       return {
         count: rows.length,
         tasks: rows.map((t) => ({
@@ -168,30 +260,16 @@ export async function executePlannerTool(
           scheduledEndTime: t.scheduledEndTime,
           recurring: Boolean(t.recurrenceRule?.trim()),
           areaId: t.areaId,
+          areaName: areaNameById.get(t.areaId) ?? null,
         })),
       };
     }
     case "createTask": {
       const title = typeof obj.title === "string" ? obj.title.trim().slice(0, 500) : "";
       if (!title) return { error: "title required" };
-      let areaId = typeof obj.areaId === "string" ? obj.areaId : null;
-      if (areaId) {
-        const ok = await db
-          .select({ id: areas.id })
-          .from(areas)
-          .where(and(eq(areas.id, areaId), eq(areas.userId, userId)))
-          .limit(1);
-        if (!ok.length) return { error: "area not found for user" };
-      } else {
-        const [first] = await db
-          .select({ id: areas.id })
-          .from(areas)
-          .where(eq(areas.userId, userId))
-          .orderBy(asc(areas.sortOrder))
-          .limit(1);
-        if (!first) return { error: "no areas — seed the database" };
-        areaId = first.id;
-      }
+      const areaRes = await resolveAreaForUser(userId, obj.areaId, obj.areaKind);
+      if ("error" in areaRes) return { error: areaRes.error };
+      const areaId = areaRes.id;
       const status =
         typeof obj.status === "string" && STATUS_ENUM.includes(obj.status as (typeof STATUS_ENUM)[number])
           ? (obj.status as (typeof STATUS_ENUM)[number])
@@ -226,10 +304,10 @@ export async function executePlannerTool(
               ? obj.physicalEnergy
               : "medium",
           taskType: "main",
-          scheduledDate: typeof obj.scheduledDate === "string" ? obj.scheduledDate : null,
+          scheduledDate: liftYmd(obj.scheduledDate),
           scheduledStartTime: typeof obj.scheduledStartTime === "string" ? obj.scheduledStartTime : null,
           scheduledEndTime: typeof obj.scheduledEndTime === "string" ? obj.scheduledEndTime : null,
-          dueDate: typeof obj.dueDate === "string" ? obj.dueDate : null,
+          dueDate: liftYmd(obj.dueDate),
           recurrenceRule: typeof obj.recurrenceRule === "string" ? obj.recurrenceRule : null,
           estimatedMinutes: typeof obj.estimatedMinutes === "number" ? obj.estimatedMinutes : null,
           description: typeof obj.description === "string" ? obj.description : null,
@@ -249,11 +327,20 @@ export async function executePlannerTool(
       const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
       if (!taskId) return { error: "taskId required" };
       const existing = await db.query.tasks.findFirst({
-        where: and(eq(tasks.id, taskId), eq(tasks.userId, userId)),
+        where: and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)),
       });
       if (!existing) return { error: "not found" };
 
       const updates: Partial<typeof tasks.$inferInsert> = { updatedAt: new Date() };
+      if (obj.areaId !== undefined || obj.areaKind !== undefined) {
+        const hasId = typeof obj.areaId === "string" && obj.areaId.trim().length > 0;
+        const hasKind = typeof obj.areaKind === "string" && obj.areaKind.trim().length > 0;
+        if (hasId || hasKind) {
+          const ar = await resolveAreaForUser(userId, hasId ? obj.areaId : undefined, hasKind ? obj.areaKind : undefined);
+          if ("error" in ar) return { error: ar.error };
+          updates.areaId = ar.id;
+        }
+      }
       if (typeof obj.title === "string") updates.title = obj.title.trim().slice(0, 500);
       if (
         typeof obj.status === "string" &&
@@ -296,16 +383,32 @@ export async function executePlannerTool(
         }
         if (typeof v === "string") (updates as Record<string, unknown>)[k] = v;
       };
-      setStr("scheduledDate", obj.scheduledDate);
+      const setDateYmd = (k: "scheduledDate" | "dueDate", v: unknown) => {
+        if (v === undefined) return;
+        if (v === "") {
+          (updates as Record<string, unknown>)[k] = null;
+          return;
+        }
+        if (typeof v !== "string") return;
+        const t = v.trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return;
+        (updates as Record<string, unknown>)[k] = liftStaleScheduleYear(t);
+      };
+      setDateYmd("scheduledDate", obj.scheduledDate);
+      setDateYmd("dueDate", obj.dueDate);
       setStr("scheduledStartTime", obj.scheduledStartTime);
       setStr("scheduledEndTime", obj.scheduledEndTime);
-      setStr("dueDate", obj.dueDate);
       setStr("recurrenceRule", obj.recurrenceRule);
       setStr("description", obj.description);
       if (obj.estimatedMinutes === null) updates.estimatedMinutes = null;
       else if (typeof obj.estimatedMinutes === "number") updates.estimatedMinutes = obj.estimatedMinutes;
 
-      const [row] = await db.update(tasks).set(updates).where(eq(tasks.id, taskId)).returning();
+      const [row] = await db
+        .update(tasks)
+        .set(updates)
+        .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)))
+        .returning();
+      if (!row) return { error: "not found" };
       if (row.parentTaskId) await rollupParentTaskStatus(db, row.parentTaskId);
       await enqueueTaskCalendarSync({
         userId: row.userId,
@@ -320,11 +423,17 @@ export async function executePlannerTool(
     case "deleteTask": {
       const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
       if (!taskId) return { error: "taskId required" };
+      const now = new Date();
       const [row] = await db
-        .delete(tasks)
-        .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
+        .update(tasks)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)))
         .returning();
       if (!row) return { error: "not found" };
+      await db
+        .update(tasks)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(and(eq(tasks.userId, userId), eq(tasks.parentTaskId, taskId), isNull(tasks.deletedAt)));
       if (row.parentTaskId) await rollupParentTaskStatus(db, row.parentTaskId);
       await enqueueTaskCalendarSync({
         userId: row.userId,
@@ -338,9 +447,10 @@ export async function executePlannerTool(
     }
     case "rescheduleTasks": {
       const ids = Array.isArray(obj.taskIds) ? obj.taskIds.filter((x): x is string => typeof x === "string") : [];
-      const startDate = typeof obj.startDate === "string" ? obj.startDate : "";
+      const rawStart = typeof obj.startDate === "string" ? obj.startDate.trim() : "";
       if (!ids.length) return { error: "taskIds required" };
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return { error: "startDate must be YYYY-MM-DD" };
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(rawStart)) return { error: "startDate must be YYYY-MM-DD" };
+      const startDate = liftStaleScheduleYear(rawStart);
       const step = typeof obj.stepDays === "number" ? Math.min(Math.max(obj.stepDays, 1), 30) : 1;
       const assignments: { id: string; scheduledDate: string }[] = [];
       for (let i = 0; i < ids.length; i++) {
@@ -349,7 +459,7 @@ export async function executePlannerTool(
         const [row] = await db
           .update(tasks)
           .set({ scheduledDate: newDate, updatedAt: new Date() })
-          .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
+          .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)))
           .returning();
         if (row) {
           assignments.push({ id: row.id, scheduledDate: newDate });

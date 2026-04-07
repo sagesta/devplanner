@@ -1,7 +1,7 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, Download, RefreshCw, Settings as SettingsIcon, Cpu, FolderPlus, LogOut, Zap } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Calendar, Download, Layers, RefreshCw, Settings as SettingsIcon, Cpu, FolderPlus, LogOut, Zap } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useState } from "react";
@@ -10,6 +10,8 @@ import { useAppUserId } from "@/hooks/use-app-user-id";
 import {
   fetchAiConfig,
   fetchAiLogs,
+  fetchAreas,
+  patchArea,
   fetchFocusExport,
   fetchGoogleCalendarStatus,
   getGoogleOAuthStartUrl,
@@ -35,6 +37,7 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { key: "general", label: "General", icon: SettingsIcon },
+  { key: "areas", label: "Areas", icon: Layers },
   { key: "calendar", label: "Calendar", icon: Calendar },
   { key: "focus", label: "Focus", icon: Zap },
   { key: "ai", label: "AI", icon: Cpu },
@@ -60,7 +63,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const t = searchParams.get("tab");
-    if (t === "general" || t === "calendar" || t === "focus" || t === "ai") setTab(t);
+    if (t === "general" || t === "areas" || t === "calendar" || t === "focus" || t === "ai") setTab(t);
   }, [searchParams]);
 
   useEffect(() => {
@@ -295,6 +298,10 @@ export default function SettingsPage() {
               <code className="rounded bg-background px-1">NEXTAUTH_COOKIE_DOMAIN=.yourdomain.com</code> in server <code className="rounded bg-background px-1">.env</code>, rebuild/restart the <strong>web</strong> container, then sign out and sign in again. See README → &quot;401 Unauthorized&quot;.
             </p>
           </section>
+        )}
+
+        {tab === "areas" && (
+          <AreasSection userId={userId} />
         )}
 
         {tab === "calendar" && (
@@ -706,5 +713,86 @@ export default function SettingsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function AreasSection({ userId }: { userId: string | undefined }) {
+  const qc = useQueryClient();
+
+  const areasQ = useQuery({
+    queryKey: ["areas", userId],
+    queryFn: () => fetchAreas(),
+    enabled: Boolean(userId),
+  });
+
+  const updateTarget = useMutation({
+    mutationFn: ({ areaId, value }: { areaId: string; value: number | null }) =>
+      patchArea(areaId, { weekly_hour_target: value }),
+    onSuccess: () => {
+      toast.success("Saved");
+      void qc.invalidateQueries({ queryKey: ["areas", userId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <section className="rounded-xl border border-white/10 bg-surface p-5">
+      <h2 className="text-sm font-semibold text-foreground">Areas &amp; weekly hour targets</h2>
+      <p className="mt-2 text-sm text-muted leading-relaxed">
+        Set a weekly hour target for each area. This is shown in the Review time panel as a progress bar.
+      </p>
+
+      {areasQ.isLoading && (
+        <div className="mt-4 space-y-2">
+          <div className="animate-shimmer h-10 rounded" />
+          <div className="animate-shimmer h-10 rounded" />
+        </div>
+      )}
+
+      {areasQ.data && (
+        <div className="mt-4 space-y-3">
+          {areasQ.data.map((area) => (
+            <div key={area.id} className="flex items-center gap-3 rounded-lg border border-white/10 bg-background/30 px-3 py-2.5">
+              {area.color && (
+                <span
+                  className="h-3 w-3 shrink-0 rounded-full"
+                  style={{ backgroundColor: area.color }}
+                />
+              )}
+              <span className="min-w-0 flex-1 text-sm text-foreground truncate">
+                {area.name}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={0}
+                  max={168}
+                  step={0.5}
+                  className="w-20 rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground text-right"
+                  defaultValue={area.weeklyHourTarget ?? ""}
+                  placeholder="—"
+                  onBlur={(e) => {
+                    const raw = e.target.value.trim();
+                    const val = raw === "" ? null : Number(raw);
+                    const prev = area.weeklyHourTarget ? Number(area.weeklyHourTarget) : null;
+                    if (val !== prev) {
+                      updateTarget.mutate({ areaId: area.id, value: val });
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                  }}
+                />
+                <span className="text-[10px] text-muted">h/wk</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {areasQ.data && areasQ.data.length === 0 && (
+        <p className="mt-4 text-sm text-muted">No areas found. Create areas from the Board view.</p>
+      )}
+    </section>
   );
 }

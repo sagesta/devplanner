@@ -9,6 +9,8 @@ import {
   KanbanSquare,
   LayoutList,
   Lightbulb,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   Sun,
   Moon,
@@ -21,6 +23,7 @@ import { useEffect, useState } from "react";
 import { AiChatDock } from "@/components/ai-chat-dock";
 import { BrainDumpModal } from "@/components/brain-dump-modal";
 import { CommandMenu } from "@/components/command-menu";
+import { GlobalTimerIndicator } from "@/components/GlobalTimerIndicator";
 import { NotificationsTray } from "@/components/notifications-tray";
 import { IdleBanner } from "@/components/idle-banner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
@@ -40,8 +43,10 @@ const NAV = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [brainOpen, setBrainOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("devplanner-theme") as "dark" | "light" | null;
@@ -58,6 +63,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.altKey && (e.key === "t" || e.key === "T")) {
         e.preventDefault();
+        setCommandOpen(false);
+        setBrainOpen(false);
         setNotificationsOpen((o) => !o);
       }
     };
@@ -73,12 +80,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <IdleBanner />
       <div className="flex min-h-screen">
         {/* ─── Desktop sidebar ──────────────────────────────────── */}
-        <aside className="hidden w-56 shrink-0 border-r border-white/10 bg-surface md:flex md:flex-col">
-          <div className="p-5">
-            <p className="font-display text-xl text-foreground tracking-tight">DevPlanner</p>
-            <p className="mt-0.5 text-[10px] text-muted">ADHD-friendly planner</p>
+        <aside
+          className={cn(
+            "hidden shrink-0 border-r border-white/10 bg-surface md:flex md:flex-col transition-all duration-300 overflow-hidden",
+            collapsed ? "w-14" : "w-56"
+          )}
+        >
+          <div className={cn("p-5", collapsed && "px-2 py-4")}>
+            {collapsed ? (
+              <p className="font-display text-lg text-foreground text-center">D</p>
+            ) : (
+              <>
+                <p className="font-display text-xl text-foreground tracking-tight">DevPlanner</p>
+                <p className="mt-0.5 text-[10px] text-muted">ADHD-friendly planner</p>
+              </>
+            )}
           </div>
-          <nav className="flex flex-1 flex-col gap-0.5 px-3 pb-4">
+          <nav className={cn("flex flex-1 flex-col gap-0.5 pb-4", collapsed ? "px-1" : "px-3")}>
             {NAV.map(([href, label, Icon]) => {
               const active = pathname === href || pathname.startsWith(`${href}/`);
               return (
@@ -89,8 +107,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     "group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all",
                     active
                       ? "bg-primary/10 text-foreground border-l-2 border-primary pl-2.5"
-                      : "text-muted hover:bg-white/5 hover:text-foreground"
+                      : "text-muted hover:bg-white/5 hover:text-foreground",
+                    collapsed && "justify-center px-0 gap-0"
                   )}
+                  title={collapsed ? label : undefined}
                 >
                   <Icon
                     size={16}
@@ -99,48 +119,80 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       active ? "text-primary" : "text-muted group-hover:text-foreground"
                     )}
                   />
-                  {label}
+                  {!collapsed && label}
                 </Link>
               );
             })}
           </nav>
-          <div className="border-t border-white/10 p-3 space-y-2">
-            <div className="flex items-center gap-2">
+          <div className={cn("border-t border-white/10 p-3 space-y-2", collapsed && "px-1")}>
+            {!collapsed && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-[11px] text-muted hover:bg-white/10 hover:text-foreground transition-colors"
+                  onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+                >
+                  {theme === "dark" ? <Sun size={12} /> : <Moon size={12} />}
+                  {theme === "dark" ? "Light" : "Dark"}
+                </button>
+                <span className="text-[10px] text-muted/60 truncate max-w-[120px]" title={session?.user?.email ?? ""}>
+                  {session?.user?.email ?? (userId ? "✓ signed in" : "…")}
+                </span>
+              </div>
+            )}
+            {collapsed && (
               <button
                 type="button"
-                className="flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-[11px] text-muted hover:bg-white/10 hover:text-foreground transition-colors"
+                className="flex w-full justify-center rounded-lg bg-white/5 p-1.5 text-muted hover:bg-white/10 hover:text-foreground transition-colors"
                 onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+                title={theme === "dark" ? "Switch to light" : "Switch to dark"}
               >
-                {theme === "dark" ? <Sun size={12} /> : <Moon size={12} />}
-                {theme === "dark" ? "Light" : "Dark"}
+                {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
               </button>
-              <span className="text-[10px] text-muted/60 truncate max-w-[120px]" title={session?.user?.email ?? ""}>
-                {session?.user?.email ?? (userId ? "✓ signed in" : "…")}
-              </span>
-            </div>
+            )}
+            {!collapsed && (
+              <>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2 text-[11px] text-muted hover:bg-white/5 hover:text-foreground transition-colors"
+                  onClick={() => void signOut({ callbackUrl: "/login" })}
+                >
+                  Sign out
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary/80 py-2 text-[11px] font-medium text-white hover:bg-primary transition-colors"
+                  onClick={() => {
+                    setCommandOpen(false);
+                    setNotificationsOpen(false);
+                    setBrainOpen(true);
+                  }}
+                >
+                  <Lightbulb size={12} />
+                  Brain dump
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2 text-[11px] text-muted hover:bg-white/5 hover:text-foreground transition-colors"
+                  onClick={() => {
+                    setCommandOpen(false);
+                    setBrainOpen(false);
+                    setNotificationsOpen(true);
+                  }}
+                  title="Notifications (Alt+T)"
+                >
+                  <Bell size={12} />
+                  Alerts
+                </button>
+              </>
+            )}
             <button
               type="button"
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2 text-[11px] text-muted hover:bg-white/5 hover:text-foreground transition-colors"
-              onClick={() => void signOut({ callbackUrl: "/login" })}
+              className="flex w-full items-center justify-center rounded-lg p-1.5 text-muted hover:bg-white/5 hover:text-foreground transition-colors"
+              onClick={() => setCollapsed((c) => !c)}
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              Sign out
-            </button>
-            <button
-              type="button"
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary/80 py-2 text-[11px] font-medium text-white hover:bg-primary transition-colors"
-              onClick={() => setBrainOpen(true)}
-            >
-              <Lightbulb size={12} />
-              Brain dump
-            </button>
-            <button
-              type="button"
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2 text-[11px] text-muted hover:bg-white/5 hover:text-foreground transition-colors"
-              onClick={() => setNotificationsOpen(true)}
-              title="Notifications (Alt+T)"
-            >
-              <Bell size={12} />
-              Alerts
+              {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
             </button>
           </div>
         </aside>
@@ -154,7 +206,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 className="flex shrink-0 items-center gap-1 rounded-lg bg-primary/80 px-2.5 py-1.5 text-xs text-white"
-                onClick={() => setBrainOpen(true)}
+                onClick={() => {
+                  setCommandOpen(false);
+                  setBrainOpen(true);
+                }}
               >
                 <Lightbulb size={12} />
                 Dump
@@ -184,12 +239,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               })}
             </nav>
           </header>
+          {/* Desktop top bar with timer indicator */}
+          <header className="hidden md:flex items-center justify-end gap-3 border-b border-white/10 bg-surface/40 backdrop-blur-sm px-4 py-2">
+            <GlobalTimerIndicator />
+          </header>
           <main className="flex-1 p-4 md:p-6">{children}</main>
         </div>
       </div>
       <BrainDumpModal open={brainOpen} onClose={() => setBrainOpen(false)} />
       <NotificationsTray open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
-      <CommandMenu onBrainDump={() => setBrainOpen(true)} />
+      <CommandMenu
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        onBrainDump={() => {
+          setCommandOpen(false);
+          setBrainOpen(true);
+        }}
+      />
       <AiChatDock />
     </div>
   );

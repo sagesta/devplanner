@@ -65,6 +65,7 @@ export type TaskRow = {
   recurring?: boolean;
   _subtasksDone?: number;
   _subtasksTotal?: number;
+  _tags?: Array<{ id: number; name: string; color: string | null }>;
 };
 
 export type AreaRow = {
@@ -74,6 +75,7 @@ export type AreaRow = {
   color: string | null;
   icon: string | null;
   sortOrder: number;
+  weeklyHourTarget?: string | null;
 };
 
 export type SprintRow = {
@@ -117,7 +119,9 @@ export async function fetchBacklog(): Promise<TaskRow[]> {
 export async function fetchToday(date?: string) {
   const params: Record<string, string> = {};
   if (date) params.date = date;
-  return fetchJson<{ tasks: TaskRow[]; date: string }>(apiUrl("/api/tasks/today", params));
+  return fetchJson<{ tasks: TaskRow[]; date: string; doneTodayCount: number }>(
+    apiUrl("/api/tasks/today", params)
+  );
 }
 
 export async function fetchTaskDetail(taskId: string) {
@@ -162,6 +166,19 @@ export async function patchTask(taskId: string, body: Record<string, unknown>) {
 export async function deleteTask(taskId: string) {
   return fetchJson<{ ok: boolean }>(apiUrl(`/api/tasks/${taskId}`), {
     method: "DELETE",
+  });
+}
+
+export async function restoreTask(taskId: string) {
+  return fetchJson<{ task: TaskRow }>(apiUrl(`/api/tasks/restore/${taskId}`), {
+    method: "POST",
+  });
+}
+
+export async function patchTasksBulkSchedule(ids: string[], scheduledDate: string) {
+  return fetchJson<{ updated: number }>(apiUrl("/api/tasks/bulk"), {
+    method: "PATCH",
+    body: JSON.stringify({ ids, scheduledDate }),
   });
 }
 
@@ -324,5 +341,110 @@ export async function postGoogleCalendarPullNow() {
   return fetchJson<{ ok: boolean; stats: CaldavPullStats; error?: string }>(apiUrl("/api/sync/google/pull-now"), {
     method: "POST",
     body: "{}",
+  });
+}
+
+// ─── Time Logs ────────────────────────────────────────────────────
+export type TimeLogRow = {
+  id: number;
+  taskId: string;
+  startedAt: string;
+  endedAt: string | null;
+  durationSeconds: number | null;
+  note: string | null;
+  createdAt: string;
+};
+
+export type ActiveTimerRow = TimeLogRow & {
+  taskTitle: string;
+};
+
+export type TimeLogSummaryRow = {
+  taskId: string;
+  taskTitle: string;
+  areaId: string | null;
+  areaName: string | null;
+  weeklyHourTarget: string | null;
+  totalSeconds: number;
+};
+
+export async function startTimer(taskId: string) {
+  return fetchJson<{ log: TimeLogRow }>(apiUrl("/api/time-logs/start"), {
+    method: "POST",
+    body: JSON.stringify({ task_id: taskId }),
+  });
+}
+
+export async function stopTimer(logId: number) {
+  return fetchJson<{ log: TimeLogRow }>(apiUrl(`/api/time-logs/${logId}/stop`), {
+    method: "PATCH",
+  });
+}
+
+export async function fetchTimeLogs(taskId: string): Promise<TimeLogRow[]> {
+  const data = await fetchJson<{ logs: TimeLogRow[] }>(apiUrl("/api/time-logs", { task_id: taskId }));
+  return data.logs;
+}
+
+export async function fetchActiveTimer(): Promise<ActiveTimerRow | null> {
+  const data = await fetchJson<{ log: ActiveTimerRow | null }>(apiUrl("/api/time-logs/active"));
+  return data.log;
+}
+
+export async function deleteTimeLog(id: number) {
+  return fetchJson<{ ok: boolean }>(apiUrl(`/api/time-logs/${id}`), {
+    method: "DELETE",
+  });
+}
+
+export async function fetchWeekSummary(weekStart: string): Promise<TimeLogSummaryRow[]> {
+  const data = await fetchJson<{ summary: TimeLogSummaryRow[] }>(apiUrl("/api/time-logs/summary/week", { week_start: weekStart }));
+  return data.summary;
+}
+
+// ─── Tags ─────────────────────────────────────────────────────────
+export type TagRow = {
+  id: number;
+  name: string;
+  color: string | null;
+  createdAt: string;
+};
+
+export async function fetchAllTags(): Promise<TagRow[]> {
+  const data = await fetchJson<{ tags: TagRow[] }>(apiUrl("/api/tags"));
+  return data.tags;
+}
+
+export async function createTag(body: { name: string; color?: string }) {
+  return fetchJson<{ tag: TagRow }>(apiUrl("/api/tags"), {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteTag(id: number) {
+  return fetchJson<{ ok: boolean }>(apiUrl(`/api/tags/${id}`), {
+    method: "DELETE",
+  });
+}
+
+export async function setTaskTags(taskId: string, tagIds: number[]) {
+  return fetchJson<{ tags: Array<{ id: number; name: string; color: string | null }> }>(
+    apiUrl(`/api/tags/tasks/${taskId}/tags`),
+    {
+      method: "POST",
+      body: JSON.stringify({ tag_ids: tagIds }),
+    }
+  );
+}
+
+// ─── Areas (extended) ─────────────────────────────────────────────
+export async function patchArea(
+  areaId: string,
+  body: Partial<{ name: string; color: string | null; icon: string | null; sortOrder: number; weekly_hour_target: number | null }>
+) {
+  return fetchJson<{ area: AreaRow }>(apiUrl(`/api/areas/${areaId}`), {
+    method: "PATCH",
+    body: JSON.stringify(body),
   });
 }

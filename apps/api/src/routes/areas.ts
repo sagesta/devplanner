@@ -17,6 +17,7 @@ const patchBody = z.object({
   color: z.string().max(32).optional().nullable(),
   icon: z.string().max(64).optional().nullable(),
   sortOrder: z.number().int().optional(),
+  weekly_hour_target: z.number().min(0).nullable().optional(),
 });
 
 export const areaRoutes = new Hono<AppEnv>()
@@ -64,6 +65,8 @@ export const areaRoutes = new Hono<AppEnv>()
     if (v.color !== undefined) updates.color = v.color;
     if (v.icon !== undefined) updates.icon = v.icon;
     if (v.sortOrder !== undefined) updates.sortOrder = v.sortOrder;
+    if (v.weekly_hour_target !== undefined)
+      updates.weeklyHourTarget = v.weekly_hour_target != null ? String(v.weekly_hour_target) : null;
 
     if (Object.keys(updates).length === 0) {
       return c.json({ error: "no fields to update" }, 422);

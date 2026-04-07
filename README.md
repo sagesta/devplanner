@@ -59,7 +59,7 @@ Those two names mean the **same thing** here: the URL users open in the browser 
 
 ## Stack
 
-- **Web:** Next.js 14 (`apps/web`) — Board (dnd-kit), Now, Table, Backlog, Sprints, Review, Settings, brain dump, Ctrl/Cmd+K palette, AI dock, SSE idle banner, light/dark.
+- **Web:** Next.js 14 (`apps/web`) — Board (dnd-kit), Now, Table, Backlog, Sprints, Review, Settings, brain dump, Ctrl/Cmd+K palette, AI dock, SSE idle banner, light/dark. **Overdue** (red badge) uses **due date** only, not scheduled day — stale plans without a due date are not marked overdue.
 - **API:** Hono + Drizzle + Postgres (pgvector) (`apps/api`).
 - **Infra:** Docker Compose — Postgres, Redis, Radicale, and **by default** API + web + worker (`docker/Dockerfile.api`, `docker/Dockerfile.web`). Use **`npm run docker:infra`** when you only want DB/Redis/Radicale and run the app with **`npm run dev`** on the host.
 

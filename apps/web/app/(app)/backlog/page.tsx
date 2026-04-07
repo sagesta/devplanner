@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { ChevronDown, ChevronRight, Inbox } from "lucide-react";
+import { ChevronDown, ChevronRight, Inbox, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -17,6 +17,8 @@ import {
 } from "@/lib/api";
 import { SkeletonListItem } from "@/lib/skeleton";
 import { cn, displayPhysicalEnergy, displayWorkDepth, isTaskOverdue } from "@/lib/utils";
+import { TagChip } from "@/components/TagChip";
+import { TimerButton } from "@/components/TimerButton";
 
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: "bg-red-500/20 text-red-300",
@@ -189,6 +191,10 @@ export default function BacklogPage() {
                           </span>
                         )}
                         <span className="min-w-0 flex-1">{t.title}</span>
+                        {(t._tags ?? []).slice(0, 2).map((tag) => (
+                          <TagChip key={tag.id} name={tag.name} color={tag.color} size="xs" />
+                        ))}
+                        <TimerButton taskId={t.id} compact />
                         <select
                           className="max-w-[140px] rounded-md border border-white/10 bg-background px-2 py-1 text-[11px] text-muted"
                           value={t.areaId}
@@ -366,14 +372,14 @@ export default function BacklogPage() {
       )}
 
       {!q.isLoading && (q.data?.length ?? 0) === 0 && (
-        <div className="mt-12 flex flex-col items-center text-center">
-          <Inbox size={32} className="mb-3 text-primary/40" />
-          <p className="text-muted text-sm">Empty backlog.</p>
-          <p className="mt-1 text-xs text-muted/60">
-            <Link href="/board" className="text-primary hover:underline">
+        <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-surface/50 py-16 text-center">
+          <CheckCircle2 size={32} className="mb-4 text-primary/40" />
+          <p className="text-foreground font-medium text-sm">Your backlog is clean!</p>
+          <p className="mt-1 text-xs text-muted max-w-sm">
+            All caught up. Use the Brain Dump (Ctrl/Cmd+Shift+D) to capture new tasks, or head to the{" "}
+            <Link href="/board" className="text-primary hover:underline font-medium">
               Board
-            </Link>{" "}
-            or brain dump (Ctrl/Cmd+Shift+D).
+            </Link>.
           </p>
         </div>
       )}

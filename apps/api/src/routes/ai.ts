@@ -1,4 +1,4 @@
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { streamText } from "hono/streaming";
 import OpenAI from "openai";
@@ -43,8 +43,9 @@ async function runPlannerToolLoop(
   opts?: { currentPhysicalEnergy?: "low" | "medium" | "high" }
 ): Promise<{ text: string; approxChars: number }> {
   const energyHint = opts?.currentPhysicalEnergy
-    ? ` User context: they report physical energy right now as "${opts.currentPhysicalEnergy}"; when listing or suggesting tasks, prefer matching tasks.physicalEnergy when those fields are set.`
+    ? ` The user's current energy level is: ${opts.currentPhysicalEnergy}. When recommending what to do next, match task cognitive load (energyLevel / workDepth) to this level: prefer shallow and admin tasks for Low energy, routine/admin for Medium, and deep_work tasks for High when appropriate.`
     : "";
+  const todayIso = new Date().toISOString().split("T")[0]!;
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     {
       role: "system",
@@ -54,7 +55,11 @@ async function runPlannerToolLoop(
         "For bulk deletes (e.g. all done tasks), call listTasks with status filter first, then deleteTask for each id. " +
         "After tools finish, reply in one or two short sentences confirming what changed (counts, titles). " +
         "Be concise and ADHD-friendly." +
-        energyHint,
+        energyHint +
+        ` Today's date is ${todayIso}. ` +
+        "A task is overdue if its scheduledDate or dueDate (compare as YYYY-MM-DD strings to today) is before today's date AND its status is not done. " +
+        `For scheduledDate, dueDate, and reschedule startDate always use the correct four-digit year — typically ${todayIso.slice(0, 4)} for near-term plans. Do not use a past year unless the user explicitly asks for history. ` +
+        "For life buckets use createTask areaKind: work | personal | sidequest (matches area names; Sidequest is created if missing).",
     },
     { role: "user", content: userMessage.slice(0, 8000) },
   ];
@@ -186,6 +191,7 @@ export const aiRoutes = new Hono<AppEnv>()
     const openToday = await db.query.tasks.findMany({
       where: and(
         eq(tasks.userId, uid),
+        isNull(tasks.deletedAt),
         or(eq(tasks.scheduledDate, today), eq(tasks.dueDate, today))
       ),
     });
@@ -244,6 +250,10 @@ export const aiRoutes = new Hono<AppEnv>()
           return;
         }
 
+        const todayLine = new Date().toISOString().split("T")[0]!;
+        const energyLine = body.currentPhysicalEnergy
+          ? ` The user's current energy level is: ${body.currentPhysicalEnergy}. When suggesting what to do next, match task cognitive load to energy (shallow/admin for Low, deep work for High).`
+          : "";
         const resp = await client.chat.completions.create({
           model,
           stream: true,
@@ -252,7 +262,10 @@ export const aiRoutes = new Hono<AppEnv>()
             {
               role: "system",
               content:
-                "You are DevPlanner assistant: concise, ADHD-friendly. User message may reference tasks; respond helpfully in under 6 sentences.",
+                `Today's date is ${todayLine}. ` +
+                "A task is overdue if its scheduledDate or dueDate is before today's date and its status is not done. " +
+                "You are DevPlanner assistant: concise, ADHD-friendly. User message may reference tasks; respond helpfully in under 6 sentences." +
+                energyLine,
             },
             { role: "user", content: body.message.slice(0, 8000) },
           ],

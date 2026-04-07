@@ -23,7 +23,7 @@ export default function LoginPage() {
 
         <button
           type="button"
-          onClick={() => signIn("google", { callbackUrl: "/board" })}
+          onClick={() => signIn("google", { callbackUrl: "/now" })}
           className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-medium text-[#141311] transition hover:bg-white/90"
         >
           Sign in with Google

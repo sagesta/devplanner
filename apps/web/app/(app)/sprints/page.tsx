@@ -3,10 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { CalendarCheck, Plus } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { createSprint, fetchSprints, patchSprint, type SprintRow } from "@/lib/api";
+import { createSprint, fetchSprints, patchSprint } from "@/lib/api";
 import { Skeleton } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +25,10 @@ export default function SprintsPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [goal, setGoal] = useState("");
+  const [startErr, setStartErr] = useState(false);
+  const [endErr, setEndErr] = useState(false);
+  const startDateRef = useRef<HTMLInputElement>(null);
+  const endDateRef = useRef<HTMLInputElement>(null);
 
   const q = useQuery({
     queryKey: ["sprints", userId],
@@ -55,6 +59,8 @@ export default function SprintsPage() {
       setStartDate("");
       setEndDate("");
       setGoal("");
+      setStartErr(false);
+      setEndErr(false);
       void qc.invalidateQueries({ queryKey: ["sprints", userId] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -107,20 +113,38 @@ export default function SprintsPage() {
             <div>
               <label className="text-[10px] uppercase tracking-wider text-muted">Start date</label>
               <input
+                ref={startDateRef}
                 type="date"
-                className="mt-1 w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm"
+                className={cn(
+                  "mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm",
+                  startErr ? "border-red-500/70" : "border-white/10"
+                )}
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setStartErr(false);
+                }}
               />
+              {startErr && (
+                <p className="mt-1 text-xs text-red-400">This field is required.</p>
+              )}
             </div>
             <div>
               <label className="text-[10px] uppercase tracking-wider text-muted">End date</label>
               <input
+                ref={endDateRef}
                 type="date"
-                className="mt-1 w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm"
+                className={cn(
+                  "mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm",
+                  endErr ? "border-red-500/70" : "border-white/10"
+                )}
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setEndErr(false);
+                }}
               />
+              {endErr && <p className="mt-1 text-xs text-red-400">This field is required.</p>}
             </div>
           </div>
           <div className="mt-4 flex justify-end gap-2">
@@ -134,8 +158,22 @@ export default function SprintsPage() {
             <button
               type="button"
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-40 hover:bg-primary-hover transition-colors"
-              disabled={!name.trim() || !startDate || !endDate || createMut.isPending}
-              onClick={() => createMut.mutate()}
+              disabled={!name.trim() || createMut.isPending}
+              onClick={() => {
+                const missStart = !startDate;
+                const missEnd = !endDate;
+                setStartErr(missStart);
+                setEndErr(missEnd);
+                if (missStart) {
+                  startDateRef.current?.focus();
+                  return;
+                }
+                if (missEnd) {
+                  endDateRef.current?.focus();
+                  return;
+                }
+                createMut.mutate();
+              }}
             >
               {createMut.isPending ? "Creating…" : "Create sprint"}
             </button>

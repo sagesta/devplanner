@@ -1,10 +1,13 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { tasks } from "../db/schema.js";
 
 type Db = typeof import("../db/client.js").db;
 
 export async function rollupParentTaskStatus(db: Db, parentId: string): Promise<void> {
-  const children = await db.select().from(tasks).where(eq(tasks.parentTaskId, parentId));
+  const children = await db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.parentTaskId, parentId), isNull(tasks.deletedAt)));
   if (children.length === 0) {
     return;
   }

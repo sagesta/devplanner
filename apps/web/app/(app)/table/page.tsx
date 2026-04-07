@@ -6,9 +6,11 @@ import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { deleteTask, fetchTasks, patchTask, postBulkStatus, type TaskRow } from "@/lib/api";
+import { deleteTask, fetchTasks, patchTask, postBulkStatus, restoreTask, type TaskRow } from "@/lib/api";
 import { SkeletonRow } from "@/lib/skeleton";
 import { StatusDot } from "@/components/task-card";
+import { TagChip } from "@/components/TagChip";
+import { TimerButton } from "@/components/TimerButton";
 import { normalizeYmd } from "@/lib/timeline-utils";
 import { cn, displayPhysicalEnergy, displayWorkDepth, isTaskOverdue } from "@/lib/utils";
 
@@ -31,6 +33,17 @@ type SortKey =
 type SortDir = "asc" | "desc";
 
 const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
+
+const COGNITIVE_LABEL: Record<string, string> = {
+  deep_work: "Deep work",
+  shallow: "Low focus",
+  admin: "Routine",
+  quick_win: "Quick win",
+};
+
+function cognitiveDisplay(v: string): string {
+  return COGNITIVE_LABEL[v] ?? v.replace(/_/g, " ");
+}
 
 function localISODate(d = new Date()) {
   const y = d.getFullYear();
@@ -134,10 +147,25 @@ export default function TablePage() {
   }
 
   const del = useMutation({
-    mutationFn: (id: string) => deleteTask(id),
-    onSuccess: () => {
+    mutationFn: ({ id, title }: { id: string; title: string }) => deleteTask(id),
+    onSuccess: (_void, { id, title }) => {
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
       void qc.invalidateQueries({ queryKey: ["tasks-today"] });
+      toast.success(`“${title}” deleted`, {
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void restoreTask(id)
+              .then(() => {
+                toast.success("Task restored");
+                void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+                void qc.invalidateQueries({ queryKey: ["tasks-today"] });
+              })
+              .catch((err: unknown) => toast.error(String(err)));
+          },
+        },
+      });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -191,24 +219,49 @@ export default function TablePage() {
   return (
     <div>
       <h1 className="font-display text-2xl text-foreground">Task table</h1>
-      <div className="mt-4 flex items-center gap-2">
-        <button
-          type="button"
-          className="rounded-lg bg-white/10 px-3 py-1.5 text-xs transition-colors hover:bg-white/15 disabled:opacity-40"
-          disabled={selCount === 0}
-          onClick={() => bulk.mutate("done")}
-        >
-          Mark {selCount > 0 ? selCount : ""} done
-        </button>
-        <button
-          type="button"
-          className="rounded-lg bg-white/10 px-3 py-1.5 text-xs transition-colors hover:bg-white/15 disabled:opacity-40"
-          disabled={selCount === 0}
-          onClick={() => bulk.mutate("todo")}
-        >
-          Mark {selCount > 0 ? selCount : ""} todo
-        </button>
-        {selCount > 0 && <span className="text-[10px] text-muted">{selCount} selected</span>}
+      <div className="mt-4 flex items-center min-h-[36px]">
+        {selCount > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-3 py-1.5 animate-fadeIn">
+            <span className="text-xs font-semibold text-primary">{selCount} selected</span>
+            <div className="h-4 w-[1px] bg-primary/20 mx-1" />
+            <button
+              type="button"
+              className="text-[11px] font-medium text-foreground hover:text-white transition-colors disabled:opacity-40"
+              disabled={bulk.isPending}
+              onClick={() => bulk.mutate("done")}
+            >
+              Mark done
+            </button>
+            <div className="h-3 w-[1px] bg-primary/20" />
+            <button
+              type="button"
+              className="text-[11px] font-medium text-foreground hover:text-white transition-colors disabled:opacity-40"
+              disabled={bulk.isPending}
+              onClick={() => bulk.mutate("todo")}
+            >
+              Mark todo
+            </button>
+            <div className="h-3 w-[1px] bg-primary/20" />
+            <button
+              type="button"
+              className="text-[11px] font-medium text-danger hover:text-red-400 transition-colors disabled:opacity-40"
+              disabled={bulk.isPending}
+              onClick={() => {
+                if (!confirm(`Delete ${selCount} tasks?`)) return;
+                const ids = Object.entries(sel).filter(([, v]) => v).map(([k]) => k);
+                if (!ids.length) return;
+                // Run deletes sequentially
+                Promise.all(ids.map(id => deleteTask(id))).then(() => {
+                  toast.success(`Deleted ${selCount} tasks`);
+                  setSel({});
+                  void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+                }).catch((e: Error) => toast.error(e.message));
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        )}
       </div>
       <div className="mt-4 overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full min-w-[880px] text-left text-sm">
@@ -232,9 +285,21 @@ export default function TablePage() {
               <SortHeader field="priority" label="Priority" />
               <SortHeader field="physicalEnergy" label="Energy" />
               <SortHeader field="workDepth" label="Depth" />
-              <SortHeader field="energyLevel" label="Cognitive" />
+              <th
+                className="cursor-pointer select-none p-2 transition-colors hover:text-foreground"
+                title="Cognitive load required: shallow (minimal focus), admin (routine), deep work (high focus)."
+                onClick={() => toggleSort("energyLevel")}
+              >
+                <span className="inline-flex items-center gap-1">
+                  Cognitive
+                  {sortKey === "energyLevel" &&
+                    (sortDir === "asc" ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                </span>
+              </th>
               <SortHeader field="scheduledDate" label="Scheduled" />
               <SortHeader field="dueDate" label="Due" />
+              <th className="p-2 text-[10px] uppercase text-muted">Tags</th>
+              <th className="p-2 text-[10px] uppercase text-muted">Timer</th>
               <th className="w-10 p-2 text-right text-[10px] uppercase text-muted"> </th>
             </tr>
           </thead>
@@ -417,12 +482,12 @@ export default function TablePage() {
                     >
                       {(["deep_work", "shallow", "admin", "quick_win"] as const).map((p) => (
                         <option key={p} value={p}>
-                          {p.replace("_", " ")}
+                          {cognitiveDisplay(p)}
                         </option>
                       ))}
                     </select>
                   ) : (
-                    t.energyLevel.replace("_", " ")
+                    cognitiveDisplay(t.energyLevel)
                   )}
                 </td>
                 <td
@@ -477,6 +542,16 @@ export default function TablePage() {
                     normalizeYmd(t.dueDate) ?? "—"
                   )}
                 </td>
+                <td className="p-2">
+                  <div className="flex flex-wrap gap-1">
+                    {(t._tags ?? []).slice(0, 3).map((tag) => (
+                      <TagChip key={tag.id} name={tag.name} color={tag.color} size="xs" />
+                    ))}
+                  </div>
+                </td>
+                <td className="p-2">
+                  <TimerButton taskId={t.id} compact />
+                </td>
                 <td className="p-2 text-right">
                   <button
                     type="button"
@@ -485,7 +560,7 @@ export default function TablePage() {
                     disabled={del.isPending}
                     onClick={() => {
                       if (!confirm(`Delete “${t.title}”?`)) return;
-                      del.mutate(t.id);
+                      del.mutate({ id: t.id, title: t.title });
                     }}
                   >
                     <Trash2 size={14} />

@@ -6,9 +6,12 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   real,
+  serial,
   text,
   time,
   timestamp,
@@ -16,7 +19,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 const vector1536 = customType<{ data: number[]; driverData: string }>({
   dataType() {
@@ -76,6 +79,7 @@ export const areas = pgTable(
     color: varchar("color", { length: 32 }),
     icon: varchar("icon", { length: 64 }),
     sortOrder: integer("sort_order").notNull().default(0),
+    weeklyHourTarget: numeric("weekly_hour_target", { precision: 5, scale: 1 }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("areas_user_idx").on(t.userId)]
@@ -167,6 +171,8 @@ export const tasks = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    /** Soft-delete: null = active; set when user deletes (restorable within client grace period). */
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => [
     index("tasks_user_idx").on(t.userId),
@@ -276,6 +282,49 @@ export const taskEmbeddings = pgTable(
   (t) => [uniqueIndex("task_embeddings_task_uidx").on(t.taskId)]
 );
 
+// ─── Time tracking ──────────────────────────────────────────────
+export const taskTimeLogs = pgTable(
+  "task_time_logs",
+  {
+    id: serial("id").primaryKey(),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    durationSeconds: integer("duration_seconds").generatedAlwaysAs(
+      sql`EXTRACT(EPOCH FROM (ended_at - started_at))::INTEGER`
+    ),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("task_time_logs_task_idx").on(t.taskId),
+    index("task_time_logs_active_idx").on(t.endedAt),
+  ]
+);
+
+// ─── Global tags ────────────────────────────────────────────────
+export const tags = pgTable("tags", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 50 }).notNull().unique(),
+  color: varchar("color", { length: 7 }).default("#6B7280"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const taskTags = pgTable(
+  "task_tags",
+  {
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    tagId: integer("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.taskId, t.tagId] })]
+);
+
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
   parent: one(tasks, {
     fields: [tasks.parentTaskId],
@@ -287,6 +336,8 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
   project: one(projects, { fields: [tasks.projectId], references: [projects.id] }),
   sprint: one(sprints, { fields: [tasks.sprintId], references: [sprints.id] }),
   user: one(users, { fields: [tasks.userId], references: [users.id] }),
+  timeLogs: many(taskTimeLogs),
+  taskTags: many(taskTags),
 }));
 
 export const areasRelations = relations(areas, ({ one, many }) => ({
@@ -319,4 +370,17 @@ export const usersRelations = relations(users, ({ many, one }) => ({
     fields: [users.id],
     references: [googleCalendarLinks.userId],
   }),
+}));
+
+export const taskTimeLogsRelations = relations(taskTimeLogs, ({ one }) => ({
+  task: one(tasks, { fields: [taskTimeLogs.taskId], references: [tasks.id] }),
+}));
+
+export const tagsRelations = relations(tags, ({ many }) => ({
+  taskTags: many(taskTags),
+}));
+
+export const taskTagsRelations = relations(taskTags, ({ one }) => ({
+  task: one(tasks, { fields: [taskTags.taskId], references: [tasks.id] }),
+  tag: one(tags, { fields: [taskTags.tagId], references: [tags.id] }),
 }));

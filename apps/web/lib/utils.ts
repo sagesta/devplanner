@@ -5,15 +5,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** stress-test-fix: overdue when scheduled (or due-only anchor) is before today and task not terminal. */
+/** Overdue = scheduled or due date is before today and task is not finished. */
 export function isTaskOverdue(
   task: { scheduledDate: string | null; dueDate: string | null; status: string },
   todayYmd: string
 ): boolean {
   if (task.status === "done" || task.status === "cancelled") return false;
-  const anchor = task.scheduledDate ?? task.dueDate;
-  if (!anchor) return false;
-  return anchor.localeCompare(todayYmd) < 0;
+  const sched = task.scheduledDate?.trim();
+  const due = task.dueDate?.trim();
+  if (sched && sched.localeCompare(todayYmd) < 0) return true;
+  if (due && due.localeCompare(todayYmd) < 0) return true;
+  return false;
 }
 
 export function displayWorkDepth(task: {

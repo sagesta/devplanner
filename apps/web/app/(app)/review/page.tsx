@@ -1,9 +1,11 @@
 "use client";
 
 import { CheckCircle2, Circle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { TimeWeekPanel } from "@/components/TimeWeekPanel";
+import { startOfWeekMonday, addDaysYMD } from "@/lib/timeline-utils";
 
 const REVIEW_LS = "devplanner.weeklyReview.v1";
 
@@ -43,12 +45,34 @@ export default function ReviewPage() {
     }
   }, [step, notes, hydrated]);
 
+  const lastWeekStart = useMemo(() => {
+    const thisWeek = startOfWeekMonday(new Date());
+    return addDaysYMD(thisWeek, -7);
+  }, []);
+
   return (
+    <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
     <div className="max-w-xl">
-      <h1 className="font-display text-2xl text-foreground">Weekly review</h1>
-      <p className="mt-1 text-sm text-muted">
-        Guided ritual — reflect on last week, plan the next.
-      </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-display text-2xl text-foreground">Weekly review</h1>
+          <p className="mt-1 text-sm text-muted">
+            Guided ritual — reflect on last week, plan the next.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (!confirm("Start over? This will clear all your notes for the current review.")) return;
+            setStep(0);
+            setNotes(["", "", "", "", ""]);
+            localStorage.removeItem(REVIEW_LS);
+          }}
+          className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-muted hover:bg-white/5 hover:text-foreground transition-colors"
+        >
+          Reset / Start over
+        </button>
+      </div>
 
       {/* Progress dots */}
       <div className="mt-5 flex items-center gap-0">
@@ -129,6 +153,11 @@ export default function ReviewPage() {
           )}
         </div>
       </div>
+    </div>
+    {/* Right column: time panel */}
+    <div className="hidden lg:block space-y-4">
+      <TimeWeekPanel weekStart={lastWeekStart} />
+    </div>
     </div>
   );
 }

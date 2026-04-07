@@ -14,7 +14,9 @@ import { focusRoutes } from "./routes/focus.js";
 import { projectRoutes } from "./routes/projects.js";
 import { sprintRoutes } from "./routes/sprints.js";
 import { syncRoutes } from "./routes/sync.js";
+import { tagRoutes } from "./routes/tags.js";
 import { taskRoutes } from "./routes/tasks.js";
+import { timeLogRoutes } from "./routes/time-logs.js";
 import type { AppEnv } from "./types.js";
 
 validateEnv();
@@ -104,6 +106,8 @@ app.route("/api/focus", focusRoutes);
 app.route("/api/events", eventRoutes);
 app.route("/api/ai", aiRoutes);
 app.route("/api/sync", syncRoutes);
+app.route("/api/time-logs", timeLogRoutes);
+app.route("/api/tags", tagRoutes);
 
 const port = Number(process.env.PORT) || 3001;
 const hostname = process.env.HOST?.trim() || "0.0.0.0";

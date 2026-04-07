@@ -50,11 +50,9 @@ export function BrainDumpModal({
     }
   }, [areasQ.data, areaId]);
 
-  // Auto-focus textarea on open
   useEffect(() => {
-    if (open) {
-      setTimeout(() => textareaRef.current?.focus(), 100);
-    }
+    if (!open) return;
+    queueMicrotask(() => textareaRef.current?.focus());
   }, [open]);
 
   const lineCount = text
@@ -78,12 +76,18 @@ export function BrainDumpModal({
           throw new Error("date too far");
         }
       }
+      const st = toPgTime(startT);
+      const et = toPgTime(endT);
+      if (st && et && et < st) {
+        toast.error("End time must be after start time.");
+        throw new Error("time order");
+      }
       const schedule =
         safeDate || startT || endT || recurrence
           ? {
               scheduledDate: safeDate,
-              scheduledStartTime: toPgTime(startT),
-              scheduledEndTime: toPgTime(endT),
+              scheduledStartTime: st,
+              scheduledEndTime: et,
               recurrenceRule: recurrence || null,
             }
           : undefined;

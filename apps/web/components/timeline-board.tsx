@@ -14,7 +14,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarOff } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PRIORITY_BAR_CLASS } from "@/components/task-card";
@@ -39,9 +39,9 @@ import {
   type BarLayout,
 } from "@/lib/timeline-utils";
 import { cn } from "@/lib/utils";
+import { ZoomControl, zoomToDays, type ZoomLevel } from "@/components/ZoomControl";
 
 const DAY_W = 44;
-const NUM_DAYS = 21;
 
 type ScheduledRow = { task: TaskRow; layout: BarLayout };
 
@@ -63,6 +63,7 @@ function DroppableDay({
   return (
     <div
       ref={setNodeRef}
+      data-date={ymd}
       style={{ width: dayWidth, minWidth: dayWidth }}
       className={cn(
         "shrink-0 border-l border-white/10 py-1 text-center transition-colors",
@@ -84,28 +85,47 @@ function UnscheduledDraggable({
   areaColor?: string | null;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id });
+  const anchor = normalizeYmd(task.scheduledDate) ?? normalizeYmd(task.dueDate);
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "flex cursor-grab items-center gap-2 rounded-lg border border-white/10 bg-background/90 px-2 py-1.5 active:cursor-grabbing",
+        "flex cursor-grab flex-col gap-0.5 rounded-lg border border-white/10 bg-background/90 px-2 py-1.5 active:cursor-grabbing",
         isDragging && "opacity-50"
       )}
       {...listeners}
       {...attributes}
     >
-      {areaColor && (
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: areaColor }} />
-      )}
-      <span className="truncate text-xs text-foreground">{task.title}</span>
-      <span
-        className={cn(
-          "ml-auto shrink-0 rounded px-1 py-0.5 text-[8px] font-semibold uppercase text-white",
-          PRIORITY_BAR_CLASS[task.priority] ?? PRIORITY_BAR_CLASS.normal
+      <div className="flex items-center gap-2">
+        {areaColor && (
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: areaColor }} />
         )}
-      >
-        {task.priority.slice(0, 1)}
-      </span>
+        <span
+          className="max-w-[200px] shrink truncate text-xs text-foreground"
+          title={task.title}
+        >
+          {task.title}
+        </span>
+        <span
+          className={cn(
+            "ml-auto shrink-0 rounded px-1 py-0.5 text-[8px] font-semibold uppercase text-white",
+            PRIORITY_BAR_CLASS[task.priority] ?? PRIORITY_BAR_CLASS.normal
+          )}
+        >
+          {task.priority.slice(0, 1)}
+        </span>
+      </div>
+      {anchor && (
+        <span
+          className="pl-4 text-[9px] font-mono text-amber-200/80"
+          title="Outside current 3-week view — drag onto a date above to reschedule"
+        >
+          {normalizeYmd(task.scheduledDate) ? `Sched ${normalizeYmd(task.scheduledDate)}` : `Due ${normalizeYmd(task.dueDate)}`}
+          {normalizeYmd(task.scheduledDate) && normalizeYmd(task.dueDate)
+            ? ` · due ${normalizeYmd(task.dueDate)}`
+            : ""}
+        </span>
+      )}
     </div>
   );
 }
@@ -226,13 +246,26 @@ export function TimelineBoard() {
   const { status } = useSession();
   const userId = useAppUserId();
   const qc = useQueryClient();
-  const [weekStart, setWeekStart] = useState(() => startOfWeekMonday(new Date()));
+  const [anchorDate, setAnchorDate] = useState(() => startOfWeekMonday(new Date()));
   const [sprintId, setSprintId] = useState<string>("");
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [dragUnschedId, setDragUnschedId] = useState<string | null>(null);
-
-  const days = useMemo(() => eachDayFrom(weekStart, NUM_DAYS), [weekStart]);
+  const [zoom, setZoom] = useState<ZoomLevel>("3-week");
+  const NUM_DAYS = zoomToDays(zoom);
   const todayYMD = toYMD(new Date());
+
+  const chartStartDate = useMemo(() => {
+    // If not navigating actively, maybe we try to use anchorDate as a base.
+    // Actually, anchorDate is the date we navigate by clicking left/right. 
+    // Is today always the reference if user clicks "This week" or just selected the tab?
+    // Let's just calculate chart start date relative to the standard 'anchor' date.
+    if (zoom === "day") return addDaysYMD(anchorDate, -3); // If anchor is today, then today-3
+    if (zoom === "week") return addDaysYMD(anchorDate, -6);
+    if (zoom === "month") return anchorDate;
+    return startOfWeekMonday(new Date(anchorDate + "T12:00:00")); // 3-week behavior
+  }, [zoom, anchorDate]);
+
+  const days = useMemo(() => eachDayFrom(chartStartDate, NUM_DAYS), [chartStartDate, NUM_DAYS]);
 
   const areasQ = useQuery({
     queryKey: ["areas", userId],
@@ -273,14 +306,19 @@ export function TimelineBoard() {
         task.scheduledStartTime,
         task.scheduledEndTime,
         task.estimatedMinutes,
-        weekStart,
+        chartStartDate,
         NUM_DAYS
       );
       if (laid.inView) {
         scheduled.push({ task, layout: laid.layout });
       } else {
         const hasAnchor = Boolean(task.scheduledDate || task.dueDate);
-        if (!hasAnchor) unsched.push(task);
+        if (!hasAnchor) {
+          unsched.push(task);
+        } else if (task.status !== "done" && task.status !== "cancelled") {
+          // Dated but outside this 3-week window — show as draggable chips (not lost).
+          unsched.push(task);
+        }
       }
     }
     scheduled.sort((a, b) => {
@@ -289,7 +327,7 @@ export function TimelineBoard() {
       return da.localeCompare(db) || a.task.title.localeCompare(b.task.title);
     });
     return { scheduledRows: scheduled, unscheduled: unsched };
-  }, [roots, weekStart]);
+  }, [roots, chartStartDate, NUM_DAYS]);
 
   const rescheduleMutation = useMutation({
     mutationFn: async ({ taskId, newYMD }: { taskId: string; newYMD: string }) => {
@@ -323,7 +361,7 @@ export function TimelineBoard() {
       if (!newYMD) return;
       rescheduleMutation.mutate({ taskId, newYMD });
     },
-    [days, rescheduleMutation]
+    [days, rescheduleMutation, NUM_DAYS]
   );
 
   const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -351,47 +389,50 @@ export function TimelineBoard() {
           <button
             type="button"
             className="rounded-lg border border-white/10 bg-surface px-2 py-1.5 text-muted hover:bg-white/5 hover:text-foreground"
-            onClick={() => setWeekStart((w) => addDaysYMD(w, -7))}
-            title="Previous week"
+            onClick={() => setAnchorDate((w) => addDaysYMD(w, -7))}
+            title="Previous period"
           >
             <ChevronLeft size={18} />
           </button>
           <button
             type="button"
             className="rounded-lg border border-white/10 bg-surface px-2 py-1.5 text-muted hover:bg-white/5 hover:text-foreground"
-            onClick={() => setWeekStart((w) => addDaysYMD(w, 7))}
-            title="Next week"
+            onClick={() => setAnchorDate((w) => addDaysYMD(w, 7))}
+            title="Next period"
           >
             <ChevronRight size={18} />
           </button>
           <button
             type="button"
             className="rounded-lg border border-white/10 bg-surface px-3 py-1.5 text-xs text-foreground hover:bg-white/5"
-            onClick={() => setWeekStart(startOfWeekMonday(new Date()))}
+            onClick={() => setAnchorDate(toYMD(new Date()))}
           >
-            This week
+            Today Focus
           </button>
           <span className="text-xs text-muted">
             {days[0]} → {days[NUM_DAYS - 1]}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <label htmlFor="timeline-sprint" className="text-[10px] uppercase tracking-wide text-muted">
-            Sprint
-          </label>
-          <select
-            id="timeline-sprint"
-            className="rounded-lg border border-white/10 bg-background px-2 py-1.5 text-xs text-foreground"
-            value={sprintId}
-            onChange={(e) => setSprintId(e.target.value)}
-          >
-            <option value="">All tasks</option>
-            {(sprintsQ.data?.sprints ?? []).map((s: SprintRow) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center gap-3">
+          <ZoomControl value={zoom} onChange={setZoom} />
+          <div className="flex items-center gap-2">
+            <label htmlFor="timeline-sprint" className="text-[10px] uppercase tracking-wide text-muted">
+              Sprint
+            </label>
+            <select
+              id="timeline-sprint"
+              className="rounded-lg border border-white/10 bg-background px-2 py-1.5 text-xs text-foreground"
+              value={sprintId}
+              onChange={(e) => setSprintId(e.target.value)}
+            >
+              <option value="">All tasks</option>
+              {(sprintsQ.data?.sprints ?? []).map((s: SprintRow) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -471,11 +512,14 @@ export function TimelineBoard() {
               })}
 
             {!tasksQ.isLoading && scheduledRows.length === 0 && (
-              <p className="p-6 text-center text-sm text-muted">
-                {unscheduled.length > 0
-                  ? "Nothing dated in this range — drag chips below onto a date, change the week, or set dates on the board."
-                  : "No scheduled or due tasks in this window. Navigate weeks or add dates from the board / table."}
-              </p>
+              <div className="flex flex-col items-center justify-center p-12 text-center bg-white/[0.01]">
+                <CalendarOff size={28} className="mb-3 text-primary/30" />
+                <p className="max-w-md text-sm text-muted">
+                  {unscheduled.length > 0
+                    ? "Nothing dated in this range. Drag chips from below onto a date, or navigate to a different time period."
+                    : "No scheduled or due tasks in this window. Navigate periods or add dates from the board."}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -483,7 +527,7 @@ export function TimelineBoard() {
         {unscheduled.length > 0 && (
           <div className="rounded-xl border border-dashed border-white/15 bg-surface/50 p-4">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted">
-              Unscheduled — drag onto a date above
+              No date or outside this 3-week window — drag onto a date above
             </p>
             <div className="flex flex-wrap gap-2">
               {unscheduled.map((t) => (

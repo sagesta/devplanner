@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/client.js";
@@ -42,7 +42,7 @@ export const sprintRoutes = new Hono<AppEnv>()
           count: sql<number>`count(*)::int`,
         })
         .from(tasks)
-        .where(sql`${tasks.sprintId} = ANY(${sprintIds})`)
+        .where(and(inArray(tasks.sprintId, sprintIds), isNull(tasks.deletedAt)))
         .groupBy(tasks.sprintId);
       for (const r of counts) {
         if (r.sprintId) taskCounts[r.sprintId] = r.count;
@@ -68,7 +68,7 @@ export const sprintRoutes = new Hono<AppEnv>()
     const [countRow] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(tasks)
-      .where(eq(tasks.sprintId, id));
+      .where(and(eq(tasks.sprintId, id), isNull(tasks.deletedAt)));
     return c.json({
       sprint: { ...row, taskCount: countRow?.count ?? 0 },
     });
