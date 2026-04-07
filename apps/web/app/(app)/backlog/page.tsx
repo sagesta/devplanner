@@ -196,6 +196,19 @@ export default function BacklogPage() {
                         ))}
                         <TimerButton taskId={t.id} compact />
                         <select
+                          className="max-w-[140px] rounded-md border border-white/10 bg-primary/10 text-primary px-2 py-1 text-[11px] font-medium transition-colors hover:bg-primary/20"
+                          value={t.sprintId ?? ""}
+                          disabled={patchMeta.isPending}
+                          onChange={(e) => patchMeta.mutate({ taskId: t.id, sprintId: e.target.value === "" ? null : e.target.value })}
+                        >
+                          <option value="">Add to sprint →</option>
+                          {(sprintsQ.data?.sprints ?? []).filter(s => s.status !== "completed").map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                        <select
                           className="max-w-[140px] rounded-md border border-white/10 bg-background px-2 py-1 text-[11px] text-muted"
                           value={t.areaId}
                           disabled={moveArea.isPending}

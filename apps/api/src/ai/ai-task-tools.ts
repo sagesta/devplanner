@@ -212,6 +212,37 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "addSubtask",
+      description: "Add a subtask to an existing task",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: { type: "string" },
+          title: { type: "string" },
+          completed: { type: "boolean" }
+        },
+        required: ["taskId", "title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "assignTaskToSprint",
+      description: "Assign an existing task to a sprint by ID",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: { type: "string" },
+          sprintId: { type: "string" }
+        },
+        required: ["taskId", "sprintId"],
+      },
+    },
+  },
 ];
 
 export async function executePlannerTool(
@@ -475,7 +506,57 @@ export async function executePlannerTool(
       }
       return { ok: true, updated: assignments.length, assignments };
     }
+    case "addSubtask": {
+      const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
+      const title = typeof obj.title === "string" ? obj.title.trim().slice(0, 500) : "";
+      const completed = typeof obj.completed === "boolean" ? obj.completed : false;
+      if (!taskId) return { error: "taskId required" };
+      if (!title) return { error: "title required" };
+
+      const existing = await db.query.tasks.findFirst({
+        where: and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)),
+      });
+      if (!existing) return { error: "parent task not found" };
+
+      const status = completed ? "done" : "todo";
+
+      const [row] = await db
+        .insert(tasks)
+        .values({
+          userId,
+          areaId: existing.areaId,
+          parentTaskId: taskId,
+          taskType: "subtask",
+          title,
+          status,
+          priority: existing.priority,
+        })
+        .returning();
+      if (!row) return { error: "failed to create subtask" };
+      await rollupParentTaskStatus(db, taskId);
+      return { ok: true, task: { id: row.id, title: row.title, status: row.status } };
+    }
+    case "assignTaskToSprint": {
+      const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
+      const sprintId = typeof obj.sprintId === "string" ? obj.sprintId : "";
+      if (!taskId) return { error: "taskId required" };
+      if (!sprintId) return { error: "sprintId required" };
+
+      const existing = await db.query.tasks.findFirst({
+        where: and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)),
+      });
+      if (!existing) return { error: "task not found" };
+
+      const [row] = await db
+        .update(tasks)
+        .set({ sprintId, updatedAt: new Date() })
+        .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
+        .returning();
+      if (!row) return { error: "not found" };
+      return { ok: true, task: { id: row.id, title: row.title, sprintId: row.sprintId } };
+    }
     default:
       return { error: `unknown tool ${name}` };
+
   }
 }

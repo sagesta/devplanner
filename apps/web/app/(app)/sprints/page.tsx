@@ -2,11 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { CalendarCheck, Plus } from "lucide-react";
+import { CalendarCheck, Plus, ArrowLeft } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { createSprint, fetchSprints, patchSprint } from "@/lib/api";
+import { createSprint, fetchSprints, patchSprint, fetchTasks, patchTask, type TaskRow } from "@/lib/api";
 import { Skeleton } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,7 @@ export default function SprintsPage() {
   const { status } = useSession();
   const userId = useAppUserId();
   const qc = useQueryClient();
+  const [planningSprintId, setPlanningSprintId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -50,7 +51,7 @@ export default function SprintsPage() {
         startDate,
         endDate,
         goal: goal.trim() || null,
-        status: "planned",
+        status: (q.data?.sprints && q.data.sprints.some(s => s.status === 'active')) ? "planned" : "active",
       }),
     onSuccess: () => {
       toast.success("Sprint created");
@@ -70,6 +71,15 @@ export default function SprintsPage() {
     return <Skeleton className="h-24 w-full rounded-xl" />;
   }
   if (!userId) return null;
+
+  if (planningSprintId) {
+    const sprint = q.data?.sprints.find(s => s.id === planningSprintId);
+    if (!sprint) {
+      setPlanningSprintId(null);
+      return null;
+    }
+    return <SprintPlanning sprint={sprint} onBack={() => setPlanningSprintId(null)} userId={userId} />;
+  }
 
   return (
     <div>
@@ -227,6 +237,15 @@ export default function SprintsPage() {
               </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5 border-t border-white/5 pt-3">
+              {s.status !== "completed" && (
+                <button
+                  type="button"
+                  className="rounded-md bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white hover:bg-white/20 transition-colors"
+                  onClick={() => setPlanningSprintId(s.id)}
+                >
+                  View tasks
+                </button>
+              )}
               {s.status !== "active" && (
                 <button
                   type="button"
@@ -270,6 +289,97 @@ export default function SprintsPage() {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function SprintPlanning({ sprint, onBack, userId }: { sprint: any; onBack: () => void; userId: string }) {
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["tasks", userId],
+    queryFn: () => fetchTasks(),
+  });
+
+  const patchMut = useMutation({
+    mutationFn: ({ taskId, sprintId }: { taskId: string; sprintId: string | null }) => 
+      patchTask(taskId, { sprintId }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["sprints", userId] });
+      void qc.invalidateQueries({ queryKey: ["backlog", userId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (q.isLoading) return <Skeleton className="h-64 w-full rounded-xl" />;
+
+  const roots = (q.data ?? []).filter((t: TaskRow) => !t.parentTaskId);
+  const sprintTasks = roots.filter(t => t.sprintId === sprint.id);
+  const backlogTasks = roots.filter(t => t.sprintId === null);
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-120px)] animate-slideIn">
+      <div className="flex items-center gap-3 mb-4">
+        <button onClick={onBack} className="rounded p-1.5 hover:bg-white/10 text-muted hover:text-foreground transition-colors">
+          <ArrowLeft size={16} />
+        </button>
+        <div>
+          <h1 className="font-display text-xl text-foreground">{sprint.name}</h1>
+          <p className="text-xs text-muted">{sprint.startDate} → {sprint.endDate}</p>
+        </div>
+      </div>
+      
+      <div className="flex flex-1 min-h-0 gap-4 flex-col md:flex-row">
+        {/* Backlog Pane */}
+        <div className="flex-1 flex flex-col rounded-xl border border-white/10 bg-surface min-h-[300px]">
+          <div className="p-3 border-b border-white/5 flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Backlog</h2>
+            <span className="text-[10px] text-muted">{backlogTasks.length}</span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {backlogTasks.map(t => (
+              <div key={t.id} className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-white/5 bg-background text-sm card-hover">
+                <span className="truncate flex-1">{t.title}</span>
+                <button
+                  disabled={patchMut.isPending}
+                  onClick={() => patchMut.mutate({ taskId: t.id, sprintId: sprint.id })}
+                  className="shrink-0 text-[10px] bg-primary/20 text-primary px-2 py-1 rounded hover:bg-primary/30 transition-colors"
+                >
+                  Add to sprint
+                </button>
+              </div>
+            ))}
+            {backlogTasks.length === 0 && (
+              <p className="text-center text-xs text-muted py-8">Backlog is empty</p>
+            )}
+          </div>
+        </div>
+
+        {/* Sprint Pane */}
+        <div className="flex-1 flex flex-col rounded-xl border border-primary/30 bg-surface min-h-[300px] shadow-sm shadow-primary/5">
+          <div className="p-3 border-b border-white/5 flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-primary">Sprint Tasks</h2>
+            <span className="text-[10px] text-muted">{sprintTasks.length}</span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {sprintTasks.map(t => (
+              <div key={t.id} className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-white/5 bg-background text-sm card-hover">
+                <span className="truncate flex-1">{t.title}</span>
+                <button
+                  disabled={patchMut.isPending}
+                  onClick={() => patchMut.mutate({ taskId: t.id, sprintId: null })}
+                  className="shrink-0 text-[10px] text-muted hover:text-red-400 px-2 py-1 rounded hover:bg-white/5 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            {sprintTasks.length === 0 && (
+              <p className="text-center text-xs text-muted py-8">No tasks in this sprint</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

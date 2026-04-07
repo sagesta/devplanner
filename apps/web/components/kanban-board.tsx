@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
 import { useTags } from "@/hooks/use-tags";
 import {
+  fetchSprints,
   createTask,
   deleteTask,
   fetchAreas,
@@ -31,6 +32,7 @@ import {
   type AreaRow,
   type TaskRow,
 } from "@/lib/api";
+import Link from "next/link";
 import { SkeletonCard } from "@/lib/skeleton";
 import { cn, displayPhysicalEnergy, displayWorkDepth, isTaskOverdue } from "@/lib/utils";
 import { StatusDot, SubtaskBar, TaskCard } from "./task-card";
@@ -38,17 +40,15 @@ import { TagChip } from "./TagChip";
 import { TagSelector } from "./TagSelector";
 
 const COLS = [
-  ["backlog", "Backlog"],
   ["todo", "Todo"],
   ["in_progress", "In progress"],
   ["done", "Done"],
 ] as const;
 
 const STATUS_CYCLE: Record<string, string> = {
-  backlog: "todo",
   todo: "in_progress",
   in_progress: "done",
-  done: "backlog",
+  done: "todo",
 };
 
 const COL_KEYS: Set<string> = new Set(COLS.map(([k]) => k));
@@ -158,11 +158,13 @@ function toPgTime(v: string): string | null {
 function InlineAddTask({
   userId,
   areaId,
+  sprintId,
   status,
   onDone,
 }: {
   userId: string;
   areaId: string;
+  sprintId: string;
   status: string;
   onDone: () => void;
 }) {
@@ -179,6 +181,7 @@ function InlineAddTask({
     mutationFn: () =>
       createTask({
         areaId,
+        sprintId,
         title: title.trim(),
         status,
         ...(scheduledDate ? { scheduledDate } : {}),
@@ -318,6 +321,12 @@ export function KanbanBoard() {
     enabled: Boolean(userId),
   });
 
+  const sprintsQ = useQuery({
+    queryKey: ["sprints", userId],
+    queryFn: () => fetchSprints(),
+    enabled: Boolean(userId),
+  });
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const m = useMutation({
@@ -401,13 +410,19 @@ export function KanbanBoard() {
     [q.data, m]
   );
 
-  const roots = (q.data ?? []).filter((t) => !t.parentTaskId);
+  const activeSprint = useMemo(() => {
+    if (!sprintsQ.data?.sprints) return null;
+    return sprintsQ.data.sprints.find(s => s.status === 'active' && s.startDate <= todayYmd && s.endDate >= todayYmd);
+  }, [sprintsQ.data?.sprints, todayYmd]);
+
+  const roots = (q.data ?? []).filter((t) => !t.parentTaskId && t.sprintId === activeSprint?.id);
+
   const areaMap = new Map<string, AreaRow>();
   for (const a of areasQ.data ?? []) {
     areaMap.set(a.id, a);
   }
   const defaultAreaId = areasQ.data?.[0]?.id ?? "";
-  const draggedTask = dragId ? roots.find((t) => t.id === dragId) : null;
+  const draggedTask = dragId ? (q.data ?? []).find((t) => t.id === dragId) : null;
   const overdueRoots = useMemo(
     () => roots.filter((t) => isTaskOverdue(t, todayYmd)),
     [roots, todayYmd]
@@ -422,10 +437,25 @@ export function KanbanBoard() {
 
   const boardStatusValues = COLS.map(([k]) => k);
 
-  if (status === "loading") {
+  if (status === "loading" || sprintsQ.isLoading) {
     return <p className="text-muted">Loading…</p>;
   }
   if (!userId) return null;
+
+  if (!activeSprint) {
+    return (
+      <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-surface/50 py-16 text-center">
+        <Sparkles size={32} className="mb-4 text-primary/40" />
+        <p className="text-foreground font-medium text-sm">No active sprint</p>
+        <p className="mt-1 text-xs text-muted max-w-md">
+          You don&apos;t have an active sprint. Head over to the Sprints page to create a new sprint and start adding tasks from your backlog!
+        </p>
+        <Link href="/sprints" className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors">
+          Go to Sprints
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -615,10 +645,11 @@ export function KanbanBoard() {
                     </div>
                   );
                 })}
-                {addingCol === key && (
+                {addingCol === key && activeSprint && (
                   <InlineAddTask
                     userId={userId}
                     areaId={defaultAreaId}
+                    sprintId={activeSprint.id}
                     status={key}
                     onDone={() => setAddingCol(null)}
                   />
