@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type OpenAI from "openai";
 import { db } from "../db/client.js";
-import { areas, tasks } from "../db/schema.js";
+import { areas, sprints, tasks } from "../db/schema.js";
 import { enqueueTaskCalendarSync } from "../queues/definitions.js";
 import { rollupParentTaskStatus } from "../services/task-rollup.js";
 import { liftStaleScheduleYear } from "./schedule-date-normalize.js";
@@ -240,6 +240,17 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
           sprintId: { type: "string" }
         },
         required: ["taskId", "sprintId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "listSprints",
+      description: "List the user's sprints to find a sprintId",
+      parameters: {
+        type: "object",
+        properties: {},
       },
     },
   },
@@ -554,6 +565,10 @@ export async function executePlannerTool(
         .returning();
       if (!row) return { error: "not found" };
       return { ok: true, task: { id: row.id, title: row.title, sprintId: row.sprintId } };
+    }
+    case "listSprints": {
+      const rows = await db.select().from(sprints).where(eq(sprints.userId, userId));
+      return { sprints: rows.map(s => ({ id: s.id, name: s.name, status: s.status, startDate: s.startDate, endDate: s.endDate })) };
     }
     default:
       return { error: `unknown tool ${name}` };
