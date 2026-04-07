@@ -141,6 +141,7 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
           dueDate: { type: "string" },
           recurrenceRule: { type: "string", description: "iCal RRULE e.g. FREQ=DAILY or FREQ=WEEKLY" },
           estimatedMinutes: { type: "integer" },
+          sprintId: { type: "string", description: "UUID of the sprint to assign this task to" },
           description: { type: "string" },
         },
         required: ["title"],
@@ -254,6 +255,23 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "createSprint",
+      description: "Create a new sprint.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          startDate: { type: "string", description: "YYYY-MM-DD" },
+          endDate: { type: "string", description: "YYYY-MM-DD" },
+          goal: { type: "string" }
+        },
+        required: ["name", "startDate", "endDate"]
+      }
+    }
+  },
 ];
 
 export async function executePlannerTool(
@@ -352,6 +370,7 @@ export async function executePlannerTool(
           dueDate: liftYmd(obj.dueDate),
           recurrenceRule: typeof obj.recurrenceRule === "string" ? obj.recurrenceRule : null,
           estimatedMinutes: typeof obj.estimatedMinutes === "number" ? obj.estimatedMinutes : null,
+          sprintId: typeof obj.sprintId === "string" ? obj.sprintId : null,
           description: typeof obj.description === "string" ? obj.description : null,
         })
         .returning();
@@ -569,6 +588,29 @@ export async function executePlannerTool(
     case "listSprints": {
       const rows = await db.select().from(sprints).where(eq(sprints.userId, userId));
       return { sprints: rows.map(s => ({ id: s.id, name: s.name, status: s.status, startDate: s.startDate, endDate: s.endDate })) };
+    }
+    case "createSprint": {
+      const name = typeof obj.name === "string" ? obj.name.trim() : "";
+      const startDate = typeof obj.startDate === "string" ? obj.startDate.trim() : "";
+      const endDate = typeof obj.endDate === "string" ? obj.endDate.trim() : "";
+      const goal = typeof obj.goal === "string" ? obj.goal.trim() : null;
+      if (!name || !startDate || !endDate) return { error: "name, startDate, endDate required" };
+
+      const existingSprints = await db.query.sprints.findMany({
+        where: eq(sprints.userId, userId),
+      });
+      const hasActive = existingSprints.some(s => s.status === "active");
+
+      const [row] = await db.insert(sprints).values({
+        userId,
+        name,
+        startDate,
+        endDate,
+        goal,
+        status: hasActive ? "planned" : "active",
+      }).returning();
+      if (!row) return { error: "failed to create sprint" };
+      return { ok: true, sprint: { id: row.id, name: row.name, status: row.status } };
     }
     default:
       return { error: `unknown tool ${name}` };

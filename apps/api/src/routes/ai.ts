@@ -60,7 +60,7 @@ async function runPlannerToolLoop(
         "A task is overdue if its scheduledDate or dueDate (compare as YYYY-MM-DD strings to today) is before today's date AND its status is not done. " +
         `For scheduledDate, dueDate, and reschedule startDate always use the correct four-digit year — typically ${todayIso.slice(0, 4)} for near-term plans. Do not use a past year unless the user explicitly asks for history. ` +
         "For life buckets use createTask areaKind: work | personal | sidequest (matches area names; Sidequest is created if missing). " +
-        "Use listSprints to find sprint IDs before assigning tasks to a sprint. Use listTasks to find task IDs before adding subtasks.",
+        "Use listSprints to find sprint IDs before assigning tasks to a sprint. If a requested sprint doesn't exist, use createSprint. Use listTasks to find task IDs before adding subtasks.",
     },
     { role: "user", content: userMessage.slice(0, 8000) },
   ];
