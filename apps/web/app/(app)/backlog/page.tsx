@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { ChevronDown, ChevronRight, Inbox, CheckCircle2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Inbox, CheckCircle2, Trash2, Plus, Circle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -12,8 +12,12 @@ import {
   fetchBacklog,
   fetchSprints,
   patchTask,
+  createSubtask,
+  patchSubtask,
+  deleteSubtask,
   type AreaRow,
   type TaskRow,
+  type SubtaskRow,
 } from "@/lib/api";
 import { SkeletonListItem } from "@/lib/skeleton";
 import { cn, displayPhysicalEnergy, displayWorkDepth, isTaskOverdue } from "@/lib/utils";
@@ -48,6 +52,7 @@ export default function BacklogPage() {
   const userId = useAppUserId();
   const qc = useQueryClient();
   const [areaFilter, setAreaFilter] = useState<AreaFilter>("all");
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const todayYmd = localISODate();
 
@@ -76,6 +81,26 @@ export default function BacklogPage() {
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  const addSubtaskM = useMutation({
+    mutationFn: ({ taskId, title }: { taskId: string; title: string }) =>
+      createSubtask({ taskId, title }),
+    onSuccess: () => {
+      setNewSubtaskTitle("");
+      void qc.invalidateQueries({ queryKey: ["backlog", userId] });
+    },
+  });
+
+  const updateSubtaskM = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<SubtaskRow> }) =>
+      patchSubtask(id, updates),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["backlog", userId] }),
+  });
+
+  const deleteSubtaskM = useMutation({
+    mutationFn: (id: string) => deleteSubtask(id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["backlog", userId] }),
   });
 
   const patchMeta = useMutation({
@@ -191,6 +216,11 @@ export default function BacklogPage() {
                           </span>
                         )}
                         <span className="min-w-0 flex-1">{t.title}</span>
+                        {t._subtasksTotal !== undefined && t._subtasksTotal > 0 && (
+                          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-muted">
+                            {t._subtasksDone}/{t._subtasksTotal}
+                          </span>
+                        )}
                         {(t._tags ?? []).slice(0, 2).map((tag) => (
                           <TagChip key={tag.id} name={tag.name} color={tag.color} size="xs" />
                         ))}
@@ -247,20 +277,7 @@ export default function BacklogPage() {
                                 }}
                               />
                             </label>
-                            <label className="text-muted">
-                              Due date
-                              <input
-                                type="date"
-                                className="mt-1 w-full rounded-md border border-white/10 bg-background px-2 py-1.5 text-foreground"
-                                defaultValue={t.dueDate?.slice(0, 10) ?? ""}
-                                onBlur={(e) => {
-                                  const v = e.target.value.trim();
-                                  if (v !== (t.dueDate?.slice(0, 10) ?? "")) {
-                                    patchMeta.mutate({ taskId: t.id, dueDate: v || null });
-                                  }
-                                }}
-                              />
-                            </label>
+
                             <label className="text-muted sm:col-span-2">
                               Sprint
                               <select
@@ -366,7 +383,67 @@ export default function BacklogPage() {
                               </select>
                             </label>
                           </div>
-                          <p className="text-[10px] text-muted/70">
+                          
+                          {/* SUBTASKS SECTION */}
+                          <div className="mt-4 pt-4 border-t border-white/10">
+                            <div className="mb-2 flex items-center justify-between">
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">Subtasks</h4>
+                            </div>
+                            <ul className="mb-3 space-y-1.5">
+                              {(t._subtasks ?? []).map((sub) => (
+                                <li key={sub.id} className="flex items-center gap-2 rounded-md bg-white/5 px-2 py-1.5 group">
+                                  <button
+                                    className="shrink-0 text-muted hover:text-white"
+                                    onClick={() => updateSubtaskM.mutate({ id: sub.id, updates: { completed: !sub.completed }})}
+                                  >
+                                    {sub.completed ? <CheckCircle2 size={14} className="text-success" /> : <Circle size={14} />}
+                                  </button>
+                                  <input 
+                                    className={cn("flex-1 bg-transparent px-1 text-xs outline-none focus:ring-1 focus:ring-primary/50 rounded", sub.completed && "line-through text-muted")}
+                                    defaultValue={sub.title}
+                                    onBlur={(e) => {
+                                      const val = e.target.value.trim();
+                                      if (val && val !== sub.title) updateSubtaskM.mutate({ id: sub.id, updates: { title: val }});
+                                    }}
+                                  />
+                                  <input
+                                    type="date"
+                                    className="w-24 shrink-0 rounded bg-background px-1 text-[10px] text-muted border border-transparent hover:border-white/10 outline-none"
+                                    defaultValue={sub.scheduledDate?.slice(0, 10) ?? ""}
+                                    title="Scheduled date"
+                                    onChange={(e) => updateSubtaskM.mutate({ id: sub.id, updates: { scheduledDate: e.target.value || null } })}
+                                  />
+                                  <button
+                                    onClick={() => deleteSubtaskM.mutate(sub.id)}
+                                    className="opacity-0 group-hover:opacity-100 p-0.5 text-muted hover:bg-danger/20 hover:text-danger rounded sm-transition"
+                                    title="Delete subtask"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </li>
+                              ))}
+                              {(t._subtasks ?? []).length === 0 && (
+                                <p className="text-[10px] text-muted/60 italic px-1">No subtasks yet</p>
+                              )}
+                            </ul>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                placeholder="+ Add subtask..."
+                                className="flex-1 rounded-md border border-white/5 bg-background px-3 py-1.5 text-xs focus:border-primary/50 focus:outline-none"
+                                value={newSubtaskTitle}
+                                onChange={e => setNewSubtaskTitle(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === "Enter" && newSubtaskTitle.trim()) {
+                                    e.preventDefault();
+                                    addSubtaskM.mutate({ taskId: t.id, title: newSubtaskTitle.trim() });
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <p className="mt-3 text-[10px] text-muted/70">
                             Blur date fields to save. Other fields save on change.
                           </p>
                         </div>

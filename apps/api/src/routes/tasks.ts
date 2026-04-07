@@ -244,6 +244,8 @@ export const taskRoutes = new Hono<AppEnv>()
     // Batch load tags
     const blIds = rows.map((t) => t.id);
     const blTagMap: Record<string, Array<{ id: number; name: string; color: string | null }>> = {};
+    const blSubtaskMap: Record<string, any[]> = {};
+    
     if (blIds.length > 0) {
       const blTagRows = await db
         .select({ taskId: taskTags.taskId, tagId: tags.id, tagName: tags.name, tagColor: tags.color })
@@ -255,8 +257,25 @@ export const taskRoutes = new Hono<AppEnv>()
         if (!blTagMap[r.taskId]) blTagMap[r.taskId] = [];
         blTagMap[r.taskId].push({ id: r.tagId, name: r.tagName, color: r.tagColor });
       }
+
+      const blSubs = await db.query.subtasks.findMany({
+        where: inArray(subtasks.taskId, blIds),
+        orderBy: (s, { asc }) => [asc(s.createdAt)]
+      });
+      for (const s of blSubs) {
+        if (!blSubtaskMap[s.taskId]) blSubtaskMap[s.taskId] = [];
+        blSubtaskMap[s.taskId].push(s);
+      }
     }
-    return c.json({ tasks: rows.map((t) => ({ ...withTaskApiFields(t), _tags: blTagMap[t.id] ?? [] })) });
+    return c.json({ 
+      tasks: rows.map((t) => ({ 
+        ...withTaskApiFields(t), 
+        _tags: blTagMap[t.id] ?? [],
+        _subtasks: blSubtaskMap[t.id] ?? [],
+        _subtasksDone: (blSubtaskMap[t.id] ?? []).filter((s: any) => s.completed).length,
+        _subtasksTotal: (blSubtaskMap[t.id] ?? []).length
+      })) 
+    });
   })
   .post("/brain-dump", async (c) => {
     const parsed = brainDumpBody.safeParse(await c.req.json());
@@ -277,9 +296,15 @@ export const taskRoutes = new Hono<AppEnv>()
     const lines = Array.isArray(rawLines)
       ? rawLines
       : rawLines.split("\n").map((l) => l.replace(/^[-*•\d.)]+\s*/, "").trim());
-    const titles = lines.map((l) => l.trim()).filter(Boolean).slice(0, 200);
+    
+    const junkPrefixes = [/^task title:/i, /^sprint:/i, /^status:/i, /^priority:/i, /^difficulty:/i, /^effort:/i, /^due date:/i, /^subtasks:/i, /^recurrence:/i];
+    const titles = lines
+      .map((l) => l.trim())
+      .filter((l) => l && !junkPrefixes.some(p => p.test(l)))
+      .slice(0, 200);
+
     if (!titles.length) {
-      return c.json({ error: "no lines" }, 422);
+      return c.json({ error: "no valid lines to create" }, 422);
     }
     const { recurrenceRule } = parsed.data;
     const inserted = await db
@@ -457,6 +482,13 @@ export const taskRoutes = new Hono<AppEnv>()
       return c.json({ error: parsed.error.flatten() }, 422);
     }
     const v = parsed.data;
+    
+    // Bug 1 Fix: Reject AI generated metadata labels masquerading as task titles
+    const junkPrefixes = [/^task title:/i, /^sprint:/i, /^status:/i, /^priority:/i, /^difficulty:/i, /^effort:/i, /^due date:/i, /^subtasks:/i, /^recurrence:/i];
+    if (junkPrefixes.some(p => p.test(v.title))) {
+      return c.json({ error: "Invalid task title — metadata labels are not valid task names" }, 400);
+    }
+
     const userId = c.get("userId");
     try {
       assertSaneCalendarDate("scheduledDate", v.scheduledDate ?? undefined);

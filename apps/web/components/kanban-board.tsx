@@ -21,6 +21,7 @@ import { useAppUserId } from "@/hooks/use-app-user-id";
 import { useTags } from "@/hooks/use-tags";
 import {
   fetchSprints,
+  createSprint,
   createTask,
   deleteTask,
   fetchAreas,
@@ -388,6 +389,15 @@ export function KanbanBoard() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ["tasks", userId] }),
   });
 
+  const createSprintM = useMutation({
+    mutationFn: (body: Parameters<typeof createSprint>[0]) => createSprint(body),
+    onSuccess: () => {
+       toast.success("Sprint created!");
+       void qc.invalidateQueries({ queryKey: ["sprints", userId] });
+    },
+    onError: (e: Error) => toast.error(e.message)
+  });
+
   const rescueMut = useMutation({
     mutationFn: (ids: string[]) => patchTasksBulkSchedule(ids, todayYmd),
     onSuccess: (r) => {
@@ -449,15 +459,71 @@ export function KanbanBoard() {
 
   if (!activeSprint) {
     return (
-      <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-surface/50 py-16 text-center">
+      <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-surface/50 py-16 px-6 text-center">
         <Sparkles size={32} className="mb-4 text-primary/40" />
-        <p className="text-foreground font-medium text-sm">No active sprint</p>
-        <p className="mt-1 text-xs text-muted max-w-md">
-          You don&apos;t have an active sprint. Head over to the Sprints page to create a new sprint and start adding tasks from your backlog!
+        <p className="text-foreground font-medium text-lg">No active sprint</p>
+        <p className="mt-1 text-sm text-muted max-w-md">
+          Create a new sprint to start adding tasks from your backlog and tracking your progress!
         </p>
-        <Link href="/sprints" className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors">
-          Go to Sprints
-        </Link>
+        
+        <form 
+          className="mt-8 flex flex-col items-center gap-3 w-full max-w-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            const name = fd.get("name") as string;
+            const startDate = fd.get("startDate") as string;
+            const endDate = fd.get("endDate") as string;
+            if (!name || !startDate || !endDate) {
+               toast.error("Please fill in all sprint fields.");
+               return;
+            }
+            createSprintM.mutate({ name, startDate, endDate, status: "active" });
+          }}
+        >
+          <input 
+             name="name" 
+             placeholder="Sprint name (e.g. Launch Week)" 
+             className="w-full rounded-lg border border-white/10 bg-background px-4 py-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50" 
+             required
+             defaultValue="Sprint 1"
+          />
+          <div className="flex gap-3 w-full">
+             <div className="flex-1">
+               <label className="block text-left text-[10px] uppercase font-semibold text-muted mb-1 px-1">Start date</label>
+               <input 
+                 type="date" 
+                 name="startDate" 
+                 className="w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none" 
+                 required
+                 defaultValue={localISODate()}
+               />
+             </div>
+             <div className="flex-1">
+               <label className="block text-left text-[10px] uppercase font-semibold text-muted mb-1 px-1">End date</label>
+               <input 
+                 type="date" 
+                 name="endDate" 
+                 className="w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none" 
+                 required
+                 defaultValue={localISODate(new Date(Date.now() + 14 * 86400000))}
+               />
+             </div>
+          </div>
+          <button 
+             type="submit" 
+             disabled={createSprintM.isPending}
+             className="w-full mt-2 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
+          >
+             <Plus size={16} /> Create & Start Sprint
+          </button>
+        </form>
+
+        <div className="mt-6 border-t border-white/5 pt-4">
+          <Link href="/sprints" className="text-xs text-muted hover:text-white hover:underline transition-colors">
+            Or manage sprints in the Sprints page →
+          </Link>
+        </div>
       </div>
     );
   }

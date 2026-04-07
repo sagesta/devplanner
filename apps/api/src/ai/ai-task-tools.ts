@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNull } from "drizzle-orm";
 import type OpenAI from "openai";
 import { db } from "../db/client.js";
 import { areas, sprints, tasks, subtasks } from "../db/schema.js";
@@ -190,7 +190,7 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
   {
     type: "function",
     function: {
-      name: "addSubtask",
+      name: "createSubtask",
       description:
         "Add a single step/subtask to an existing task. Use this to break down a task into executable steps. " +
         "Subtasks with scheduledDate appear in the Now view and Timeline. " +
@@ -208,6 +208,53 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
         required: ["taskId", "title"],
       },
     },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getSubtasks",
+      description: "List all subtasks for a given task. You should use this to get subtask IDs before trying to update or delete them.",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: { type: "string" },
+          taskTitle: { type: "string", description: "Use this if taskId is unknown but you know the parent task title" }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "updateSubtask",
+      description: "Update an existing subtask. You MUST provide the subtaskId.",
+      parameters: {
+        type: "object",
+        properties: {
+          subtaskId: { type: "string" },
+          title: { type: "string" },
+          completed: { type: "boolean" },
+          scheduledDate: { type: "string", description: "YYYY-MM-DD" },
+          scheduledTime: { type: "string", description: "HH:MM" },
+          estimatedMinutes: { type: "integer" }
+        },
+        required: ["subtaskId"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "deleteSubtask",
+      description: "Delete a subtask by ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          subtaskId: { type: "string" }
+        },
+        required: ["subtaskId"]
+      }
+    }
   },
   {
     type: "function",
@@ -575,11 +622,12 @@ export async function executePlannerTool(
       
       return { ok: true, subtask: sub };
     }
-    case "addSubtask": {
+    case "createSubtask": {
       const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
       const title = typeof obj.title === "string" ? obj.title.trim().slice(0, 500) : "";
       const completed = typeof obj.completed === "boolean" ? obj.completed : false;
       const scheduledDate = typeof obj.scheduledDate === "string" ? liftYmd(obj.scheduledDate) : null;
+      const scheduledTime = typeof obj.scheduledTime === "string" ? obj.scheduledTime : null;
       if (!taskId) return { error: "taskId required" };
       if (!title) return { error: "title required" };
 
@@ -595,6 +643,7 @@ export async function executePlannerTool(
           title,
           completed,
           scheduledDate,
+          scheduledTime,
           estimatedMinutes: typeof obj.estimatedMinutes === "number" ? obj.estimatedMinutes : null,
           completedAt: completed ? new Date() : null
         })
@@ -665,6 +714,63 @@ export async function executePlannerTool(
       await rollupParentTaskStatus(db, taskId);
 
       return { ok: true, subtasks: rows };
+    }
+    case "getSubtasks": {
+      const parentTaskId = typeof obj.taskId === "string" ? obj.taskId : null;
+      const term = typeof obj.taskTitle === "string" ? obj.taskTitle : null;
+      
+      let tid = parentTaskId;
+      if (!tid && term) {
+        const matches = await db.query.tasks.findMany({
+          where: and(ilike(tasks.title, `%${term}%`), eq(tasks.userId, userId), isNull(tasks.deletedAt)),
+          limit: 1
+        });
+        if (matches.length > 0) tid = matches[0].id;
+      }
+      
+      if (!tid) return { error: "Could not identify parent task. Try calling listTasks first." };
+      
+      const subs = await db.query.subtasks.findMany({
+        where: eq(subtasks.taskId, tid),
+        orderBy: (s, { asc }) => [asc(s.createdAt)]
+      });
+      return { subtasks: subs };
+    }
+    case "updateSubtask": {
+      const subtaskId = typeof obj.subtaskId === "string" ? obj.subtaskId : "";
+      if (!subtaskId) return { error: "subtaskId required" };
+
+      const existing = await db.query.subtasks.findFirst({
+        where: eq(subtasks.id, subtaskId)
+      });
+      if (!existing) return { error: "subtask not found" };
+
+      const updates: Record<string, unknown> = {};
+      if (typeof obj.title === "string") updates.title = obj.title.trim().slice(0, 500);
+      if (typeof obj.completed === "boolean") {
+        updates.completed = obj.completed;
+        updates.completedAt = obj.completed ? new Date() : null;
+      }
+      if (typeof obj.scheduledDate === "string") {
+        updates.scheduledDate = obj.scheduledDate.trim() === "" ? null : liftYmd(obj.scheduledDate);
+      }
+      if (typeof obj.scheduledTime === "string") updates.scheduledTime = obj.scheduledTime;
+      if (typeof obj.estimatedMinutes === "number") updates.estimatedMinutes = obj.estimatedMinutes;
+
+      const [row] = await db.update(subtasks).set(updates).where(eq(subtasks.id, subtaskId)).returning();
+      if (row) await rollupParentTaskStatus(db, row.taskId);
+      return { ok: true, subtask: row };
+    }
+    case "deleteSubtask": {
+      const subtaskId = typeof obj.subtaskId === "string" ? obj.subtaskId : "";
+      if (!subtaskId) return { error: "subtaskId required" };
+      
+      const existing = await db.query.subtasks.findFirst({ where: eq(subtasks.id, subtaskId) });
+      if (!existing) return { error: "subtask not found" };
+
+      await db.delete(subtasks).where(eq(subtasks.id, subtaskId));
+      await rollupParentTaskStatus(db, existing.taskId);
+      return { ok: true, deletedId: subtaskId };
     }
     case "assignTaskToSprint": {
       const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
