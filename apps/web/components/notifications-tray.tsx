@@ -5,7 +5,6 @@ import { Bell, Sparkles, X } from "lucide-react";
 import { useMemo } from "react";
 import { useAppUserId } from "@/hooks/use-app-user-id";
 import { fetchGoogleCalendarStatus, fetchTasks } from "@/lib/api";
-import { normalizeYmd } from "@/lib/timeline-utils";
 import { cn, isTaskOverdue } from "@/lib/utils";
 
 function localISODate(d = new Date()) {
@@ -45,30 +44,34 @@ export function NotificationsTray({ open, onClose }: { open: boolean; onClose: (
 
   const { actionable, googleDetail } = useMemo(() => {
     const out: TrayItem[] = [];
-    const roots = (tasksQ.data ?? []).filter((t) => !t.parentTaskId);
-    const overdue = roots.filter((t) => isTaskOverdue(t, today));
+    const allTasks = tasksQ.data ?? [];
+    const overdue = allTasks.filter((t) => isTaskOverdue(t, today));
     for (const t of overdue.slice(0, 12)) {
       out.push({
         kind: "overdue",
         title: t.title,
-        detail: `Scheduled ${t.scheduledDate ?? t.dueDate ?? "—"}`,
+        detail: `Due ${t.dueDate ?? "—"}`,
       });
     }
 
+    // "Soon" — subtasks scheduled today with a scheduledTime in the next 2 hours
     const nowM = new Date().getHours() * 60 + new Date().getMinutes();
-    const soon = roots.filter((t) => {
-      if (t.status === "done" || t.status === "cancelled") return false;
-      if (normalizeYmd(t.scheduledDate) !== today) return false;
-      const sm = parseTimeToMinutes(t.scheduledStartTime);
-      if (sm == null) return false;
-      return sm >= nowM && sm <= nowM + 120;
-    });
-    for (const t of soon.slice(0, 8)) {
-      const block =
-        t.scheduledStartTime && t.scheduledEndTime
-          ? `${t.scheduledStartTime.slice(0, 5)}–${t.scheduledEndTime.slice(0, 5)}`
-          : t.scheduledStartTime?.slice(0, 5);
-      out.push({ kind: "soon", title: t.title, detail: block ? `Starts ${block}` : "Starting soon" });
+    for (const t of allTasks) {
+      if (t.status === "done" || t.status === "cancelled") continue;
+      for (const s of t._subtasks ?? []) {
+        if (s.scheduledDate !== today) continue;
+        if (s.completed) continue;
+        const sm = parseTimeToMinutes(s.scheduledTime);
+        if (sm == null) continue;
+        if (sm >= nowM && sm <= nowM + 120) {
+          out.push({
+            kind: "soon",
+            title: `${t.title} → ${s.title}`,
+            detail: s.scheduledTime ? `Starts ${s.scheduledTime.slice(0, 5)}` : "Starting soon",
+          });
+        }
+      }
+      if (out.filter(i => i.kind === "soon").length >= 8) break;
     }
 
     let g: string | null = null;

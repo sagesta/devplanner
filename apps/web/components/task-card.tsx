@@ -17,9 +17,7 @@ type TaskCardProps = {
   energyLevel: string;
   areaColor?: string | null;
   areaName?: string;
-  scheduledDate?: string | null;
-  scheduledStartTime?: string | null;
-  scheduledEndTime?: string | null;
+  dueDate?: string | null;
   subtasksDone?: number;
   subtasksTotal?: number;
   compact?: boolean;
@@ -122,9 +120,7 @@ export const TaskCard = memo(function TaskCard({
   energyLevel,
   areaColor,
   areaName,
-  scheduledDate,
-  scheduledStartTime,
-  scheduledEndTime,
+  dueDate,
   subtasksDone,
   subtasksTotal,
   compact = false,
@@ -171,10 +167,6 @@ export const TaskCard = memo(function TaskCard({
   }, []);
 
   const hasSubtasks = subtasksTotal != null && subtasksTotal > 0;
-  const timeBlock =
-    scheduledStartTime && scheduledEndTime
-      ? `${scheduledStartTime.slice(0, 5)}–${scheduledEndTime.slice(0, 5)}`
-      : null;
 
   const depth = depthLabel ?? "normal";
   const energy = energyLabel ?? "medium";
@@ -323,11 +315,8 @@ export const TaskCard = memo(function TaskCard({
             >
               E:{energy}
             </span>
-            {timeBlock && (
-              <span className="text-[10px] font-mono text-muted">{timeBlock}</span>
-            )}
-            {scheduledDate && !timeBlock && (
-              <span className="text-[10px] text-muted">{scheduledDate}</span>
+            {dueDate && (
+              <span className="text-[10px] text-muted tooltip-hover" title="Due Date">Due: {dueDate}</span>
             )}
           </div>
           {hasSubtasks && (

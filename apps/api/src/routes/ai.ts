@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { streamText } from "hono/streaming";
 import OpenAI from "openai";
@@ -7,7 +7,7 @@ import { executePlannerTool, PLANNER_CHAT_TOOLS } from "../ai/ai-task-tools.js";
 import { logAiCall } from "../ai/logCall.js";
 import { openaiJsonCompletion } from "../ai/openai-json.js";
 import { db } from "../db/client.js";
-import { aiCallLog, tasks } from "../db/schema.js";
+import { aiCallLog, subtasks, tasks } from "../db/schema.js";
 import type { AppEnv } from "../types.js";
 
 const parseDumpBody = z.object({
@@ -30,7 +30,7 @@ const chatBody = z.object({
 const ALLOWED_CHAT_MODELS = new Set(["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4"]);
 
 function resolveChatModel(requested?: string): string {
-  const fallback = process.env.OPENAI_SMART_MODEL ?? "gpt-4o-mini";
+  const fallback = process.env.OPENAI_SMART_MODEL ?? "gpt-4o";
   if (requested && ALLOWED_CHAT_MODELS.has(requested)) return requested;
   return fallback;
 }
@@ -43,24 +43,31 @@ async function runPlannerToolLoop(
   opts?: { currentPhysicalEnergy?: "low" | "medium" | "high" }
 ): Promise<{ text: string; approxChars: number }> {
   const energyHint = opts?.currentPhysicalEnergy
-    ? ` The user's current energy level is: ${opts.currentPhysicalEnergy}. When recommending what to do next, match task cognitive load (energyLevel / workDepth) to this level: prefer shallow and admin tasks for Low energy, routine/admin for Medium, and deep_work tasks for High when appropriate.`
+    ? ` The user's current energy level is: ${opts.currentPhysicalEnergy}. When recommending what to do next, match task cognitive load to this: prefer shallow/admin for Low, deep_work for High.`
     : "";
   const todayIso = new Date().toISOString().split("T")[0]!;
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     {
       role: "system",
       content:
-        "You are DevPlanner assistant with tools that read and modify the user's real task board. " +
-        "When asked to list, create, update, delete, or reschedule tasks, call the appropriate tools. " +
-        "For bulk deletes (e.g. all done tasks), call listTasks with status filter first, then deleteTask for each id. " +
-        "After tools finish, reply in one or two short sentences confirming what changed (counts, titles). " +
-        "Be concise and ADHD-friendly." +
-        energyHint +
-        ` Today's date is ${todayIso}. ` +
-        "A task is overdue if its scheduledDate or dueDate (compare as YYYY-MM-DD strings to today) is before today's date AND its status is not done. " +
-        `For scheduledDate, dueDate, and reschedule startDate always use the correct four-digit year — typically ${todayIso.slice(0, 4)} for near-term plans. Do not use a past year unless the user explicitly asks for history. ` +
-        "For life buckets use createTask areaKind: work | personal | sidequest (matches area names; Sidequest is created if missing). " +
-        "Use listSprints to find sprint IDs before assigning tasks to a sprint. If a requested sprint doesn't exist, use createSprint. Use listTasks to find task IDs before adding subtasks.",
+        `You are DevPlanner AI — a smart, concise planning assistant that manages the user's real task board. Today is ${todayIso}. ` +
+        `\n\nARCHITECTURE (CRITICAL — read carefully):` +
+        `\n- The system uses 3 levels: Sprint → Task → Subtask.` +
+        `\n- TASKS are the parent unit (title, priority, sprintId, dueDate). They never have a scheduledDate themselves.` +
+        `\n- SUBTASKS are the schedulable execution units. Each subtask has: title, scheduledDate (YYYY-MM-DD), scheduledTime (HH:MM, optional), estimatedMinutes, completed.` +
+        `\n- The Now view shows subtasks scheduled for today. The Timeline shows subtasks as dots on a calendar.` +
+        `\n- To schedule a task for a day, you CREATE A SUBTASK with that scheduledDate — not by modifying the task.` +
+        `\n- A task with no subtasks is shown as a flat task (appears in Now/Timeline only if it has a dueDate).` +
+        `\n\nWORKFLOW RULES:` +
+        `\n- To break down a task: call listTasks to find its ID, then createSubtasks with meaningful steps.` +
+        `\n- To schedule work: createSubtasks with scheduledDate fields, or use spreadSubtasksAcrossDays.` +
+        `\n- To create a task AND schedule it in one step: use createTask with scheduledDate (auto-creates a matching subtask).` +
+        `\n- For bulk deletes (e.g. all done tasks): listTasks with status filter, then deleteTask for each.` +
+        `\n- Always use listSprints before assigning tasks to sprints. If sprint doesn’t exist, use createSprint.` +
+        `\n- A task is overdue if its dueDate is before today AND status is not done.` +
+        `\n- Use areaKind: work | personal | sidequest to pick the right area automatically.` +
+        `\n\nSTYLE: Be concise and ADHD-friendly. After tool calls complete, reply in 1-2 sentences confirming what changed.` +
+        energyHint,
     },
     { role: "user", content: userMessage.slice(0, 8000) },
   ];
@@ -189,16 +196,20 @@ export const aiRoutes = new Hono<AppEnv>()
   .post("/briefing", async (c) => {
     const uid = c.get("userId");
     const today = new Date().toISOString().slice(0, 10);
-    const openToday = await db.query.tasks.findMany({
-      where: and(
-        eq(tasks.userId, uid),
-        isNull(tasks.deletedAt),
-        or(eq(tasks.scheduledDate, today), eq(tasks.dueDate, today))
-      ),
-    });
+    // Find tasks that have subtasks scheduled today
+    const subMatches = await db
+      .select({ taskId: subtasks.taskId })
+      .from(subtasks)
+      .where(eq(subtasks.scheduledDate, today));
+    const taskIds = [...new Set(subMatches.map(s => s.taskId))];
+    const openToday = taskIds.length > 0
+      ? await db.query.tasks.findMany({
+          where: and(eq(tasks.userId, uid), isNull(tasks.deletedAt), inArray(tasks.id, taskIds))
+        })
+      : [];
     return c.json({
       date: today,
-      summary: `You have ${openToday.length} task(s) scheduled today.`,
+      summary: `You have ${openToday.length} task(s) with work scheduled today.`,
       tasks: openToday.map((t) => ({ id: t.id, title: t.title, status: t.status })),
     });
   })

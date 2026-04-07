@@ -38,14 +38,8 @@ export type TaskRow = {
   status: string;
   priority: string;
   energyLevel: string;
-  taskType: string;
-  scheduledDate: string | null;
-  scheduledStartTime: string | null;
-  scheduledEndTime: string | null;
-  estimatedMinutes: number | null;
   dueDate: string | null;
   sprintId: string | null;
-  parentTaskId: string | null;
   icalUid?: string | null;
   caldavResourceFilename?: string | null;
   caldavRemoteDtstamp?: string | null;
@@ -65,7 +59,20 @@ export type TaskRow = {
   recurring?: boolean;
   _subtasksDone?: number;
   _subtasksTotal?: number;
+  _subtasks?: SubtaskRow[];
   _tags?: Array<{ id: number; name: string; color: string | null }>;
+};
+
+export type SubtaskRow = {
+  id: string;
+  taskId: string;
+  title: string;
+  completed: boolean;
+  scheduledDate: string | null;
+  scheduledTime: string | null;
+  estimatedMinutes: number | null;
+  completedAt: string | null;
+  createdAt: string;
 };
 
 export type AreaRow = {
@@ -127,7 +134,7 @@ export async function fetchToday(date?: string) {
 export async function fetchTaskDetail(taskId: string) {
   return fetchJson<{
     task: TaskRow;
-    subtasks: TaskRow[];
+    subtasks: SubtaskRow[];
     subtaskProgress: { done: number; total: number } | null;
   }>(apiUrl(`/api/tasks/${taskId}`));
 }
@@ -172,6 +179,53 @@ export async function deleteTask(taskId: string) {
 export async function restoreTask(taskId: string) {
   return fetchJson<{ task: TaskRow }>(apiUrl(`/api/tasks/restore/${taskId}`), {
     method: "POST",
+  });
+}
+
+// ─── Subtasks ─────────────────────────────────────────────────────
+export async function createSubtask(body: {
+  taskId: string;
+  title: string;
+  scheduledDate?: string | null;
+  scheduledTime?: string | null;
+  estimatedMinutes?: number | null;
+}) {
+  return fetchJson<{ subtask: SubtaskRow }>(apiUrl("/api/subtasks"), {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchSubtask(id: string, body: Partial<{
+  title: string;
+  completed: boolean;
+  scheduledDate: string | null;
+  scheduledTime: string | null;
+  estimatedMinutes: number | null;
+}>) {
+  return fetchJson<{ subtask: SubtaskRow }>(apiUrl(`/api/subtasks/${id}`), {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteSubtask(id: string) {
+  return fetchJson<{ ok: boolean }>(apiUrl(`/api/subtasks/${id}`), {
+    method: "DELETE",
+  });
+}
+
+export async function postSubtasksBulk(taskId: string, subtasks: { title: string; scheduledDate?: string | null; estimatedMinutes?: number | null }[]) {
+  return fetchJson<{ subtasks: SubtaskRow[] }>(apiUrl("/api/subtasks/bulk"), {
+    method: "POST",
+    body: JSON.stringify({ taskId, subtasks }),
+  });
+}
+
+export async function postSubtasksSpread(taskId: string, subtaskTitles: string[], startDate: string, endDate: string, maxPerDay?: number) {
+  return fetchJson<{ subtasks: SubtaskRow[] }>(apiUrl("/api/subtasks/spread"), {
+    method: "POST",
+    body: JSON.stringify({ taskId, subtaskTitles, startDate, endDate, maxPerDay }),
   });
 }
 

@@ -4,7 +4,7 @@
  */
 import "../lib/loadRootEnv.js";
 import { Worker } from "bullmq";
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { caldavEnabled } from "../caldav/config.js";
 import { buildTaskVcalendar } from "../caldav/ical.js";
 import { runCaldavPullForUser, listUserIdsForCaldavPull } from "../caldav/pull-sync.js";
@@ -36,8 +36,7 @@ async function runIdleScan() {
       .where(
         and(
           eq(tasks.status, "in_progress"),
-          isNotNull(tasks.estimatedMinutes),
-          sql`${tasks.updatedAt} < NOW() - (${tasks.estimatedMinutes} * 2) * INTERVAL '1 minute'`,
+          sql`${tasks.updatedAt} < NOW() - INTERVAL '2 hours'`,
           eq(tasks.idleFlagged, false)
         )
       );
@@ -138,11 +137,11 @@ const syncWorker = new Worker(
       description: task.description,
       status: task.status,
       priority: task.priority,
-      scheduledDate: task.scheduledDate,
-      scheduledStartTime: task.scheduledStartTime,
-      scheduledEndTime: task.scheduledEndTime,
+      scheduledDate: task.dueDate ?? null,
+      scheduledStartTime: null,
+      scheduledEndTime: null,
       dueDate: task.dueDate,
-      estimatedMinutes: task.estimatedMinutes,
+      estimatedMinutes: null,
       recurrenceRule: task.recurrenceRule,
       caldavUid: effectiveCaldavUid,
       icalUid: task.icalUid,

@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type OpenAI from "openai";
 import { db } from "../db/client.js";
-import { areas, sprints, tasks } from "../db/schema.js";
+import { areas, sprints, tasks, subtasks } from "../db/schema.js";
 import { enqueueTaskCalendarSync } from "../queues/definitions.js";
 import { rollupParentTaskStatus } from "../services/task-rollup.js";
 import { liftStaleScheduleYear } from "./schedule-date-normalize.js";
@@ -99,12 +99,12 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
     function: {
       name: "listTasks",
       description:
-        "List the user's tasks (main tasks only, not subtasks). Filter by status and/or scheduled date.",
+        "List the user's tasks. Filter by status and/or scheduled date. Always call this before addSubtask/createSubtasks to find the correct taskId.",
       parameters: {
         type: "object",
         properties: {
           status: { type: "string", enum: [...STATUS_ENUM] },
-          scheduledDate: { type: "string", description: "YYYY-MM-DD" },
+          scheduledDate: { type: "string", description: "YYYY-MM-DD — returns tasks that have subtasks scheduled on this date" },
           limit: { type: "integer", minimum: 1, maximum: 100 },
         },
       },
@@ -115,7 +115,7 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
     function: {
       name: "createTask",
       description:
-        "Create a new task. Prefer areaKind work|personal|sidequest for life buckets (matches area name; creates Sidequest if missing). Otherwise areaId or first area by sort.",
+        "Create a new task. Can optionally schedule it via an implicit subtask if scheduledDate is provided.",
       parameters: {
         type: "object",
         properties: {
@@ -124,24 +124,20 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
           areaKind: {
             type: "string",
             enum: ["work", "personal", "sidequest"],
-            description: "Maps to user's area by name (case-insensitive)",
           },
           status: { type: "string", enum: [...STATUS_ENUM] },
           priority: { type: "string", enum: ["urgent", "high", "normal", "low"] },
           energyLevel: {
             type: "string",
             enum: ["deep_work", "shallow", "admin", "quick_win"],
-            description: "Cognitive / focus type (legacy field)",
           },
           workDepth: { type: "string", enum: ["shallow", "normal", "deep"] },
           physicalEnergy: { type: "string", enum: ["low", "medium", "high"] },
-          scheduledDate: { type: "string" },
-          scheduledStartTime: { type: "string", description: "HH:MM or HH:MM:SS" },
-          scheduledEndTime: { type: "string" },
-          dueDate: { type: "string" },
-          recurrenceRule: { type: "string", description: "iCal RRULE e.g. FREQ=DAILY or FREQ=WEEKLY" },
+          dueDate: { type: "string", description: "YYYY-MM-DD" },
+          scheduledDate: { type: "string", description: "YYYY-MM-DD (creates implicit scheduled subtask)" },
           estimatedMinutes: { type: "integer" },
-          sprintId: { type: "string", description: "UUID of the sprint to assign this task to" },
+          recurrenceRule: { type: "string" },
+          sprintId: { type: "string" },
           description: { type: "string" },
         },
         required: ["title"],
@@ -157,11 +153,10 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
         type: "object",
         properties: {
           taskId: { type: "string" },
-          areaId: { type: "string", description: "UUID — move task to this area" },
+          areaId: { type: "string" },
           areaKind: {
             type: "string",
             enum: ["work", "personal", "sidequest"],
-            description: "Move task to area by name (creates Sidequest if missing)",
           },
           title: { type: "string" },
           status: { type: "string", enum: [...STATUS_ENUM] },
@@ -172,12 +167,8 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
           },
           workDepth: { type: "string", enum: ["shallow", "normal", "deep"] },
           physicalEnergy: { type: "string", enum: ["low", "medium", "high"] },
-          scheduledDate: { type: "string", description: "YYYY-MM-DD or empty to clear" },
-          scheduledStartTime: { type: "string" },
-          scheduledEndTime: { type: "string" },
           dueDate: { type: "string" },
           recurrenceRule: { type: "string" },
-          estimatedMinutes: { type: "integer" },
           description: { type: "string" },
         },
         required: ["taskId"],
@@ -199,35 +190,89 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
   {
     type: "function",
     function: {
-      name: "rescheduleTasks",
+      name: "addSubtask",
       description:
-        "Assign sequential scheduled dates to tasks (e.g. spread across days). stepDays defaults to 1.",
+        "Add a single step/subtask to an existing task. Use this to break down a task into executable steps. " +
+        "Subtasks with scheduledDate appear in the Now view and Timeline. " +
+        "You MUST call listTasks first to get the correct taskId.",
       parameters: {
         type: "object",
         properties: {
-          taskIds: { type: "array", items: { type: "string" } },
-          startDate: { type: "string", description: "YYYY-MM-DD for the first task" },
-          stepDays: { type: "integer", minimum: 1, maximum: 30 },
+          taskId: { type: "string", description: "UUID of the parent task" },
+          title: { type: "string", description: "The step title" },
+          scheduledDate: { type: "string", description: "YYYY-MM-DD — which day to do this step" },
+          scheduledTime: { type: "string", description: "HH:MM — optional time block" },
+          estimatedMinutes: { type: "integer", description: "Estimated minutes for this step" },
+          completed: { type: "boolean" }
         },
-        required: ["taskIds", "startDate"],
+        required: ["taskId", "title"],
       },
     },
   },
   {
     type: "function",
     function: {
-      name: "addSubtask",
-      description: "Add a subtask to an existing task",
+      name: "createSubtasks",
+      description:
+        "Break a task into multiple steps at once. Use when user asks to plan, break down, or decompose a task. " +
+        "Each subtask can optionally have a scheduledDate to appear in the Now view. " +
+        "You MUST call listTasks first to get the correct taskId.",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: { type: "string", description: "UUID of the parent task" },
+          subtasks: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "Step title" },
+                scheduledDate: { type: "string", description: "YYYY-MM-DD" },
+                scheduledTime: { type: "string", description: "HH:MM" },
+                estimatedMinutes: { type: "integer" }
+              },
+              required: ["title"]
+            },
+            description: "List of steps to create"
+          }
+        },
+        required: ["taskId", "subtasks"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "spreadSubtasksAcrossDays",
+      description: "Create AI-distributed subtasks across a date range for a parent task. Good for spreading work out.",
       parameters: {
         type: "object",
         properties: {
           taskId: { type: "string" },
-          title: { type: "string" },
-          completed: { type: "boolean" }
+          subtaskTitles: { type: "array", items: { type: "string" } },
+          startDate: { type: "string", description: "YYYY-MM-DD" },
+          endDate: { type: "string", description: "YYYY-MM-DD" },
+          maxPerDay: { type: "integer", default: 3, description: "Max subtasks per day" }
         },
-        required: ["taskId", "title"],
-      },
-    },
+        required: ["taskId", "subtaskTitles", "startDate", "endDate"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "scheduleTask",
+      description: "Set the scheduledDate on a task that has no subtasks (by creating an implicit identical subtask).",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: { type: "string" },
+          scheduledDate: { type: "string", description: "YYYY-MM-DD" },
+          estimatedMinutes: { type: "integer" }
+        },
+        required: ["taskId", "scheduledDate"]
+      }
+    }
   },
   {
     type: "function",
@@ -284,18 +329,28 @@ export async function executePlannerTool(
   switch (name) {
     case "listTasks": {
       const limit = Math.min(Math.max(Number(obj.limit) || 50, 1), 100);
-      const conditions = [eq(tasks.userId, userId), isNull(tasks.parentTaskId), isNull(tasks.deletedAt)];
+      const conditions = [eq(tasks.userId, userId), isNull(tasks.deletedAt)];
+      
       if (typeof obj.status === "string" && STATUS_ENUM.includes(obj.status as (typeof STATUS_ENUM)[number])) {
         conditions.push(eq(tasks.status, obj.status as (typeof STATUS_ENUM)[number]));
       }
+
+      let subScheduledTaskIds: string[] | null = null;
       if (typeof obj.scheduledDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(obj.scheduledDate)) {
-        conditions.push(eq(tasks.scheduledDate, obj.scheduledDate));
+        const subs = await db.query.subtasks.findMany({
+          where: eq(subtasks.scheduledDate, obj.scheduledDate)
+        });
+        subScheduledTaskIds = subs.map(s => s.taskId);
+        if (subScheduledTaskIds.length === 0) return { count: 0, tasks: [] };
+        conditions.push(inArray(tasks.id, subScheduledTaskIds));
       }
+
       const rows = await db.query.tasks.findMany({
         where: and(...conditions),
         orderBy: (t, { asc }) => [asc(t.sortOrder), asc(t.createdAt)],
         limit,
       });
+
       const areaIds = [...new Set(rows.map((r) => r.areaId))];
       const areaRows =
         areaIds.length > 0
@@ -304,6 +359,7 @@ export async function executePlannerTool(
             })
           : [];
       const areaNameById = new Map(areaRows.map((a) => [a.id, a.name]));
+
       return {
         count: rows.length,
         tasks: rows.map((t) => ({
@@ -311,13 +367,7 @@ export async function executePlannerTool(
           title: t.title,
           status: t.status,
           priority: t.priority,
-          energyLevel: t.energyLevel,
-          workDepth: t.workDepth,
-          physicalEnergy: t.physicalEnergy,
-          scheduledDate: t.scheduledDate,
           dueDate: t.dueDate,
-          scheduledStartTime: t.scheduledStartTime,
-          scheduledEndTime: t.scheduledEndTime,
           recurring: Boolean(t.recurrenceRule?.trim()),
           areaId: t.areaId,
           areaName: areaNameById.get(t.areaId) ?? null,
@@ -363,17 +413,24 @@ export async function executePlannerTool(
             obj.physicalEnergy === "low" || obj.physicalEnergy === "medium" || obj.physicalEnergy === "high"
               ? obj.physicalEnergy
               : "medium",
-          taskType: "main",
-          scheduledDate: liftYmd(obj.scheduledDate),
-          scheduledStartTime: typeof obj.scheduledStartTime === "string" ? obj.scheduledStartTime : null,
-          scheduledEndTime: typeof obj.scheduledEndTime === "string" ? obj.scheduledEndTime : null,
           dueDate: liftYmd(obj.dueDate),
           recurrenceRule: typeof obj.recurrenceRule === "string" ? obj.recurrenceRule : null,
-          estimatedMinutes: typeof obj.estimatedMinutes === "number" ? obj.estimatedMinutes : null,
           sprintId: typeof obj.sprintId === "string" ? obj.sprintId : null,
           description: typeof obj.description === "string" ? obj.description : null,
         })
         .returning();
+
+      // If scheduledDate is passed, immediately lazily wrap it in a subtask
+      const scheduledDate = liftYmd(obj.scheduledDate);
+      if (scheduledDate) {
+         await db.insert(subtasks).values({
+            taskId: row.id,
+            title: title,
+            scheduledDate,
+            estimatedMinutes: typeof obj.estimatedMinutes === "number" ? obj.estimatedMinutes : null
+         });
+      }
+
       await enqueueTaskCalendarSync({
         userId: row.userId,
         taskId: row.id,
@@ -444,7 +501,7 @@ export async function executePlannerTool(
         }
         if (typeof v === "string") (updates as Record<string, unknown>)[k] = v;
       };
-      const setDateYmd = (k: "scheduledDate" | "dueDate", v: unknown) => {
+      const setDateYmd = (k: "dueDate", v: unknown) => {
         if (v === undefined) return;
         if (v === "") {
           (updates as Record<string, unknown>)[k] = null;
@@ -455,14 +512,9 @@ export async function executePlannerTool(
         if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return;
         (updates as Record<string, unknown>)[k] = liftStaleScheduleYear(t);
       };
-      setDateYmd("scheduledDate", obj.scheduledDate);
       setDateYmd("dueDate", obj.dueDate);
-      setStr("scheduledStartTime", obj.scheduledStartTime);
-      setStr("scheduledEndTime", obj.scheduledEndTime);
       setStr("recurrenceRule", obj.recurrenceRule);
       setStr("description", obj.description);
-      if (obj.estimatedMinutes === null) updates.estimatedMinutes = null;
-      else if (typeof obj.estimatedMinutes === "number") updates.estimatedMinutes = obj.estimatedMinutes;
 
       const [row] = await db
         .update(tasks)
@@ -470,7 +522,6 @@ export async function executePlannerTool(
         .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)))
         .returning();
       if (!row) return { error: "not found" };
-      if (row.parentTaskId) await rollupParentTaskStatus(db, row.parentTaskId);
       await enqueueTaskCalendarSync({
         userId: row.userId,
         taskId: row.id,
@@ -491,11 +542,10 @@ export async function executePlannerTool(
         .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)))
         .returning();
       if (!row) return { error: "not found" };
-      await db
-        .update(tasks)
-        .set({ deletedAt: now, updatedAt: now })
-        .where(and(eq(tasks.userId, userId), eq(tasks.parentTaskId, taskId), isNull(tasks.deletedAt)));
-      if (row.parentTaskId) await rollupParentTaskStatus(db, row.parentTaskId);
+      
+      // Cascading subtasks isn't strictly necessary for soft-deleting tasks since subtasks
+      // are filtered out if parent is deleted, but we'll leave it simple.
+      
       await enqueueTaskCalendarSync({
         userId: row.userId,
         taskId: row.id,
@@ -506,40 +556,30 @@ export async function executePlannerTool(
       }).catch(() => {});
       return { ok: true, deletedId: row.id };
     }
-    case "rescheduleTasks": {
-      const ids = Array.isArray(obj.taskIds) ? obj.taskIds.filter((x): x is string => typeof x === "string") : [];
-      const rawStart = typeof obj.startDate === "string" ? obj.startDate.trim() : "";
-      if (!ids.length) return { error: "taskIds required" };
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(rawStart)) return { error: "startDate must be YYYY-MM-DD" };
-      const startDate = liftStaleScheduleYear(rawStart);
-      const step = typeof obj.stepDays === "number" ? Math.min(Math.max(obj.stepDays, 1), 30) : 1;
-      const assignments: { id: string; scheduledDate: string }[] = [];
-      for (let i = 0; i < ids.length; i++) {
-        const taskId = ids[i]!;
-        const newDate = addDaysISO(startDate, i * step);
-        const [row] = await db
-          .update(tasks)
-          .set({ scheduledDate: newDate, updatedAt: new Date() })
-          .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)))
-          .returning();
-        if (row) {
-          assignments.push({ id: row.id, scheduledDate: newDate });
-          await enqueueTaskCalendarSync({
-            userId: row.userId,
-            taskId: row.id,
-            caldavUid: row.caldavUid,
-            resourceFilename: row.caldavResourceFilename,
-            googleEventId: row.googleEventId,
-            action: "update",
-          }).catch(() => {});
-        }
-      }
-      return { ok: true, updated: assignments.length, assignments };
+    case "scheduleTask": {
+      const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
+      const scheduledDate = typeof obj.scheduledDate === "string" ? liftYmd(obj.scheduledDate) : null;
+      if (!taskId || !scheduledDate) return { error: "taskId and scheduledDate required" };
+
+      const existing = await db.query.tasks.findFirst({
+        where: and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)),
+      });
+      if (!existing) return { error: "task not found" };
+
+      const [sub] = await db.insert(subtasks).values({
+        taskId,
+        title: existing.title,
+        scheduledDate,
+        estimatedMinutes: typeof obj.estimatedMinutes === "number" ? obj.estimatedMinutes : null
+      }).returning();
+      
+      return { ok: true, subtask: sub };
     }
     case "addSubtask": {
       const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
       const title = typeof obj.title === "string" ? obj.title.trim().slice(0, 500) : "";
       const completed = typeof obj.completed === "boolean" ? obj.completed : false;
+      const scheduledDate = typeof obj.scheduledDate === "string" ? liftYmd(obj.scheduledDate) : null;
       if (!taskId) return { error: "taskId required" };
       if (!title) return { error: "title required" };
 
@@ -548,23 +588,83 @@ export async function executePlannerTool(
       });
       if (!existing) return { error: "parent task not found" };
 
-      const status = completed ? "done" : "todo";
-
       const [row] = await db
-        .insert(tasks)
+        .insert(subtasks)
         .values({
-          userId,
-          areaId: existing.areaId,
-          parentTaskId: taskId,
-          taskType: "subtask",
+          taskId,
           title,
-          status,
-          priority: existing.priority,
+          completed,
+          scheduledDate,
+          estimatedMinutes: typeof obj.estimatedMinutes === "number" ? obj.estimatedMinutes : null,
+          completedAt: completed ? new Date() : null
         })
         .returning();
       if (!row) return { error: "failed to create subtask" };
       await rollupParentTaskStatus(db, taskId);
-      return { ok: true, task: { id: row.id, title: row.title, status: row.status } };
+      return { ok: true, subtask: { id: row.id, title: row.title, completed: row.completed } };
+    }
+    case "createSubtasks": {
+      const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
+      if (!taskId) return { error: "taskId required" };
+      const subArr = Array.isArray(obj.subtasks) ? obj.subtasks : [];
+      if (!subArr.length) return { error: "subtasks array required" };
+
+      const existing = await db.query.tasks.findFirst({
+        where: and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)),
+      });
+      if (!existing) return { error: "parent task not found" };
+
+      const inserts = await db.insert(subtasks).values(
+         subArr.map((s: any) => ({
+           taskId,
+           title: typeof s.title === "string" ? s.title : "Untitled",
+           scheduledDate: typeof s.scheduledDate === "string" ? liftYmd(s.scheduledDate) : null,
+           scheduledTime: typeof s.scheduledTime === "string" ? s.scheduledTime : null,
+           estimatedMinutes: typeof s.estimatedMinutes === "number" ? s.estimatedMinutes : null
+         }))
+      ).returning();
+
+      await rollupParentTaskStatus(db, taskId);
+      return { ok: true, count: inserts.length, subtasks: inserts.map(s => ({ id: s.id, title: s.title, scheduledDate: s.scheduledDate })) };
+    }
+    case "spreadSubtasksAcrossDays": {
+      const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
+      if (!taskId) return { error: "taskId required" };
+      const titles = Array.isArray(obj.subtaskTitles) ? obj.subtaskTitles.map(t => String(t)) : [];
+      if (!titles.length) return { error: "subtaskTitles array required" };
+      const rawStart = typeof obj.startDate === "string" ? obj.startDate : "";
+      const rawEnd = typeof obj.endDate === "string" ? obj.endDate : "";
+      if (!rawStart || !rawEnd) return { error: "startDate and endDate required" };
+      const maxPerDay = typeof obj.maxPerDay === "number" ? obj.maxPerDay : 3;
+
+      const existing = await db.query.tasks.findFirst({
+        where: and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)),
+      });
+      if (!existing) return { error: "parent task not found" };
+
+      // Simplified spread: just assign 1 per day linearly without loading global loads for the AI tool
+      // since the AI might just want to schedule them sequentially.
+      const assigned = [];
+      let currentISO = liftYmd(rawStart) ?? addDaysISO(new Date().toISOString().slice(0, 10), 0);
+      let dayCount = 0;
+      
+      for (const t of titles) {
+         assigned.push({
+           taskId,
+           title: t,
+           scheduledDate: currentISO
+         });
+         dayCount++;
+         if (dayCount >= maxPerDay) {
+           currentISO = addDaysISO(currentISO, 1);
+           dayCount = 0;
+         }
+      }
+
+      const rows = await db.insert(subtasks).values(assigned).returning();
+      await rollupParentTaskStatus(db, taskId);
+
+      return { ok: true, subtasks: rows };
     }
     case "assignTaskToSprint": {
       const taskId = typeof obj.taskId === "string" ? obj.taskId : "";

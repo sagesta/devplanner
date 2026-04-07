@@ -6,7 +6,7 @@ import { CalendarCheck, Plus, ArrowLeft } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { createSprint, fetchSprints, patchSprint, fetchTasks, patchTask, type TaskRow } from "@/lib/api";
+import { createSprint, fetchSprints, patchSprint, fetchTasks, patchTask } from "@/lib/api";
 import { Skeleton } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -314,7 +314,7 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: any; onBack: () =>
 
   if (q.isLoading) return <Skeleton className="h-64 w-full rounded-xl" />;
 
-  const roots = (q.data ?? []).filter((t: TaskRow) => !t.parentTaskId);
+  const roots = q.data ?? [];
   const sprintTasks = roots.filter(t => t.sprintId === sprint.id);
   const backlogTasks = roots.filter(t => t.sprintId === null);
 

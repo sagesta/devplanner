@@ -4,7 +4,7 @@ import { DEVPLANNER_UID_RE, parseDevplannerCaldavUid, parseIncomingICS } from ".
 import { getCalendarResourceByHref, listCalendarIcsHrefs } from "./radicale-client.js";
 import { db } from "../db/client.js";
 import { resolveOrCreateImportAreaId } from "../lib/importArea.js";
-import { tasks, users } from "../db/schema.js";
+import { subtasks, tasks, users } from "../db/schema.js";
 
 function basenameFromHref(href: string): string {
   const parts = href.split("/").filter(Boolean);
@@ -102,10 +102,7 @@ export async function runCaldavPullForUser(userId: string): Promise<{
             title: ev.title,
             description: ev.description,
             status,
-            scheduledDate: ev.scheduledDate,
-            scheduledStartTime: ev.scheduledStartTime,
-            scheduledEndTime: ev.scheduledEndTime,
-            dueDate: ev.dueDate,
+            dueDate: ev.dueDate ?? ev.scheduledDate,
             recurrenceRule: ev.recurrenceRule,
             icalUid: ev.icalUid,
             caldavResourceFilename: filename,
@@ -115,6 +112,21 @@ export async function runCaldavPullForUser(userId: string): Promise<{
             completedAt: status === "done" ? (existing.completedAt ?? now) : null,
           })
           .where(eq(tasks.id, existing.id));
+
+        // Update scheduled subtask if there's a scheduledDate
+        if (ev.scheduledDate) {
+          const existingSub = await db.query.subtasks.findFirst({
+            where: and(eq(subtasks.taskId, existing.id), eq(subtasks.scheduledDate, ev.scheduledDate)),
+          });
+          if (!existingSub) {
+            await db.insert(subtasks).values({
+              taskId: existing.id,
+              title: ev.title,
+              scheduledDate: ev.scheduledDate,
+              scheduledTime: ev.scheduledStartTime ?? null,
+            });
+          }
+        }
 
         stats.updated++;
       } else {
@@ -131,11 +143,7 @@ export async function runCaldavPullForUser(userId: string): Promise<{
           priority: "normal",
           energyLevel: "shallow",
           taskType: "main",
-          parentTaskId: null,
-          scheduledDate: ev.scheduledDate,
-          scheduledStartTime: ev.scheduledStartTime,
-          scheduledEndTime: ev.scheduledEndTime,
-          dueDate: ev.dueDate,
+          dueDate: ev.dueDate ?? ev.scheduledDate,
           recurrenceRule: ev.recurrenceRule,
           icalUid: ev.icalUid,
           caldavResourceFilename: filename,
@@ -147,7 +155,16 @@ export async function runCaldavPullForUser(userId: string): Promise<{
           insertRow.caldavUid = ourUid;
         }
         try {
-          await db.insert(tasks).values(insertRow);
+          const [inserted] = await db.insert(tasks).values(insertRow).returning();
+          // Create a subtask for the scheduled date
+          if (inserted && ev.scheduledDate) {
+            await db.insert(subtasks).values({
+              taskId: inserted.id,
+              title: ev.title,
+              scheduledDate: ev.scheduledDate,
+              scheduledTime: ev.scheduledStartTime ?? null,
+            });
+          }
           stats.imported++;
         } catch (e) {
           stats.errors.push(`${filename} ${ev.icalUid}: insert ${String(e)}`);

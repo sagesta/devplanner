@@ -1,5 +1,4 @@
 import {
-  AnyPgColumn,
   boolean,
   customType,
   date,
@@ -143,12 +142,6 @@ export const tasks = pgTable(
     workDepth: workDepthEnum("work_depth"),
     physicalEnergy: physicalEnergyEnum("physical_energy"),
     taskType: taskTypeEnum("task_type").notNull().default("main"),
-    parentTaskId: uuid("parent_task_id").references((): AnyPgColumn => tasks.id, { onDelete: "cascade" }),
-    estimatedMinutes: integer("estimated_minutes"),
-    actualMinutes: integer("actual_minutes"),
-    scheduledDate: date("scheduled_date"),
-    scheduledStartTime: time("scheduled_start_time"),
-    scheduledEndTime: time("scheduled_end_time"),
     dueDate: date("due_date"),
     recurrenceRule: text("recurrence_rule"),
     caldavUid: uuid("caldav_uid").defaultRandom(),
@@ -178,9 +171,28 @@ export const tasks = pgTable(
     index("tasks_user_idx").on(t.userId),
     index("tasks_sprint_idx").on(t.sprintId),
     index("tasks_area_idx").on(t.areaId),
-    index("tasks_parent_idx").on(t.parentTaskId),
-    index("tasks_scheduled_date_idx").on(t.scheduledDate),
     uniqueIndex("tasks_user_ical_uid_uidx").on(t.userId, t.icalUid),
+  ]
+);
+
+export const subtasks = pgTable(
+  "subtasks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 500 }).notNull(),
+    completed: boolean("completed").notNull().default(false),
+    scheduledDate: date("scheduled_date"),
+    scheduledTime: time("scheduled_time"),
+    estimatedMinutes: integer("estimated_minutes"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("subtasks_task_idx").on(t.taskId),
+    index("subtasks_scheduled_date_idx").on(t.scheduledDate),
   ]
 );
 
@@ -326,12 +338,7 @@ export const taskTags = pgTable(
 );
 
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
-  parent: one(tasks, {
-    fields: [tasks.parentTaskId],
-    references: [tasks.id],
-    relationName: "taskHierarchy",
-  }),
-  subtasks: many(tasks, { relationName: "taskHierarchy" }),
+  subtasks: many(subtasks),
   area: one(areas, { fields: [tasks.areaId], references: [areas.id] }),
   project: one(projects, { fields: [tasks.projectId], references: [projects.id] }),
   sprint: one(sprints, { fields: [tasks.sprintId], references: [sprints.id] }),
@@ -383,4 +390,8 @@ export const tagsRelations = relations(tags, ({ many }) => ({
 export const taskTagsRelations = relations(taskTags, ({ one }) => ({
   task: one(tasks, { fields: [taskTags.taskId], references: [tasks.id] }),
   tag: one(tags, { fields: [taskTags.tagId], references: [tags.id] }),
+}));
+
+export const subtasksRelations = relations(subtasks, ({ one }) => ({
+  task: one(tasks, { fields: [subtasks.taskId], references: [tasks.id] }),
 }));

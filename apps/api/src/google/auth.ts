@@ -6,7 +6,9 @@ import { getGoogleClientId, getGoogleClientSecret, getGoogleRedirectUri, googleC
 
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 
-export function createOAuth2Client() {
+import type { OAuth2Client } from 'google-auth-library';
+
+export function createOAuth2Client(): OAuth2Client {
   return new google.auth.OAuth2(getGoogleClientId(), getGoogleClientSecret(), getGoogleRedirectUri());
 }
 
@@ -33,7 +35,7 @@ export function parseOAuthState(state: string): { userId: string } | null {
   }
 }
 
-export async function exchangeCodeForTokens(code: string) {
+export async function exchangeCodeForTokens(code: string): Promise<{ access_token?: string | null; refresh_token?: string | null; expiry_date?: number | null; token_type?: string | null; id_token?: string | null; scope?: string }> {
   const oauth2 = createOAuth2Client();
   const { tokens } = await oauth2.getToken(code);
   return tokens;

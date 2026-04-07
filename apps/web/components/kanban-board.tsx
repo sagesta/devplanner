@@ -29,8 +29,13 @@ import {
   patchTask,
   patchTasksBulkSchedule,
   restoreTask,
+  createSubtask,
+  patchSubtask,
+  deleteSubtask,
+  postSubtasksSpread,
   type AreaRow,
   type TaskRow,
+  type SubtaskRow,
 } from "@/lib/api";
 import Link from "next/link";
 import { SkeletonCard } from "@/lib/skeleton";
@@ -400,7 +405,7 @@ export function KanbanBoard() {
       const overId = e.over?.id as string | undefined;
       const activeId = e.active.id as string;
       if (!activeId) return;
-      const list = (q.data ?? []).filter((t) => !t.parentTaskId);
+      const list = q.data ?? [];
       const targetStatus = resolveDropStatus(overId, list);
       if (!targetStatus) return;
       const activeTask = list.find((t) => t.id === activeId);
@@ -415,7 +420,7 @@ export function KanbanBoard() {
     return sprintsQ.data.sprints.find(s => s.status === 'active' && s.startDate <= todayYmd && s.endDate >= todayYmd);
   }, [sprintsQ.data?.sprints, todayYmd]);
 
-  const roots = (q.data ?? []).filter((t) => !t.parentTaskId && t.sprintId === activeSprint?.id);
+  const roots = (q.data ?? []).filter((t) => t.sprintId === activeSprint?.id);
 
   const areaMap = new Map<string, AreaRow>();
   for (const a of areasQ.data ?? []) {
@@ -580,9 +585,7 @@ export function KanbanBoard() {
                           energyLevel={t.energyLevel}
                           areaColor={area?.color}
                           areaName={area?.name}
-                          scheduledDate={t.scheduledDate}
-                          scheduledStartTime={t.scheduledStartTime}
-                          scheduledEndTime={t.scheduledEndTime}
+                          dueDate={t.dueDate}
                           subtasksDone={t._subtasksDone}
                           subtasksTotal={t._subtasksTotal}
                           overdue={isTaskOverdue(t, todayYmd)}
@@ -704,24 +707,21 @@ function TaskDrawer({
     enabled: Boolean(userId),
   });
 
-  const [title, setTitle] = useState("");
-  const [scheduledDate, setScheduledDate] = useState("");
-  const [startT, setStartT] = useState("");
-  const [endT, setEndT] = useState("");
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [recurrence, setRecurrence] = useState("");
   const [areaId, setAreaId] = useState("");
   const [priority, setPriority] = useState("normal");
   const [workDepth, setWorkDepth] = useState<string>("normal");
   const [physicalEnergy, setPhysicalEnergy] = useState<string>("medium");
-  const [timeOrderError, setTimeOrderError] = useState(false);
+  const [showSpread, setShowSpread] = useState(false);
+  const [spreadStart, setSpreadStart] = useState("");
+  const [spreadEnd, setSpreadEnd] = useState("");
 
   useEffect(() => {
     const t = q.data?.task;
     if (!t) return;
-    setScheduledDate(t.scheduledDate ?? "");
-    setStartT(t.scheduledStartTime ? t.scheduledStartTime.slice(0, 5) : "");
-    setEndT(t.scheduledEndTime ? t.scheduledEndTime.slice(0, 5) : "");
-    setTimeOrderError(false);
+    setDueDate(t.dueDate ?? "");
     const rr = t.recurrenceRule ?? "";
     if (!rr) setRecurrence("");
     else if (RECURRENCE_PRESETS.some((p) => p.value === rr)) setRecurrence(rr);
@@ -734,49 +734,69 @@ function TaskDrawer({
 
   const addSub = useMutation({
     mutationFn: async () => {
-      if (!title.trim() || !q.data) return null;
-      return createTask({
-        areaId: q.data.task.areaId,
-        title: title.trim(),
-        parentTaskId: taskId,
-        status: "todo",
-        taskType: "subtask",
+      if (!newSubtaskTitle.trim() || !q.data) return null;
+      return createSubtask({
+        taskId: taskId,
+        title: newSubtaskTitle.trim(),
       });
     },
     onSuccess: () => {
-      setTitle("");
+      setNewSubtaskTitle("");
       void qc.invalidateQueries({ queryKey: ["task", taskId] });
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
     },
   });
 
   const toggleSubStatus = useMutation({
-    mutationFn: async (sub: TaskRow) => {
-      const next = sub.status === "done" ? "todo" : "done";
-      return patchTask(sub.id, { status: next });
+    mutationFn: async (sub: SubtaskRow) => {
+      const next = !sub.completed;
+      return patchSubtask(sub.id, { completed: next });
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["task", taskId] });
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      // Invalidate now/timeline queries as subtask completion affects their display
+      void qc.invalidateQueries({ queryKey: ["tasks-today"] });
     },
+  });
+
+  const deleteSub = useMutation({
+    mutationFn: async (subId: string) => deleteSubtask(subId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["task", taskId] });
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+    }
+  });
+
+  const spreadSubs = useMutation({
+     mutationFn: async () => {
+       if (!q.data) return null;
+       const unscheduled = q.data.subtasks.filter(s => !s.scheduledDate && !s.completed);
+       if (unscheduled.length === 0 || !spreadStart || !spreadEnd) return null;
+       // We use spread endpoint to create subtasks, but to avoid duplication we must first DELETE the unscheduled ones!
+       // Or even better, just let the AI spread tool handle actual assignment instead of building a whole UI here,
+       // but as requested, here is a rudimentary spread action:
+       await Promise.all(unscheduled.map(s => deleteSubtask(s.id)));
+       return postSubtasksSpread(taskId, unscheduled.map(s => s.title), spreadStart, spreadEnd, 3);
+     },
+     onSuccess: () => {
+        setShowSpread(false);
+        setSpreadStart("");
+        setSpreadEnd("");
+        void qc.invalidateQueries({ queryKey: ["task", taskId] });
+        void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+     }
   });
 
   const saveMeta = useMutation({
     mutationFn: async () => {
       if (!q.data) return;
-      const st = toPgTime(startT);
-      const et = toPgTime(endT);
-      if (st && et && et < st) {
-        throw new Error("End time must be after start time.");
-      }
       let recurrenceRule: string | null;
       if (recurrence === "") recurrenceRule = null;
       else if (recurrence === "__custom") recurrenceRule = q.data.task.recurrenceRule ?? null;
       else recurrenceRule = recurrence;
       return patchTask(taskId, {
-        scheduledDate: scheduledDate || null,
-        scheduledStartTime: toPgTime(startT),
-        scheduledEndTime: toPgTime(endT),
+        dueDate: dueDate || null,
         recurrenceRule,
         areaId: areaId || q.data.task.areaId,
         priority: priority as "urgent" | "high" | "normal" | "low",
@@ -785,7 +805,6 @@ function TaskDrawer({
       });
     },
     onSuccess: () => {
-      setTimeOrderError(false);
       toast.success("Saved");
       void qc.invalidateQueries({ queryKey: ["task", taskId] });
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
@@ -793,10 +812,6 @@ function TaskDrawer({
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
     },
     onError: (e: Error) => {
-      if (e.message === "End time must be after start time.") {
-        setTimeOrderError(true);
-        return;
-      }
       toast.error(e.message);
     },
   });
@@ -895,10 +910,7 @@ function TaskDrawer({
             </div>
 
             <div className="mt-4 space-y-3 rounded-xl border border-white/10 bg-background/30 p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Schedule &amp; fields</p>
-              {timeOrderError && (
-                <p className="text-xs text-red-400">End time must be after start time.</p>
-              )}
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Fields &amp; Deadline</p>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block text-[11px] text-muted">
                   Priority
@@ -958,41 +970,14 @@ function TaskDrawer({
                 </select>
               </label>
               <label className="block text-[11px] text-muted">
-                Day
+                Due Date
                 <input
                   type="date"
                   className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
                 />
               </label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="text-[11px] text-muted">
-                  Start
-                  <input
-                    type="time"
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm"
-                    value={startT}
-                    onChange={(e) => {
-                      setStartT(e.target.value);
-                      setTimeOrderError(false);
-                    }}
-                  />
-                </label>
-                <label className="text-[11px] text-muted">
-                  End
-                  <input
-                    type="time"
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm"
-                    style={timeOrderError ? { borderColor: "var(--color-error)" } : undefined}
-                    value={endT}
-                    onChange={(e) => {
-                      setEndT(e.target.value);
-                      setTimeOrderError(false);
-                    }}
-                  />
-                </label>
-              </div>
               <label className="block text-[11px] text-muted">
                 Recurrence (RRULE)
                 <select
@@ -1018,9 +1003,35 @@ function TaskDrawer({
                 className="w-full rounded-lg bg-primary py-2 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
                 onClick={() => saveMeta.mutate()}
               >
-                {saveMeta.isPending ? "Saving…" : "Save schedule & details"}
+                {saveMeta.isPending ? "Saving…" : "Save details"}
               </button>
             </div>
+
+            <div className="mt-6 flex items-center justify-between">
+              <h3 className="font-display text-sm tracking-wide text-foreground">Subtasks</h3>
+              <button onClick={() => setShowSpread(!showSpread)} className="text-xs text-primary hover:text-primary-hover flex items-center gap-1">
+                <Sparkles size={12}/> Spread across days
+              </button>
+            </div>
+
+            {showSpread && (
+               <div className="mt-2 rounded-xl border border-primary/30 bg-primary/5 p-3 flex flex-col gap-2">
+                 <p className="text-xs text-muted">Distribute unscheduled subtasks across a date range.</p>
+                 <div className="flex gap-2">
+                   <div className="flex-1">
+                     <label className="block text-[10px] uppercase tracking-wider text-muted mb-1">Start</label>
+                     <input type="date" value={spreadStart} onChange={e => setSpreadStart(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-white/10" />
+                   </div>
+                   <div className="flex-1">
+                     <label className="block text-[10px] uppercase tracking-wider text-muted mb-1">End</label>
+                     <input type="date" value={spreadEnd} onChange={e => setSpreadEnd(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-white/10" />
+                   </div>
+                 </div>
+                 <button onClick={() => spreadSubs.mutate()} disabled={!spreadStart || !spreadEnd || spreadSubs.isPending || !q.data.subtasks.some((s: SubtaskRow) => !s.scheduledDate)} className="w-full mt-2 rounded bg-primary py-1.5 text-xs text-white hover:bg-primary-hover disabled:opacity-50">
+                    Apply Spread
+                 </button>
+               </div>
+            )}
 
             {q.data.subtaskProgress && (
               <div className="mt-3">
@@ -1028,44 +1039,102 @@ function TaskDrawer({
               </div>
             )}
             <ul className="mt-4 space-y-1.5 stagger-list">
-              {q.data.subtasks.map((s: TaskRow) => (
+              {q.data.subtasks.map((s: SubtaskRow) => (
                 <li
                   key={s.id}
                   className={cn(
-                    "flex items-center gap-2 rounded-lg border border-white/5 px-3 py-2 text-sm transition-all",
-                    s.status === "done" && "opacity-50"
+                    "group flex items-center gap-2 rounded-lg border border-white/5 bg-background/50 px-2 py-2 transition-all hover:border-white/10",
+                    s.completed && "opacity-50"
                   )}
                 >
+                  {/* Checkbox */}
                   <button
                     type="button"
                     className={cn(
                       "h-4 w-4 shrink-0 rounded border transition-colors",
-                      s.status === "done"
+                      s.completed
                         ? "bg-primary border-primary"
                         : "border-white/20 hover:border-primary/50"
                     )}
                     onClick={() => toggleSubStatus.mutate(s)}
                   />
-                  <span
+                  {/* Title */}
+                  <input
                     className={cn(
-                      "min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap",
-                      s.status === "done" && "line-through"
+                      "flex-1 bg-transparent px-1 min-w-0 text-sm outline-none placeholder:text-muted/50",
+                      s.completed && "line-through text-muted"
                     )}
+                    defaultValue={s.title}
+                    disabled={s.completed}
+                    onBlur={(e) => {
+                      if (e.target.value !== s.title) {
+                        patchSubtask(s.id, { title: e.target.value })
+                          .then(() => qc.invalidateQueries({ queryKey: ["task", taskId] }));
+                      }
+                    }}
+                  />
+                  {/* Date */}
+                  <input
+                    type="date"
+                    className="w-28 bg-transparent text-[11px] text-muted outline-none hover:text-foreground cursor-pointer"
+                    defaultValue={s.scheduledDate ?? ""}
+                    disabled={s.completed}
+                    title="Scheduled date"
+                    onChange={(e) => {
+                      patchSubtask(s.id, { scheduledDate: e.target.value || null })
+                        .then(() => qc.invalidateQueries({ queryKey: ["task", taskId] }));
+                    }}
+                  />
+                  {/* Time */}
+                  <input
+                    type="time"
+                    className="w-[4.5rem] bg-transparent text-[11px] text-muted outline-none hover:text-foreground"
+                    defaultValue={s.scheduledTime?.slice(0, 5) ?? ""}
+                    disabled={s.completed}
+                    title="Scheduled time"
+                    onChange={(e) => {
+                      patchSubtask(s.id, { scheduledTime: e.target.value || null })
+                        .then(() => qc.invalidateQueries({ queryKey: ["task", taskId] }));
+                    }}
+                  />
+                  {/* Est. minutes */}
+                  <input
+                    type="number"
+                    min={0}
+                    step={5}
+                    className="w-12 bg-transparent text-[11px] text-muted outline-none hover:text-foreground text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    defaultValue={s.estimatedMinutes ?? ""}
+                    disabled={s.completed}
+                    placeholder="min"
+                    title="Estimated minutes"
+                    onBlur={(e) => {
+                      const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                      if (val !== s.estimatedMinutes) {
+                        patchSubtask(s.id, { estimatedMinutes: val })
+                          .then(() => qc.invalidateQueries({ queryKey: ["task", taskId] }));
+                      }
+                    }}
+                  />
+                  {/* Delete */}
+                  <button
+                    type="button"
+                    onClick={() => { if (confirm("Delete subtask?")) deleteSub.mutate(s.id); }}
+                    className="shrink-0 p-1 rounded text-muted opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-red-400 hover:bg-white/5 transition-all"
+                    title="Delete subtask"
                   >
-                    {s.title}
-                  </span>
-                  <span className="ml-auto text-[10px] text-muted">{s.status.replace("_", " ")}</span>
+                    <Trash2 size={12} />
+                  </button>
                 </li>
               ))}
             </ul>
             <div className="mt-4 flex gap-2">
               <input
-                className="flex-1 rounded-lg border border-white/10 bg-background px-3 py-2 text-sm placeholder:text-muted/50"
-                placeholder="+ Add step"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                className="flex-1 rounded-lg border border-white/10 bg-background px-3 py-2 text-sm placeholder:text-muted/50 focus:border-primary focus:ring-1 focus:ring-primary"
+                placeholder="+ Add executable step"
+                value={newSubtaskTitle}
+                onChange={(e) => setNewSubtaskTitle(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && title.trim()) addSub.mutate();
+                  if (e.key === "Enter" && newSubtaskTitle.trim()) addSub.mutate();
                 }}
               />
               <button

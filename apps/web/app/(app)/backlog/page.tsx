@@ -234,15 +234,15 @@ export default function BacklogPage() {
                         <div className="space-y-2 border-t border-white/10 bg-background/30 px-3 py-3 text-[11px]">
                           <div className="grid gap-2 sm:grid-cols-2">
                             <label className="text-muted">
-                              Scheduled date
+                              Due date
                               <input
                                 type="date"
                                 className="mt-1 w-full rounded-md border border-white/10 bg-background px-2 py-1.5 text-foreground"
-                                defaultValue={t.scheduledDate?.slice(0, 10) ?? ""}
+                                defaultValue={t.dueDate?.slice(0, 10) ?? ""}
                                 onBlur={(e) => {
                                   const v = e.target.value.trim();
-                                  if (v !== (t.scheduledDate?.slice(0, 10) ?? "")) {
-                                    patchMeta.mutate({ taskId: t.id, scheduledDate: v || null });
+                                  if (v !== (t.dueDate?.slice(0, 10) ?? "")) {
+                                    patchMeta.mutate({ taskId: t.id, dueDate: v || null });
                                   }
                                 }}
                               />

@@ -2,7 +2,7 @@ import type { calendar_v3 } from "googleapis";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { DEVPLANNER_UID_RE, parseDevplannerCaldavUid } from "../caldav/parse-incoming.js";
 import { db } from "../db/client.js";
-import { googleCalendarLinks, tasks, users } from "../db/schema.js";
+import { googleCalendarLinks, subtasks, tasks, users } from "../db/schema.js";
 import { resolveOrCreateImportAreaId } from "../lib/importArea.js";
 import { getCalendarForUser } from "./auth.js";
 
@@ -269,7 +269,13 @@ export async function runGooglePushJob(input: {
   const task = await db.query.tasks.findFirst({ where: eq(tasks.id, input.taskId) });
   if (!task) return { ok: false, detail: "task not found" };
 
-  const body = taskToGoogleEvent(task, tz);
+  // Build a synthetic view for Google — use dueDate as the scheduledDate for push
+  const body = taskToGoogleEvent({
+    ...task,
+    scheduledDate: task.dueDate ?? null,
+    scheduledStartTime: null,
+    scheduledEndTime: null,
+  }, tz);
   if (!body) {
     if (task.googleEventId) {
       try {
@@ -555,10 +561,7 @@ async function applyOneGoogleEvent(
         title: parsed.title,
         description: parsed.description,
         status,
-        scheduledDate: parsed.scheduledDate,
-        scheduledStartTime: parsed.scheduledStartTime,
-        scheduledEndTime: parsed.scheduledEndTime,
-        dueDate: parsed.dueDate,
+        dueDate: parsed.dueDate ?? parsed.scheduledDate,
         recurrenceRule: parsed.recurrenceRule,
         icalUid: parsed.icalUid,
         googleEventId: evId,
@@ -568,6 +571,21 @@ async function applyOneGoogleEvent(
         completedAt: status === "done" ? (existing.completedAt ?? now) : null,
       })
       .where(eq(tasks.id, existing.id));
+
+    // Upsert a subtask for the scheduled date
+    if (parsed.scheduledDate) {
+      const existingSub = await db.query.subtasks.findFirst({
+        where: and(eq(subtasks.taskId, existing.id), eq(subtasks.scheduledDate, parsed.scheduledDate)),
+      });
+      if (!existingSub) {
+        await db.insert(subtasks).values({
+          taskId: existing.id,
+          title: parsed.title,
+          scheduledDate: parsed.scheduledDate,
+          scheduledTime: parsed.scheduledStartTime ?? null,
+        });
+      }
+    }
     stats.updated++;
     return;
   }
@@ -586,11 +604,7 @@ async function applyOneGoogleEvent(
     workDepth: null,
     physicalEnergy: null,
     taskType: "main",
-    parentTaskId: null,
-    scheduledDate: parsed.scheduledDate,
-    scheduledStartTime: parsed.scheduledStartTime,
-    scheduledEndTime: parsed.scheduledEndTime,
-    dueDate: parsed.dueDate,
+    dueDate: parsed.dueDate ?? parsed.scheduledDate,
     recurrenceRule: parsed.recurrenceRule,
     icalUid: parsed.icalUid,
     googleEventId: evId,
@@ -605,7 +619,16 @@ async function applyOneGoogleEvent(
   }
 
   try {
-    await db.insert(tasks).values(insertRow);
+    const [inserted] = await db.insert(tasks).values(insertRow).returning();
+    // Create a subtask for the scheduled date so it appears in Now/Timeline
+    if (inserted && parsed.scheduledDate) {
+      await db.insert(subtasks).values({
+        taskId: inserted.id,
+        title: parsed.title,
+        scheduledDate: parsed.scheduledDate,
+        scheduledTime: parsed.scheduledStartTime ?? null,
+      });
+    }
     stats.imported++;
   } catch (e) {
     stats.errors.push(`${evId}: ${String(e)}`);

@@ -2,9 +2,8 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/client.js";
-import { areas, tags, taskTags, tasks } from "../db/schema.js";
+import { areas, tags, taskTags, tasks, subtasks } from "../db/schema.js";
 import { enqueueTaskCalendarSync } from "../queues/definitions.js";
-import { rollupParentTaskStatus } from "../services/task-rollup.js";
 import type { AppEnv } from "../types.js";
 
 const uuidParam = z.string().uuid();
@@ -14,23 +13,22 @@ const createBody = z.object({
   areaId: z.string().uuid(),
   projectId: z.string().uuid().optional().nullable(),
   sprintId: z.string().uuid().optional().nullable(),
-  parentTaskId: z.string().uuid().optional().nullable(),
   status: z
     .enum(["backlog", "todo", "in_progress", "done", "cancelled", "blocked"])
     .optional(),
   priority: z.enum(["urgent", "high", "normal", "low"]).optional(),
   energyLevel: z.enum(["deep_work", "shallow", "admin", "quick_win"]).optional(),
   taskType: z.enum(["main", "subtask"]).optional(),
-  scheduledDate: z.string().optional().nullable(),
-  scheduledStartTime: z.string().optional().nullable(),
-  scheduledEndTime: z.string().optional().nullable(),
-  estimatedMinutes: z.number().int().optional().nullable(),
   description: z.string().optional().nullable(),
   dueDate: z.string().optional().nullable(),
   recurrenceRule: z.string().optional().nullable(),
   tags: z.array(z.string()).optional().nullable(),
   workDepth: z.enum(["shallow", "normal", "deep"]).optional().nullable(),
   physicalEnergy: z.enum(["low", "medium", "high"]).optional().nullable(),
+  scheduledDate: z.string().optional().nullable(),
+  scheduledStartTime: z.string().optional().nullable(),
+  scheduledEndTime: z.string().optional().nullable(),
+  estimatedMinutes: z.number().int().optional().nullable(),
 });
 
 const patchBody = createBody.partial();
@@ -67,10 +65,10 @@ const taskActive = isNull(tasks.deletedAt);
 const brainDumpBody = z.object({
   areaId: z.string().uuid(),
   lines: z.union([z.array(z.string()), z.string()]),
-  scheduledDate: z.string().optional().nullable(),
+  recurrenceRule: z.string().optional().nullable(),
+  scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   scheduledStartTime: z.string().optional().nullable(),
   scheduledEndTime: z.string().optional().nullable(),
-  recurrenceRule: z.string().optional().nullable(),
 });
 
 const bulkStatusBody = z.object({
@@ -83,12 +81,10 @@ const bulkScheduleBody = z.object({
   scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
-// Allowlist of patchable fields for cleaner update logic
 const PATCH_FIELDS = [
-  "title", "description", "projectId", "sprintId", "parentTaskId", "areaId",
-  "priority", "energyLevel", "workDepth", "physicalEnergy", "taskType", "scheduledDate",
-  "scheduledStartTime", "scheduledEndTime", "estimatedMinutes", "dueDate",
-  "recurrenceRule", "tags",
+  "title", "description", "projectId", "sprintId", "areaId",
+  "priority", "energyLevel", "workDepth", "physicalEnergy",
+  "dueDate","recurrenceRule", "tags",
 ] as const;
 
 export const taskRoutes = new Hono<AppEnv>()
@@ -123,23 +119,17 @@ export const taskRoutes = new Hono<AppEnv>()
       orderBy: (t, { asc: ascFn }) => [ascFn(t.sortOrder), ascFn(t.createdAt)],
     });
 
-    // Batch load subtask progress for all parent tasks
-    const parentIds = rows.filter((t) => !t.parentTaskId).map((t) => t.id);
-    let subtaskMap: Record<string, { done: number; total: number }> = {};
+    const parentIds = rows.map((t) => t.id);
+    let subtaskMap: Record<string, { done: number; total: number; list: any[] }> = {};
     if (parentIds.length > 0) {
-      const subtaskRows = await db
-        .select({
-          parentId: tasks.parentTaskId,
-          total: sql<number>`count(*)::int`,
-          done: sql<number>`count(*) filter (where ${tasks.status} = 'done')::int`,
-        })
-        .from(tasks)
-        .where(and(inArray(tasks.parentTaskId, parentIds), taskActive))
-        .groupBy(tasks.parentTaskId);
-      for (const r of subtaskRows) {
-        if (r.parentId) {
-          subtaskMap[r.parentId] = { done: r.done, total: r.total };
-        }
+      const allSubs = await db.query.subtasks.findMany({
+        where: inArray(subtasks.taskId, parentIds),
+      });
+      for (const s of allSubs) {
+        if (!subtaskMap[s.taskId]) subtaskMap[s.taskId] = { done: 0, total: 0, list: [] };
+        subtaskMap[s.taskId].list.push(s);
+        subtaskMap[s.taskId].total++;
+        if (s.completed) subtaskMap[s.taskId].done++;
       }
     }
 
@@ -171,6 +161,7 @@ export const taskRoutes = new Hono<AppEnv>()
         ...withTaskApiFields(t),
         _subtasksDone: progress?.done ?? 0,
         _subtasksTotal: progress?.total ?? 0,
+        _subtasks: progress?.list ?? [],
         _tags: tagMap[t.id] ?? [],
       };
     });
@@ -181,31 +172,42 @@ export const taskRoutes = new Hono<AppEnv>()
     const userId = c.get("userId");
     const dateParam = c.req.query("date");
     const hasParam = Boolean(dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam));
-    const dateFilter = hasParam
-      ? or(eq(tasks.scheduledDate, dateParam!), eq(tasks.dueDate, dateParam!))
-      : or(sql`${tasks.scheduledDate} = CURRENT_DATE`, sql`${tasks.dueDate} = CURRENT_DATE`);
+    const dt = hasParam ? dateParam! : serverTodayYmd();
+
+    const subtaskMatches = await db.select({ taskId: subtasks.taskId })
+      .from(subtasks)
+      .where(eq(subtasks.scheduledDate, dt));
+    const matchedTaskIds = subtaskMatches.map(r => r.taskId);
+
+    let baseFilter = eq(tasks.dueDate, dt);
+    if (matchedTaskIds.length > 0) {
+       baseFilter = or(baseFilter, inArray(tasks.id, matchedTaskIds)) as any;
+    }
+
     const rows = await db.query.tasks.findMany({
-      where: and(eq(tasks.userId, userId), taskActive, dateFilter),
+      where: and(eq(tasks.userId, userId), taskActive, baseFilter),
       orderBy: [
-        sql`${tasks.scheduledStartTime} ASC NULLS LAST`,
         desc(tasks.priority),
         sql`${tasks.createdAt} ASC`,
       ],
     });
+
     const [doneTodayRow] = await db
       .select({ count: sql<number>`count(*)::int` })
-      .from(tasks)
+      .from(subtasks)
+      .innerJoin(tasks, eq(tasks.id, subtasks.taskId))
       .where(
         and(
           eq(tasks.userId, userId),
-          taskActive,
-          eq(tasks.status, "done"),
-          sql`(${tasks.updatedAt})::date = CURRENT_DATE`
+          eq(subtasks.completed, true),
+          sql`(${subtasks.completedAt})::date = CURRENT_DATE`
         )
       );
-    // Batch load tags for today's tasks
+
     const todayTaskIds = rows.map((t) => t.id);
     const todayTagMap: Record<string, Array<{ id: number; name: string; color: string | null }>> = {};
+    const subtaskMap: Record<string, any[]> = {};
+
     if (todayTaskIds.length > 0) {
       const todayTagRows = await db
         .select({ taskId: taskTags.taskId, tagId: tags.id, tagName: tags.name, tagColor: tags.color })
@@ -217,18 +219,26 @@ export const taskRoutes = new Hono<AppEnv>()
         if (!todayTagMap[r.taskId]) todayTagMap[r.taskId] = [];
         todayTagMap[r.taskId].push({ id: r.tagId, name: r.tagName, color: r.tagColor });
       }
+
+      const subs = await db.query.subtasks.findMany({
+        where: and(inArray(subtasks.taskId, todayTaskIds), eq(subtasks.scheduledDate, dt)),
+      });
+      for (const s of subs) {
+        if (!subtaskMap[s.taskId]) subtaskMap[s.taskId] = [];
+        subtaskMap[s.taskId].push(s);
+      }
     }
 
     return c.json({
-      tasks: rows.map((t) => ({ ...withTaskApiFields(t), _tags: todayTagMap[t.id] ?? [] })),
-      date: hasParam ? dateParam! : serverTodayYmd(),
+      tasks: rows.map((t) => ({ ...withTaskApiFields(t), _tags: todayTagMap[t.id] ?? [], _subtasks: subtaskMap[t.id] ?? [] })),
+      date: dt,
       doneTodayCount: doneTodayRow?.count ?? 0,
     });
   })
   .get("/backlog", async (c) => {
     const userId = c.get("userId");
     const rows = await db.query.tasks.findMany({
-      where: and(eq(tasks.userId, userId), isNull(tasks.sprintId), isNull(tasks.parentTaskId), taskActive),
+      where: and(eq(tasks.userId, userId), isNull(tasks.sprintId), taskActive),
       orderBy: (t, { asc: ascFn }) => [ascFn(t.sortOrder), ascFn(t.createdAt)],
     });
     // Batch load tags
@@ -255,11 +265,6 @@ export const taskRoutes = new Hono<AppEnv>()
     }
     const userId = c.get("userId");
     const { areaId } = parsed.data;
-    try {
-      assertSaneCalendarDate("scheduledDate", parsed.data.scheduledDate ?? undefined);
-    } catch (e) {
-      return c.json({ error: String(e) }, 422);
-    }
     const areaOk = await db
       .select({ id: areas.id })
       .from(areas)
@@ -276,7 +281,7 @@ export const taskRoutes = new Hono<AppEnv>()
     if (!titles.length) {
       return c.json({ error: "no lines" }, 422);
     }
-    const { scheduledDate, scheduledStartTime, scheduledEndTime, recurrenceRule } = parsed.data;
+    const { recurrenceRule } = parsed.data;
     const inserted = await db
       .insert(tasks)
       .values(
@@ -286,12 +291,7 @@ export const taskRoutes = new Hono<AppEnv>()
           title: title.slice(0, 500),
           status: "backlog" as const,
           sprintId: null,
-          parentTaskId: null,
-          taskType: "main" as const,
           sortOrder: i,
-          scheduledDate: scheduledDate ?? null,
-          scheduledStartTime: scheduledStartTime ?? null,
-          scheduledEndTime: scheduledEndTime ?? null,
           recurrenceRule: recurrenceRule ?? null,
         }))
       )
@@ -305,6 +305,19 @@ export const taskRoutes = new Hono<AppEnv>()
         googleEventId: t.googleEventId,
         action: "create",
       }).catch(() => {});
+    }
+    // If scheduledDate provided, create one subtask per inserted task
+    if (parsed.data.scheduledDate) {
+      const schedDate = parsed.data.scheduledDate;
+      const schedTime = parsed.data.scheduledStartTime ?? null;
+      await db.insert(subtasks).values(
+        inserted.map((t) => ({
+          taskId: t.id,
+          title: t.title,
+          scheduledDate: schedDate,
+          scheduledTime: schedTime,
+        }))
+      );
     }
     return c.json(
       { tasks: inserted.map((t) => withTaskApiFields(t)), count: inserted.length },
@@ -357,10 +370,6 @@ export const taskRoutes = new Hono<AppEnv>()
     if (!row) {
       return c.json({ error: "not found" }, 404);
     }
-    await db
-      .update(tasks)
-      .set({ deletedAt: null, updatedAt: now })
-      .where(and(eq(tasks.userId, userId), eq(tasks.parentTaskId, id), isNotNull(tasks.deletedAt)));
     await enqueueTaskCalendarSync({
       userId: row.userId,
       taskId: row.id,
@@ -383,27 +392,30 @@ export const taskRoutes = new Hono<AppEnv>()
     } catch (e) {
       return c.json({ error: String(e) }, 422);
     }
-    const updated = await db
-      .update(tasks)
-      .set({ scheduledDate, updatedAt: new Date() })
-      .where(and(eq(tasks.userId, userId), inArray(tasks.id, ids), taskActive))
-      .returning({
-        id: tasks.id,
-        caldavUid: tasks.caldavUid,
-        caldavResourceFilename: tasks.caldavResourceFilename,
-        googleEventId: tasks.googleEventId,
-      });
-    for (const row of updated) {
-      await enqueueTaskCalendarSync({
-        userId,
-        taskId: row.id,
-        caldavUid: row.caldavUid,
-        resourceFilename: row.caldavResourceFilename,
-        googleEventId: row.googleEventId,
-        action: "update",
-      }).catch(() => {});
+
+    // Verify all tasks belong to this user
+    const validTasks = await db
+      .select({ id: tasks.id, title: tasks.title })
+      .from(tasks)
+      .where(and(eq(tasks.userId, userId), inArray(tasks.id, ids), taskActive));
+
+    if (!validTasks.length) return c.json({ updated: 0 });
+
+    // For each task, insert a subtask with this scheduledDate (skip if already has one for this date)
+    const existingSubs = await db
+      .select({ taskId: subtasks.taskId })
+      .from(subtasks)
+      .where(and(inArray(subtasks.taskId, validTasks.map(t => t.id)), eq(subtasks.scheduledDate, scheduledDate)));
+    const alreadyScheduled = new Set(existingSubs.map(s => s.taskId));
+
+    const toInsert = validTasks.filter(t => !alreadyScheduled.has(t.id));
+    if (toInsert.length > 0) {
+      await db.insert(subtasks).values(
+        toInsert.map(t => ({ taskId: t.id, title: t.title, scheduledDate }))
+      );
     }
-    return c.json({ updated: updated.length });
+
+    return c.json({ updated: validTasks.length });
   })
   .get("/:id", async (c) => {
     const idParsed = uuidParam.safeParse(c.req.param("id"));
@@ -418,11 +430,11 @@ export const taskRoutes = new Hono<AppEnv>()
     if (!task) {
       return c.json({ error: "not found" }, 404);
     }
-    const subtasks = await db.query.tasks.findMany({
-      where: and(eq(tasks.parentTaskId, id), taskActive),
-      orderBy: (t, { asc: ascFn }) => [ascFn(t.sortOrder), ascFn(t.createdAt)],
+    const subtasksList = await db.query.subtasks.findMany({
+      where: eq(subtasks.taskId, id),
+      orderBy: (s, { asc: ascFn }) => [ascFn(s.createdAt)],
     });
-    const subtasksDone = subtasks.filter((s) => s.status === "done").length;
+    const subtasksDone = subtasksList.filter((s) => s.completed).length;
 
     // Load tags for this task
     const detailTagRows = await db
@@ -435,8 +447,8 @@ export const taskRoutes = new Hono<AppEnv>()
 
     return c.json({
       task: { ...withTaskApiFields(task), _tags: taskTags_ },
-      subtasks,
-      subtaskProgress: subtasks.length ? { done: subtasksDone, total: subtasks.length } : null,
+      subtasks: subtasksList,
+      subtaskProgress: subtasksList.length ? { done: subtasksDone, total: subtasksList.length } : null,
     });
   })
   .post("/", async (c) => {
@@ -452,23 +464,6 @@ export const taskRoutes = new Hono<AppEnv>()
     } catch (e) {
       return c.json({ error: String(e) }, 422);
     }
-    const today = serverTodayYmd();
-    const scheduledDate =
-      v.parentTaskId != null
-        ? v.scheduledDate === undefined
-          ? null
-          : v.scheduledDate
-        : v.scheduledDate === undefined
-          ? today
-          : v.scheduledDate;
-    const dueDate =
-      v.parentTaskId != null
-        ? v.dueDate === undefined
-          ? null
-          : v.dueDate
-        : v.dueDate === undefined
-          ? today
-          : v.dueDate;
     const [row] = await db
       .insert(tasks)
       .values({
@@ -477,26 +472,17 @@ export const taskRoutes = new Hono<AppEnv>()
         title: v.title,
         projectId: v.projectId ?? null,
         sprintId: v.sprintId ?? null,
-        parentTaskId: v.parentTaskId ?? null,
         status: v.status ?? "todo",
         priority: v.priority ?? "normal",
         energyLevel: v.energyLevel ?? "shallow",
         workDepth: v.workDepth ?? "normal",
         physicalEnergy: v.physicalEnergy ?? "medium",
-        taskType: v.parentTaskId ? "subtask" : (v.taskType ?? "main"),
-        scheduledDate,
-        scheduledStartTime: v.scheduledStartTime ?? null,
-        scheduledEndTime: v.scheduledEndTime ?? null,
-        estimatedMinutes: v.estimatedMinutes ?? null,
         description: v.description ?? null,
-        dueDate,
+        dueDate: v.dueDate ?? null,
         recurrenceRule: v.recurrenceRule ?? null,
         tags: v.tags ?? null,
       })
       .returning();
-    if (row.parentTaskId) {
-      await rollupParentTaskStatus(db, row.parentTaskId);
-    }
     await enqueueTaskCalendarSync({
       userId: row.userId,
       taskId: row.id,
@@ -505,7 +491,25 @@ export const taskRoutes = new Hono<AppEnv>()
       googleEventId: row.googleEventId,
       action: "create",
     }).catch(() => {});
-    return c.json({ task: withTaskApiFields(row) }, 201);
+
+    // If a scheduledDate was provided, create an initial subtask so the task
+    // appears in Now + Timeline views immediately (subtask = schedulable unit)
+    let initialSubtasks: any[] = [];
+    if (v.scheduledDate) {
+      const [sub] = await db.insert(subtasks).values({
+        taskId: row.id,
+        title: v.title,
+        scheduledDate: v.scheduledDate,
+        scheduledTime: v.scheduledStartTime ?? null,
+        estimatedMinutes: v.estimatedMinutes ?? null,
+      }).returning();
+      if (sub) initialSubtasks = [sub];
+    }
+
+    return c.json({
+      task: withTaskApiFields(row),
+      subtasks: initialSubtasks,
+    }, 201);
   })
   .patch("/:id", async (c) => {
     const idParsed = uuidParam.safeParse(c.req.param("id"));
@@ -519,7 +523,6 @@ export const taskRoutes = new Hono<AppEnv>()
     }
     const v = parsed.data;
     try {
-      if (v.scheduledDate !== undefined) assertSaneCalendarDate("scheduledDate", v.scheduledDate);
       if (v.dueDate !== undefined) assertSaneCalendarDate("dueDate", v.dueDate);
     } catch (e) {
       return c.json({ error: String(e) }, 422);
@@ -530,8 +533,9 @@ export const taskRoutes = new Hono<AppEnv>()
 
     // Clean field mapping via allowlist
     for (const key of PATCH_FIELDS) {
-      if (v[key] !== undefined) {
-        (updates as Record<string, unknown>)[key] = v[key];
+      const k = key as keyof typeof v;
+      if (v[k] !== undefined) {
+        (updates as Record<string, unknown>)[key] = v[k];
       }
     }
 
@@ -551,9 +555,6 @@ export const taskRoutes = new Hono<AppEnv>()
       .returning();
     if (!row) {
       return c.json({ error: "not found" }, 404);
-    }
-    if (row.parentTaskId) {
-      await rollupParentTaskStatus(db, row.parentTaskId);
     }
     await enqueueTaskCalendarSync({
       userId: row.userId,
@@ -580,13 +581,6 @@ export const taskRoutes = new Hono<AppEnv>()
       .returning();
     if (!row) {
       return c.json({ error: "not found" }, 404);
-    }
-    await db
-      .update(tasks)
-      .set({ deletedAt: now, updatedAt: now })
-      .where(and(eq(tasks.userId, userId), eq(tasks.parentTaskId, id), taskActive));
-    if (row.parentTaskId) {
-      await rollupParentTaskStatus(db, row.parentTaskId);
     }
     await enqueueTaskCalendarSync({
       userId: row.userId,

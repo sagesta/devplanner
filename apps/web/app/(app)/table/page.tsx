@@ -28,7 +28,6 @@ type SortKey =
   | "energyLevel"
   | "workDepth"
   | "physicalEnergy"
-  | "scheduledDate"
   | "dueDate";
 type SortDir = "asc" | "desc";
 
@@ -58,7 +57,7 @@ export default function TablePage() {
   const qc = useQueryClient();
   const todayYmd = localISODate();
   const [sel, setSel] = useState<Record<string, boolean>>({});
-  const [sortKey, setSortKey] = useState<SortKey>("scheduledDate");
+  const [sortKey, setSortKey] = useState<SortKey>("dueDate");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [editCell, setEditCell] = useState<{ id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -70,7 +69,7 @@ export default function TablePage() {
   });
 
   const roots = useMemo(() => {
-    const items = (q.data ?? []).filter((t) => !t.parentTaskId);
+    const items = q.data ?? [];
     return items.sort((a, b) => {
       let cmp = 0;
       const dateCmp = (x: string | null | undefined, y: string | null | undefined) => {
@@ -99,9 +98,6 @@ export default function TablePage() {
           break;
         case "physicalEnergy":
           cmp = displayPhysicalEnergy(a).localeCompare(displayPhysicalEnergy(b));
-          break;
-        case "scheduledDate":
-          cmp = dateCmp(a.scheduledDate, b.scheduledDate);
           break;
         case "dueDate":
           cmp = dateCmp(a.dueDate, b.dueDate);
@@ -139,7 +135,7 @@ export default function TablePage() {
 
   function commitEdit(id: string, field: string, raw: string) {
     let value: unknown = raw;
-    if (field === "scheduledDate" || field === "dueDate") {
+    if (field === "dueDate") {
       value = raw.trim() === "" ? null : raw.trim();
     }
     if (field === "title") value = raw.trim();
@@ -296,8 +292,8 @@ export default function TablePage() {
                     (sortDir === "asc" ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
                 </span>
               </th>
-              <SortHeader field="scheduledDate" label="Scheduled" />
               <SortHeader field="dueDate" label="Due" />
+              <th className="p-2 text-[10px] uppercase text-muted">Scheduled (next sub)</th>
               <th className="p-2 text-[10px] uppercase text-muted">Tags</th>
               <th className="p-2 text-[10px] uppercase text-muted">Timer</th>
               <th className="w-10 p-2 text-right text-[10px] uppercase text-muted"> </th>
@@ -491,30 +487,13 @@ export default function TablePage() {
                   )}
                 </td>
                 <td
-                  className="cursor-pointer p-2 text-xs text-muted"
-                  onClick={() => startEdit(t, "scheduledDate", normalizeYmd(t.scheduledDate) ?? "")}
+                  className="p-2 text-xs text-muted"
                 >
-                  {editCell?.id === t.id && editCell.field === "scheduledDate" ? (
-                    <input
-                      type="date"
-                      autoFocus
-                      className="w-full rounded border border-primary/50 bg-background px-1 py-0.5 text-xs"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") commitEdit(t.id, "scheduledDate", editValue);
-                        if (e.key === "Escape") setEditCell(null);
-                      }}
-                      onBlur={() => {
-                        const v = editValue.trim();
-                        const prev = normalizeYmd(t.scheduledDate) ?? "";
-                        if (v !== prev) commitEdit(t.id, "scheduledDate", v);
-                        else setEditCell(null);
-                      }}
-                    />
-                  ) : (
-                    normalizeYmd(t.scheduledDate) ?? "—"
-                  )}
+                  {/* Show earliest scheduled subtask date */}
+                  {(t._subtasks ?? [])
+                    .map((s) => s.scheduledDate)
+                    .filter((d): d is string => Boolean(d))
+                    .sort()[0] ?? "—"}
                 </td>
                 <td
                   className="cursor-pointer p-2 text-xs text-muted"
