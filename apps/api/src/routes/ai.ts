@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { streamText } from "hono/streaming";
 import OpenAI from "openai";
@@ -7,7 +7,7 @@ import { executePlannerTool, PLANNER_CHAT_TOOLS } from "../ai/ai-task-tools.js";
 import { logAiCall } from "../ai/logCall.js";
 import { openaiJsonCompletion } from "../ai/openai-json.js";
 import { db } from "../db/client.js";
-import { aiCallLog, subtasks, tasks } from "../db/schema.js";
+import { aiCallLog, tasks } from "../db/schema.js";
 import type { AppEnv } from "../types.js";
 
 const parseDumpBody = z.object({
@@ -196,17 +196,9 @@ export const aiRoutes = new Hono<AppEnv>()
   .post("/briefing", async (c) => {
     const uid = c.get("userId");
     const today = new Date().toISOString().slice(0, 10);
-    // Find tasks that have subtasks scheduled today
-    const subMatches = await db
-      .select({ taskId: subtasks.taskId })
-      .from(subtasks)
-      .where(eq(subtasks.scheduledDate, today));
-    const taskIds = [...new Set(subMatches.map(s => s.taskId))];
-    const openToday = taskIds.length > 0
-      ? await db.query.tasks.findMany({
-          where: and(eq(tasks.userId, uid), isNull(tasks.deletedAt), inArray(tasks.id, taskIds))
-        })
-      : [];
+    const openToday = await db.query.tasks.findMany({
+      where: and(eq(tasks.userId, uid), isNull(tasks.deletedAt), eq(tasks.dueDate, today))
+    });
     return c.json({
       date: today,
       summary: `You have ${openToday.length} task(s) with work scheduled today.`,

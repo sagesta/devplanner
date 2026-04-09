@@ -229,7 +229,23 @@ export default function BacklogPage() {
                           className="max-w-[140px] rounded-md border border-white/10 bg-primary/10 text-primary px-2 py-1 text-[11px] font-medium transition-colors hover:bg-primary/20"
                           value={t.sprintId ?? ""}
                           disabled={patchMeta.isPending}
-                          onChange={(e) => patchMeta.mutate({ taskId: t.id, sprintId: e.target.value === "" ? null : e.target.value })}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "") {
+                              patchMeta.mutate({ taskId: t.id, sprintId: null });
+                              return;
+                            }
+                            const sprintName = sprintsQ.data?.sprints.find(s => s.id === val)?.name || "sprint";
+                            const newStatus = ["todo", "in_progress", "done"].includes(t.status) ? t.status : "todo";
+                            patchMeta.mutate(
+                              { taskId: t.id, sprintId: val, status: newStatus },
+                              { onSuccess: () => {
+                                  toast.success(`Added to ${sprintName}`);
+                                  void qc.invalidateQueries({ queryKey: ["backlog", userId] });
+                                } 
+                              }
+                            );
+                          }}
                         >
                           <option value="">Add to sprint →</option>
                           {(sprintsQ.data?.sprints ?? []).filter(s => s.status !== "completed").map((s) => (
@@ -406,13 +422,7 @@ export default function BacklogPage() {
                                       if (val && val !== sub.title) updateSubtaskM.mutate({ id: sub.id, updates: { title: val }});
                                     }}
                                   />
-                                  <input
-                                    type="date"
-                                    className="w-24 shrink-0 rounded bg-background px-1 text-[10px] text-muted border border-transparent hover:border-white/10 outline-none"
-                                    defaultValue={sub.scheduledDate?.slice(0, 10) ?? ""}
-                                    title="Scheduled date"
-                                    onChange={(e) => updateSubtaskM.mutate({ id: sub.id, updates: { scheduledDate: e.target.value || null } })}
-                                  />
+
                                   <button
                                     onClick={() => deleteSubtaskM.mutate(sub.id)}
                                     className="opacity-0 group-hover:opacity-100 p-0.5 text-muted hover:bg-danger/20 hover:text-danger rounded sm-transition"

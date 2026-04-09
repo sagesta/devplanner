@@ -8,6 +8,13 @@
       "when": 1775553542281,
       "tag": "0000_adorable_the_renegades",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775688164491,
+      "tag": "0001_add_subtasks_table",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@ import type { calendar_v3 } from "googleapis";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { DEVPLANNER_UID_RE, parseDevplannerCaldavUid } from "../caldav/parse-incoming.js";
 import { db } from "../db/client.js";
-import { googleCalendarLinks, subtasks, tasks, users } from "../db/schema.js";
+import { googleCalendarLinks, tasks, users } from "../db/schema.js";
 import { resolveOrCreateImportAreaId } from "../lib/importArea.js";
 import { getCalendarForUser } from "./auth.js";
 
@@ -572,20 +572,7 @@ async function applyOneGoogleEvent(
       })
       .where(eq(tasks.id, existing.id));
 
-    // Upsert a subtask for the scheduled date
-    if (parsed.scheduledDate) {
-      const existingSub = await db.query.subtasks.findFirst({
-        where: and(eq(subtasks.taskId, existing.id), eq(subtasks.scheduledDate, parsed.scheduledDate)),
-      });
-      if (!existingSub) {
-        await db.insert(subtasks).values({
-          taskId: existing.id,
-          title: parsed.title,
-          scheduledDate: parsed.scheduledDate,
-          scheduledTime: parsed.scheduledStartTime ?? null,
-        });
-      }
-    }
+
     stats.updated++;
     return;
   }
@@ -619,16 +606,8 @@ async function applyOneGoogleEvent(
   }
 
   try {
-    const [inserted] = await db.insert(tasks).values(insertRow).returning();
-    // Create a subtask for the scheduled date so it appears in Now/Timeline
-    if (inserted && parsed.scheduledDate) {
-      await db.insert(subtasks).values({
-        taskId: inserted.id,
-        title: parsed.title,
-        scheduledDate: parsed.scheduledDate,
-        scheduledTime: parsed.scheduledStartTime ?? null,
-      });
-    }
+    await db.insert(tasks).values(insertRow).returning();
+
     stats.imported++;
   } catch (e) {
     stats.errors.push(`${evId}: ${String(e)}`);

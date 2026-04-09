@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/client.js";
@@ -174,15 +174,7 @@ export const taskRoutes = new Hono<AppEnv>()
     const hasParam = Boolean(dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam));
     const dt = hasParam ? dateParam! : serverTodayYmd();
 
-    const subtaskMatches = await db.select({ taskId: subtasks.taskId })
-      .from(subtasks)
-      .where(eq(subtasks.scheduledDate, dt));
-    const matchedTaskIds = subtaskMatches.map(r => r.taskId);
-
-    let baseFilter = eq(tasks.dueDate, dt);
-    if (matchedTaskIds.length > 0) {
-       baseFilter = or(baseFilter, inArray(tasks.id, matchedTaskIds)) as any;
-    }
+    let baseFilter = eq(tasks.dueDate, dt) as any;
 
     const rows = await db.query.tasks.findMany({
       where: and(eq(tasks.userId, userId), taskActive, baseFilter),
@@ -221,7 +213,7 @@ export const taskRoutes = new Hono<AppEnv>()
       }
 
       const subs = await db.query.subtasks.findMany({
-        where: and(inArray(subtasks.taskId, todayTaskIds), eq(subtasks.scheduledDate, dt)),
+        where: inArray(subtasks.taskId, todayTaskIds),
       });
       for (const s of subs) {
         if (!subtaskMap[s.taskId]) subtaskMap[s.taskId] = [];
@@ -426,18 +418,9 @@ export const taskRoutes = new Hono<AppEnv>()
 
     if (!validTasks.length) return c.json({ updated: 0 });
 
-    // For each task, insert a subtask with this scheduledDate (skip if already has one for this date)
-    const existingSubs = await db
-      .select({ taskId: subtasks.taskId })
-      .from(subtasks)
-      .where(and(inArray(subtasks.taskId, validTasks.map(t => t.id)), eq(subtasks.scheduledDate, scheduledDate)));
-    const alreadyScheduled = new Set(existingSubs.map(s => s.taskId));
-
-    const toInsert = validTasks.filter(t => !alreadyScheduled.has(t.id));
-    if (toInsert.length > 0) {
-      await db.insert(subtasks).values(
-        toInsert.map(t => ({ taskId: t.id, title: t.title, scheduledDate }))
-      );
+    if (validTasks.length > 0) {
+      await db.update(tasks).set({ dueDate: scheduledDate })
+        .where(inArray(tasks.id, validTasks.map(t => t.id)));
     }
 
     return c.json({ updated: validTasks.length });
@@ -524,23 +507,11 @@ export const taskRoutes = new Hono<AppEnv>()
       action: "create",
     }).catch(() => {});
 
-    // If a scheduledDate was provided, create an initial subtask so the task
-    // appears in Now + Timeline views immediately (subtask = schedulable unit)
-    let initialSubtasks: any[] = [];
-    if (v.scheduledDate) {
-      const [sub] = await db.insert(subtasks).values({
-        taskId: row.id,
-        title: v.title,
-        scheduledDate: v.scheduledDate,
-        scheduledTime: v.scheduledStartTime ?? null,
-        estimatedMinutes: v.estimatedMinutes ?? null,
-      }).returning();
-      if (sub) initialSubtasks = [sub];
-    }
+
 
     return c.json({
       task: withTaskApiFields(row),
-      subtasks: initialSubtasks,
+      subtasks: [],
     }, 201);
   })
   .patch("/:id", async (c) => {

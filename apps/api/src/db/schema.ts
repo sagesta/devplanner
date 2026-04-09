@@ -12,7 +12,6 @@ import {
   real,
   serial,
   text,
-  time,
   timestamp,
   uniqueIndex,
   uuid,
@@ -184,15 +183,12 @@ export const subtasks = pgTable(
       .references(() => tasks.id, { onDelete: "cascade" }),
     title: varchar("title", { length: 500 }).notNull(),
     completed: boolean("completed").notNull().default(false),
-    scheduledDate: date("scheduled_date"),
-    scheduledTime: time("scheduled_time"),
     estimatedMinutes: integer("estimated_minutes"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index("subtasks_task_idx").on(t.taskId),
-    index("subtasks_scheduled_date_idx").on(t.scheduledDate),
   ]
 );
 

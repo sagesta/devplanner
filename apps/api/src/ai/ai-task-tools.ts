@@ -15,12 +15,7 @@ const STATUS_ENUM = [
   "blocked",
 ] as const;
 
-function addDaysISO(iso: string, delta: number): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
-  dt.setUTCDate(dt.getUTCDate() + delta);
-  return dt.toISOString().slice(0, 10);
-}
+
 
 function normYmd(v: unknown): string | null {
   if (typeof v !== "string") return null;
@@ -99,12 +94,11 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
     function: {
       name: "listTasks",
       description:
-        "List the user's tasks. Filter by status and/or scheduled date. Always call this before addSubtask/createSubtasks to find the correct taskId.",
+        "List the user's tasks. Filter by status. Always call this before addSubtask/createSubtasks to find the correct taskId.",
       parameters: {
         type: "object",
         properties: {
           status: { type: "string", enum: [...STATUS_ENUM] },
-          scheduledDate: { type: "string", description: "YYYY-MM-DD — returns tasks that have subtasks scheduled on this date" },
           limit: { type: "integer", minimum: 1, maximum: 100 },
         },
       },
@@ -134,7 +128,6 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
           workDepth: { type: "string", enum: ["shallow", "normal", "deep"] },
           physicalEnergy: { type: "string", enum: ["low", "medium", "high"] },
           dueDate: { type: "string", description: "YYYY-MM-DD" },
-          scheduledDate: { type: "string", description: "YYYY-MM-DD (creates implicit scheduled subtask)" },
           estimatedMinutes: { type: "integer" },
           recurrenceRule: { type: "string" },
           sprintId: { type: "string" },
@@ -191,19 +184,13 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
     type: "function",
     function: {
       name: "createSubtask",
-      description:
-        "Add a single step/subtask to an existing task. Use this to break down a task into executable steps. " +
-        "Subtasks with scheduledDate appear in the Now view and Timeline. " +
-        "You MUST call listTasks first to get the correct taskId.",
+      description: "Create a single subtask under an existing task.",
       parameters: {
         type: "object",
         properties: {
-          taskId: { type: "string", description: "UUID of the parent task" },
-          title: { type: "string", description: "The step title" },
-          scheduledDate: { type: "string", description: "YYYY-MM-DD — which day to do this step" },
-          scheduledTime: { type: "string", description: "HH:MM — optional time block" },
-          estimatedMinutes: { type: "integer", description: "Estimated minutes for this step" },
-          completed: { type: "boolean" }
+          taskId: { type: "string" },
+          title: { type: "string" },
+          estimatedMinutes: { type: "integer" }
         },
         required: ["taskId", "title"],
       },
@@ -212,13 +199,38 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
   {
     type: "function",
     function: {
-      name: "getSubtasks",
-      description: "List all subtasks for a given task. You should use this to get subtask IDs before trying to update or delete them.",
+      name: "createSubtasks",
+      description: "Create multiple subtasks under a task at once. Use this when breaking a task into steps.",
       parameters: {
         type: "object",
         properties: {
           taskId: { type: "string" },
-          taskTitle: { type: "string", description: "Use this if taskId is unknown but you know the parent task title" }
+          subtasks: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                estimatedMinutes: { type: "integer" }
+              },
+              required: ["title"]
+            }
+          }
+        },
+        required: ["taskId", "subtasks"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "getSubtasks",
+      description: "List all subtasks for a given task. Can look up task by ID or by title.",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: { type: "string" },
+          taskTitle: { type: "string" }
         }
       }
     }
@@ -227,15 +239,13 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
     type: "function",
     function: {
       name: "updateSubtask",
-      description: "Update an existing subtask. You MUST provide the subtaskId.",
+      description: "Update a subtask — rename it, mark it complete or incomplete, or change the estimate.",
       parameters: {
         type: "object",
         properties: {
           subtaskId: { type: "string" },
           title: { type: "string" },
           completed: { type: "boolean" },
-          scheduledDate: { type: "string", description: "YYYY-MM-DD" },
-          scheduledTime: { type: "string", description: "HH:MM" },
           estimatedMinutes: { type: "integer" }
         },
         required: ["subtaskId"]
@@ -246,62 +256,13 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
     type: "function",
     function: {
       name: "deleteSubtask",
-      description: "Delete a subtask by ID.",
+      description: "Delete a subtask permanently.",
       parameters: {
         type: "object",
         properties: {
           subtaskId: { type: "string" }
         },
         required: ["subtaskId"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "createSubtasks",
-      description:
-        "Break a task into multiple steps at once. Use when user asks to plan, break down, or decompose a task. " +
-        "Each subtask can optionally have a scheduledDate to appear in the Now view. " +
-        "You MUST call listTasks first to get the correct taskId.",
-      parameters: {
-        type: "object",
-        properties: {
-          taskId: { type: "string", description: "UUID of the parent task" },
-          subtasks: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                title: { type: "string", description: "Step title" },
-                scheduledDate: { type: "string", description: "YYYY-MM-DD" },
-                scheduledTime: { type: "string", description: "HH:MM" },
-                estimatedMinutes: { type: "integer" }
-              },
-              required: ["title"]
-            },
-            description: "List of steps to create"
-          }
-        },
-        required: ["taskId", "subtasks"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "spreadSubtasksAcrossDays",
-      description: "Create AI-distributed subtasks across a date range for a parent task. Good for spreading work out.",
-      parameters: {
-        type: "object",
-        properties: {
-          taskId: { type: "string" },
-          subtaskTitles: { type: "array", items: { type: "string" } },
-          startDate: { type: "string", description: "YYYY-MM-DD" },
-          endDate: { type: "string", description: "YYYY-MM-DD" },
-          maxPerDay: { type: "integer", default: 3, description: "Max subtasks per day" }
-        },
-        required: ["taskId", "subtaskTitles", "startDate", "endDate"]
       }
     }
   },
@@ -382,15 +343,7 @@ export async function executePlannerTool(
         conditions.push(eq(tasks.status, obj.status as (typeof STATUS_ENUM)[number]));
       }
 
-      let subScheduledTaskIds: string[] | null = null;
-      if (typeof obj.scheduledDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(obj.scheduledDate)) {
-        const subs = await db.query.subtasks.findMany({
-          where: eq(subtasks.scheduledDate, obj.scheduledDate)
-        });
-        subScheduledTaskIds = subs.map(s => s.taskId);
-        if (subScheduledTaskIds.length === 0) return { count: 0, tasks: [] };
-        conditions.push(inArray(tasks.id, subScheduledTaskIds));
-      }
+
 
       const rows = await db.query.tasks.findMany({
         where: and(...conditions),
@@ -467,16 +420,7 @@ export async function executePlannerTool(
         })
         .returning();
 
-      // If scheduledDate is passed, immediately lazily wrap it in a subtask
-      const scheduledDate = liftYmd(obj.scheduledDate);
-      if (scheduledDate) {
-         await db.insert(subtasks).values({
-            taskId: row.id,
-            title: title,
-            scheduledDate,
-            estimatedMinutes: typeof obj.estimatedMinutes === "number" ? obj.estimatedMinutes : null
-         });
-      }
+      // Note: Implicitly scheduled subtasks from scheduledDate have been removed in this migration.
 
       await enqueueTaskCalendarSync({
         userId: row.userId,
@@ -603,31 +547,11 @@ export async function executePlannerTool(
       }).catch(() => {});
       return { ok: true, deletedId: row.id };
     }
-    case "scheduleTask": {
-      const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
-      const scheduledDate = typeof obj.scheduledDate === "string" ? liftYmd(obj.scheduledDate) : null;
-      if (!taskId || !scheduledDate) return { error: "taskId and scheduledDate required" };
 
-      const existing = await db.query.tasks.findFirst({
-        where: and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)),
-      });
-      if (!existing) return { error: "task not found" };
-
-      const [sub] = await db.insert(subtasks).values({
-        taskId,
-        title: existing.title,
-        scheduledDate,
-        estimatedMinutes: typeof obj.estimatedMinutes === "number" ? obj.estimatedMinutes : null
-      }).returning();
-      
-      return { ok: true, subtask: sub };
-    }
     case "createSubtask": {
       const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
       const title = typeof obj.title === "string" ? obj.title.trim().slice(0, 500) : "";
       const completed = typeof obj.completed === "boolean" ? obj.completed : false;
-      const scheduledDate = typeof obj.scheduledDate === "string" ? liftYmd(obj.scheduledDate) : null;
-      const scheduledTime = typeof obj.scheduledTime === "string" ? obj.scheduledTime : null;
       if (!taskId) return { error: "taskId required" };
       if (!title) return { error: "title required" };
 
@@ -642,8 +566,6 @@ export async function executePlannerTool(
           taskId,
           title,
           completed,
-          scheduledDate,
-          scheduledTime,
           estimatedMinutes: typeof obj.estimatedMinutes === "number" ? obj.estimatedMinutes : null,
           completedAt: completed ? new Date() : null
         })
@@ -667,54 +589,14 @@ export async function executePlannerTool(
          subArr.map((s: any) => ({
            taskId,
            title: typeof s.title === "string" ? s.title : "Untitled",
-           scheduledDate: typeof s.scheduledDate === "string" ? liftYmd(s.scheduledDate) : null,
-           scheduledTime: typeof s.scheduledTime === "string" ? s.scheduledTime : null,
            estimatedMinutes: typeof s.estimatedMinutes === "number" ? s.estimatedMinutes : null
          }))
       ).returning();
 
       await rollupParentTaskStatus(db, taskId);
-      return { ok: true, count: inserts.length, subtasks: inserts.map(s => ({ id: s.id, title: s.title, scheduledDate: s.scheduledDate })) };
+      return { ok: true, count: inserts.length, subtasks: inserts.map(s => ({ id: s.id, title: s.title })) };
     }
-    case "spreadSubtasksAcrossDays": {
-      const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
-      if (!taskId) return { error: "taskId required" };
-      const titles = Array.isArray(obj.subtaskTitles) ? obj.subtaskTitles.map(t => String(t)) : [];
-      if (!titles.length) return { error: "subtaskTitles array required" };
-      const rawStart = typeof obj.startDate === "string" ? obj.startDate : "";
-      const rawEnd = typeof obj.endDate === "string" ? obj.endDate : "";
-      if (!rawStart || !rawEnd) return { error: "startDate and endDate required" };
-      const maxPerDay = typeof obj.maxPerDay === "number" ? obj.maxPerDay : 3;
 
-      const existing = await db.query.tasks.findFirst({
-        where: and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)),
-      });
-      if (!existing) return { error: "parent task not found" };
-
-      // Simplified spread: just assign 1 per day linearly without loading global loads for the AI tool
-      // since the AI might just want to schedule them sequentially.
-      const assigned = [];
-      let currentISO = liftYmd(rawStart) ?? addDaysISO(new Date().toISOString().slice(0, 10), 0);
-      let dayCount = 0;
-      
-      for (const t of titles) {
-         assigned.push({
-           taskId,
-           title: t,
-           scheduledDate: currentISO
-         });
-         dayCount++;
-         if (dayCount >= maxPerDay) {
-           currentISO = addDaysISO(currentISO, 1);
-           dayCount = 0;
-         }
-      }
-
-      const rows = await db.insert(subtasks).values(assigned).returning();
-      await rollupParentTaskStatus(db, taskId);
-
-      return { ok: true, subtasks: rows };
-    }
     case "getSubtasks": {
       const parentTaskId = typeof obj.taskId === "string" ? obj.taskId : null;
       const term = typeof obj.taskTitle === "string" ? obj.taskTitle : null;
@@ -751,10 +633,6 @@ export async function executePlannerTool(
         updates.completed = obj.completed;
         updates.completedAt = obj.completed ? new Date() : null;
       }
-      if (typeof obj.scheduledDate === "string") {
-        updates.scheduledDate = obj.scheduledDate.trim() === "" ? null : liftYmd(obj.scheduledDate);
-      }
-      if (typeof obj.scheduledTime === "string") updates.scheduledTime = obj.scheduledTime;
       if (typeof obj.estimatedMinutes === "number") updates.estimatedMinutes = obj.estimatedMinutes;
 
       const [row] = await db.update(subtasks).set(updates).where(eq(subtasks.id, subtaskId)).returning();
@@ -802,18 +680,13 @@ export async function executePlannerTool(
       const goal = typeof obj.goal === "string" ? obj.goal.trim() : null;
       if (!name || !startDate || !endDate) return { error: "name, startDate, endDate required" };
 
-      const existingSprints = await db.query.sprints.findMany({
-        where: eq(sprints.userId, userId),
-      });
-      const hasActive = existingSprints.some(s => s.status === "active");
-
       const [row] = await db.insert(sprints).values({
         userId,
         name,
         startDate,
         endDate,
         goal,
-        status: hasActive ? "planned" : "active",
+        status: "active",
       }).returning();
       if (!row) return { error: "failed to create sprint" };
       return { ok: true, sprint: { id: row.id, name: row.name, status: row.status } };

@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "../db/client.js";
 import { subtasks, tasks } from "../db/schema.js";
@@ -17,15 +17,11 @@ export const focusRoutes = new Hono<AppEnv>()
     const taskIds = userTasks.map((t) => t.id);
     const taskMap = new Map(userTasks.map((t) => [t.id, t]));
 
-    const todaySubs = taskIds.length > 0
+    const filtered = taskIds.length > 0
       ? await db.query.subtasks.findMany({
-          where: and(
-            eq(subtasks.scheduledDate, today),
-          ),
+          where: inArray(subtasks.taskId, taskIds),
         })
       : [];
-
-    const filtered = todaySubs.filter((s) => taskMap.has(s.taskId));
 
     const tasksOut = filtered.map((s) => {
       const parent = taskMap.get(s.taskId)!;
