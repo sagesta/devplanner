@@ -36,20 +36,20 @@ async function waitAndEnsureVector() {
 await waitAndEnsureVector();
 
 if (process.env.SKIP_SCHEMA_SYNC === "1") {
-  console.log("[entrypoint] SKIP_SCHEMA_SYNC=1 — skipping drizzle-kit push");
+  console.log("[entrypoint] SKIP_SCHEMA_SYNC=1 — skipping drizzle-kit migrate");
   process.exit(0);
 }
 
-console.log("[entrypoint] Running drizzle-kit push...");
-const r = spawnSync("npm", ["run", "db:push", "-w", "@devplanner/api"], {
+console.log("[entrypoint] Running drizzle-kit migrate...");
+const r = spawnSync("npm", ["run", "db:migrate", "-w", "@devplanner/api"], {
   cwd: "/app",
   stdio: "inherit",
   env: process.env,
   shell: false,
 });
 if (r.status !== 0) {
-  console.error("[entrypoint] db:push failed");
+  console.error("[entrypoint] db:migrate failed");
   process.exit(r.status ?? 1);
 }
-console.log("[entrypoint] Schema sync complete");
+console.log("[entrypoint] Schema validation complete");
 process.exit(0);

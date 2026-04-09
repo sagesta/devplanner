@@ -122,7 +122,7 @@ services:
       - .:/src
     environment:
       DATABASE_URL: postgresql://devplanner:${DB_PASSWORD:-devplanner}@devplanner-db:5432/devplanner
-    command: ["sh", "-c", "npm ci && npm run db:push -w @devplanner/api"]
+    command: ["sh", "-c", "npm ci && npm run db:migrate -w @devplanner/api"]
     depends_on:
       devplanner-db:
         condition: service_healthy

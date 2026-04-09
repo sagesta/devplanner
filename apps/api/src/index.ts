@@ -16,6 +16,7 @@ import { sprintRoutes } from "./routes/sprints.js";
 import { syncRoutes } from "./routes/sync.js";
 import { tagRoutes } from "./routes/tags.js";
 import { taskRoutes } from "./routes/tasks.js";
+import { backlogRoutes } from "./routes/backlog.js";
 import { subtasksRoutes } from "./routes/subtasks.js";
 import { timeLogRoutes } from "./routes/time-logs.js";
 import type { AppEnv } from "./types.js";
@@ -110,6 +111,7 @@ app.route("/api/sync", syncRoutes);
 app.route("/api/time-logs", timeLogRoutes);
 app.route("/api/tags", tagRoutes);
 app.route("/api/subtasks", subtasksRoutes);
+app.route("/api/backlog", backlogRoutes);
 
 const port = Number(process.env.PORT) || 3001;
 const hostname = process.env.HOST?.trim() || "0.0.0.0";

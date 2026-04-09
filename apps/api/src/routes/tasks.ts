@@ -227,48 +227,7 @@ export const taskRoutes = new Hono<AppEnv>()
       doneTodayCount: doneTodayRow?.count ?? 0,
     });
   })
-  .get("/backlog", async (c) => {
-    const userId = c.get("userId");
-    const rows = await db.query.tasks.findMany({
-      where: and(eq(tasks.userId, userId), isNull(tasks.sprintId), taskActive),
-      orderBy: (t, { asc: ascFn }) => [ascFn(t.sortOrder), ascFn(t.createdAt)],
-    });
-    // Batch load tags
-    const blIds = rows.map((t) => t.id);
-    const blTagMap: Record<string, Array<{ id: number; name: string; color: string | null }>> = {};
-    const blSubtaskMap: Record<string, any[]> = {};
-    
-    if (blIds.length > 0) {
-      const blTagRows = await db
-        .select({ taskId: taskTags.taskId, tagId: tags.id, tagName: tags.name, tagColor: tags.color })
-        .from(taskTags)
-        .innerJoin(tags, eq(tags.id, taskTags.tagId))
-        .where(inArray(taskTags.taskId, blIds))
-        .orderBy(asc(tags.name));
-      for (const r of blTagRows) {
-        if (!blTagMap[r.taskId]) blTagMap[r.taskId] = [];
-        blTagMap[r.taskId].push({ id: r.tagId, name: r.tagName, color: r.tagColor });
-      }
 
-      const blSubs = await db.query.subtasks.findMany({
-        where: inArray(subtasks.taskId, blIds),
-        orderBy: (s, { asc }) => [asc(s.createdAt)]
-      });
-      for (const s of blSubs) {
-        if (!blSubtaskMap[s.taskId]) blSubtaskMap[s.taskId] = [];
-        blSubtaskMap[s.taskId].push(s);
-      }
-    }
-    return c.json({ 
-      tasks: rows.map((t) => ({ 
-        ...withTaskApiFields(t), 
-        _tags: blTagMap[t.id] ?? [],
-        _subtasks: blSubtaskMap[t.id] ?? [],
-        _subtasksDone: (blSubtaskMap[t.id] ?? []).filter((s: any) => s.completed).length,
-        _subtasksTotal: (blSubtaskMap[t.id] ?? []).length
-      })) 
-    });
-  })
   .post("/brain-dump", async (c) => {
     const parsed = brainDumpBody.safeParse(await c.req.json());
     if (!parsed.success) {
