@@ -134,25 +134,11 @@ export function TaskDetailPanel({
     mutationFn: () => deleteTask(taskId),
     onSuccess: () => {
       const name = q.data?.task.title ?? "Task";
-      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
+      void qc.invalidateQueries({ queryKey: ["tasks"] });
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
       onClose();
-      toast.success(`“${name}” deleted`, {
-        duration: 5000,
-        action: {
-          label: "Undo",
-          onClick: () => {
-            void restoreTask(taskId)
-              .then(() => {
-                toast.success("Task restored");
-                void qc.invalidateQueries({ queryKey: ["tasks", userId] });
-                void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
-                void qc.invalidateQueries({ queryKey: ["task", taskId] });
-              })
-              .catch((err: unknown) => toast.error(String(err)));
-          },
-        },
-      });
+      toast.success(`“${name}” deleted`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -430,12 +416,18 @@ export function TaskDetailPanel({
                   <input
                     type="date"
                     className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-2 text-sm text-foreground"
-                    value={dueDate}
-                    onChange={(e) => {
-                      setDueDate(e.target.value);
-                      updateTaskDetails.mutate({ dueDate: e.target.value || null });
-                    }}
+                    value={dueDate || ""}
+                    onChange={(e) => setDueDate(e.target.value)}
                   />
+                  <button
+                    onClick={() => {
+                      updateTaskDetails.mutate({ dueDate: dueDate || null });
+                      toast.success("Saved");
+                    }}
+                    className="mt-2 w-full rounded bg-primary px-2 py-1.5 text-xs text-white hover:bg-primary-hover transition-colors"
+                  >
+                    Save details
+                  </button>
                 </label>
               </div>
 

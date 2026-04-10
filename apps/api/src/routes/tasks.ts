@@ -535,11 +535,9 @@ export const taskRoutes = new Hono<AppEnv>()
     }
     const id = idParsed.data;
     const userId = c.get("userId");
-    const now = new Date();
     const [row] = await db
-      .update(tasks)
-      .set({ deletedAt: now, updatedAt: now })
-      .where(and(eq(tasks.id, id), eq(tasks.userId, userId), taskActive))
+      .delete(tasks)
+      .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
       .returning();
     if (!row) {
       return c.json({ error: "not found" }, 404);

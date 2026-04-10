@@ -11,9 +11,13 @@ import {
   Lightbulb,
   Settings,
   Zap,
+  CheckCircle2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useAppUserId } from "@/hooks/use-app-user-id";
+import { fetchTasks } from "@/lib/api";
 
 const NAV_ITEMS = [
   { href: "/board", label: "Board", icon: KanbanSquare },
@@ -38,6 +42,13 @@ export function CommandMenu({
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
+  const userId = useAppUserId();
+
+  const { data: tasks } = useQuery({
+    queryKey: ["tasks", userId],
+    queryFn: () => fetchTasks(),
+    enabled: open && Boolean(userId),
+  });
 
   useEffect(() => {
     if (!open) {
@@ -75,6 +86,11 @@ export function CommandMenu({
     );
   }, [q]);
 
+  const tasksFiltered = useMemo(() => {
+    if (!tasks || !q) return [];
+    return tasks.filter((t) => t.title.toLowerCase().includes(q));
+  }, [tasks, q]);
+
   const brainMatches =
     !q ||
     "brain dump".includes(q) ||
@@ -85,9 +101,14 @@ export function CommandMenu({
     onOpenChange(false);
   }
 
+  function openTask(taskId: string) {
+    onOpenChange(false);
+    window.dispatchEvent(new CustomEvent("open-task", { detail: { id: taskId } }));
+  }
+
   if (!open) return null;
 
-  const nothingMatches = navFiltered.length === 0 && !brainMatches;
+  const nothingMatches = navFiltered.length === 0 && !brainMatches && tasksFiltered.length === 0;
 
   return (
     <div
@@ -130,7 +151,28 @@ export function CommandMenu({
                   ))}
                 </Command.Group>
               )}
-              {navFiltered.length > 0 && brainMatches && (
+              {tasksFiltered.length > 0 && (
+                <>
+                  {navFiltered.length > 0 && <Command.Separator className="my-1 border-t border-white/5" />}
+                  <Command.Group
+                    heading="Tasks"
+                    className="text-[10px] uppercase tracking-wider text-muted mb-1"
+                  >
+                    {tasksFiltered.map((task) => (
+                      <Command.Item
+                        key={task.id}
+                        value={`${task.title} t-${task.id}`}
+                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-foreground aria-selected:bg-white/10"
+                        onSelect={() => openTask(task.id)}
+                      >
+                        <CheckCircle2 size={14} className="text-muted" />
+                        <span className="truncate">{task.title}</span>
+                      </Command.Item>
+                    ))}
+                  </Command.Group>
+                </>
+              )}
+              {(navFiltered.length > 0 || tasksFiltered.length > 0) && brainMatches && (
                 <Command.Separator className="my-1 border-t border-white/5" />
               )}
               {brainMatches && (

@@ -252,7 +252,7 @@ function InlineAddTask({
             <input
               type="date"
               className="mt-0.5 w-full rounded border border-white/10 bg-background px-1.5 py-1 text-foreground"
-              value={scheduledDate}
+              defaultValue={scheduledDate}
               onChange={(e) => setScheduledDate(e.target.value)}
             />
           </label>
@@ -339,16 +339,28 @@ export function KanbanBoard() {
     enabled: Boolean(activeSprint?.id),
   });
 
+  useEffect(() => {
+    const handleOpenTask = (e: Event) => {
+      const customEvent = e as CustomEvent<{ id: string }>;
+      if (customEvent.detail?.id) {
+        setOpenTaskId(customEvent.detail.id);
+      }
+    };
+    window.addEventListener("open-task", handleOpenTask);
+    return () => window.removeEventListener("open-task", handleOpenTask);
+  }, []);
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const m = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => patchTask(id, { status }),
     onMutate: async ({ id, status }) => {
-      await qc.cancelQueries({ queryKey: ["tasks", userId] });
-      const prev = qc.getQueryData<TaskRow[]>(["tasks", userId]);
+      await qc.cancelQueries({ queryKey: ["sprintTasks"] });
+      await qc.cancelQueries({ queryKey: ["tasks"] });
+      const prev = qc.getQueryData<TaskRow[]>(["sprintTasks", activeSprint?.id]);
       if (prev) {
         qc.setQueryData(
-          ["tasks", userId],
+          ["sprintTasks", activeSprint?.id],
           prev.map((t) => (t.id === id ? { ...t, status } : t))
         );
       }
@@ -366,11 +378,12 @@ export function KanbanBoard() {
       }
     },
     onError: (e: Error, _v, ctx) => {
-      if (ctx?.prev) qc.setQueryData(["tasks", userId], ctx.prev);
+      if (ctx?.prev) qc.setQueryData(["sprintTasks", activeSprint?.id], ctx.prev);
       toast.error(e.message);
     },
     onSettled: () => {
-      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
+      void qc.invalidateQueries({ queryKey: ["tasks"] });
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
     },
   });
@@ -378,21 +391,25 @@ export function KanbanBoard() {
   const priMut = useMutation({
     mutationFn: ({ id, priority }: { id: string; priority: string }) => patchTask(id, { priority }),
     onMutate: async ({ id, priority }) => {
-      await qc.cancelQueries({ queryKey: ["tasks", userId] });
-      const prev = qc.getQueryData<TaskRow[]>(["tasks", userId]);
+      await qc.cancelQueries({ queryKey: ["sprintTasks"] });
+      await qc.cancelQueries({ queryKey: ["tasks"] });
+      const prev = qc.getQueryData<TaskRow[]>(["sprintTasks", activeSprint?.id]);
       if (prev) {
         qc.setQueryData(
-          ["tasks", userId],
+          ["sprintTasks", activeSprint?.id],
           prev.map((t) => (t.id === id ? { ...t, priority } : t))
         );
       }
       return { prev };
     },
     onError: (e: Error, _v, ctx) => {
-      if (ctx?.prev) qc.setQueryData(["tasks", userId], ctx.prev);
+      if (ctx?.prev) qc.setQueryData(["sprintTasks", activeSprint?.id], ctx.prev);
       toast.error(e.message);
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["tasks", userId] }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
+      void qc.invalidateQueries({ queryKey: ["tasks"] });
+    },
   });
 
   const createSprintM = useMutation({
@@ -409,7 +426,8 @@ export function KanbanBoard() {
     onSuccess: (r) => {
       toast.success(`Rescheduled ${r.updated} task(s) to today`);
       setRescueDismissed(true);
-      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
+      void qc.invalidateQueries({ queryKey: ["tasks"] });
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -686,23 +704,10 @@ export function KanbanBoard() {
                             void (async () => {
                               try {
                                 await deleteTask(t.id);
-                                void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+                                void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
+                                void qc.invalidateQueries({ queryKey: ["tasks"] });
                                 void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
-                                toast.success(`“${t.title}” deleted`, {
-                                  duration: 5000,
-                                  action: {
-                                    label: "Undo",
-                                    onClick: () => {
-                                      void restoreTask(t.id)
-                                        .then(() => {
-                                          toast.success("Task restored");
-                                          void qc.invalidateQueries({ queryKey: ["tasks", userId] });
-                                          void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
-                                        })
-                                        .catch((err: unknown) => toast.error(String(err)));
-                                    },
-                                  },
-                                });
+                                toast.success(`“${t.title}” deleted`);
                               } catch (e) {
                                 toast.error(String(e));
                               }
@@ -1087,11 +1092,11 @@ function TaskDrawer({
                  <div className="flex gap-2">
                    <div className="flex-1">
                      <label className="block text-[10px] uppercase tracking-wider text-muted mb-1">Start</label>
-                     <input type="date" value={spreadStart} onChange={e => setSpreadStart(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-white/10" />
+                     <input type="date" defaultValue={spreadStart} onChange={e => setSpreadStart(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-white/10" />
                    </div>
                    <div className="flex-1">
                      <label className="block text-[10px] uppercase tracking-wider text-muted mb-1">End</label>
-                     <input type="date" value={spreadEnd} onChange={e => setSpreadEnd(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-white/10" />
+                     <input type="date" defaultValue={spreadEnd} onChange={e => setSpreadEnd(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-white/10" />
                    </div>
                  </div>
                  <button onClick={() => spreadSubs.mutate()} disabled={!spreadStart || !spreadEnd || spreadSubs.isPending || !q.data.subtasks.some((s: SubtaskRow) => !s.scheduledDate)} className="w-full mt-2 rounded bg-primary py-1.5 text-xs text-white hover:bg-primary-hover disabled:opacity-50">
