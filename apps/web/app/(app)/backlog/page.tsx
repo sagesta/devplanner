@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useAppUserId } from "@/hooks/use-app-user-id";
+import { AddToSprintButton } from "@/components/AddToSprintButton";
 import { ChevronDown, ChevronRight, Inbox, CheckCircle2, Trash2, Plus, Circle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -225,6 +226,7 @@ export default function BacklogPage() {
                           <TagChip key={tag.id} name={tag.name} color={tag.color} size="xs" />
                         ))}
                         <TimerButton taskId={t.id} compact />
+                        <AddToSprintButton taskId={t.id} />
                         <select
                           className="max-w-[140px] rounded-md border border-white/10 bg-primary/10 text-primary px-2 py-1 text-[11px] font-medium transition-colors hover:bg-primary/20"
                           value={t.sprintId ?? ""}

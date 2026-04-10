@@ -13,7 +13,7 @@ import { TagChip } from "@/components/TagChip";
 import { TimerButton } from "@/components/TimerButton";
 import { normalizeYmd } from "@/lib/timeline-utils";
 import { cn, displayPhysicalEnergy, displayWorkDepth, isTaskOverdue } from "@/lib/utils";
-
+import { TaskTableRow } from "@/components/TaskTableRow";
 const STATUS_CYCLE: Record<string, string> = {
   backlog: "todo",
   todo: "in_progress",
@@ -59,8 +59,6 @@ export default function TablePage() {
   const [sel, setSel] = useState<Record<string, boolean>>({});
   const [sortKey, setSortKey] = useState<SortKey>("dueDate");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [editCell, setEditCell] = useState<{ id: string; field: string } | null>(null);
-  const [editValue, setEditValue] = useState("");
 
   const q = useQuery({
     queryKey: ["tasks", userId, "table"],
@@ -120,27 +118,6 @@ export default function TablePage() {
     mutationFn: ({ id, status }: { id: string; status: string }) => patchTask(id, { status }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["tasks", userId] }),
   });
-
-  const inlineEdit = useMutation({
-    mutationFn: async ({ id, field, value }: { id: string; field: string; value: unknown }) => {
-      const body: Record<string, unknown> = { [field]: value };
-      return patchTask(id, body);
-    },
-    onSuccess: () => {
-      setEditCell(null);
-      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  function commitEdit(id: string, field: string, raw: string) {
-    let value: unknown = raw;
-    if (field === "dueDate") {
-      value = raw.trim() === "" ? null : raw.trim();
-    }
-    if (field === "title") value = raw.trim();
-    inlineEdit.mutate({ id, field, value });
-  }
 
   const del = useMutation({
     mutationFn: ({ id, title }: { id: string; title: string }) => deleteTask(id),
@@ -205,11 +182,6 @@ export default function TablePage() {
         </span>
       </th>
     );
-  }
-
-  function startEdit(t: TaskRow, field: string, current: string) {
-    setEditCell({ id: t.id, field });
-    setEditValue(current);
   }
 
   return (
@@ -309,243 +281,15 @@ export default function TablePage() {
               </>
             )}
             {roots.map((t, i) => (
-              <tr
-                key={t.id}
-                className={cn(
-                  "border-b border-white/5 transition-colors hover:bg-white/[0.03]",
-                  i % 2 === 1 && "bg-white/[0.01]"
-                )}
-              >
-                <td className="p-2">
-                  <input
-                    type="checkbox"
-                    className="rounded"
-                    checked={Boolean(sel[t.id])}
-                    onChange={(e) => setSel((s) => ({ ...s, [t.id]: e.target.checked }))}
-                  />
-                </td>
-                <td className="p-2">
-                  <StatusDot
-                    status={t.status}
-                    onClick={() => {
-                      const next = STATUS_CYCLE[t.status] ?? "todo";
-                      statusMut.mutate({ id: t.id, status: next });
-                    }}
-                  />
-                </td>
-                <td
-                  className="cursor-pointer p-2 text-foreground"
-                  onClick={() => startEdit(t, "title", t.title)}
-                >
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {isTaskOverdue(t, todayYmd) && (
-                      <span className="rounded-full bg-red-500/20 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-red-200">
-                        Overdue
-                      </span>
-                    )}
-                    {editCell?.id === t.id && editCell.field === "title" ? (
-                      <input
-                        autoFocus
-                        className="w-full min-w-[120px] rounded border border-primary/50 bg-background px-1 py-0.5 text-sm"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") commitEdit(t.id, "title", editValue);
-                          if (e.key === "Escape") setEditCell(null);
-                        }}
-                        onBlur={() => {
-                          if (editCell?.id === t.id && editCell.field === "title") {
-                            if (editValue.trim() && editValue !== t.title) commitEdit(t.id, "title", editValue);
-                            else setEditCell(null);
-                          }
-                        }}
-                      />
-                    ) : (
-                      <span className={cn(t.status === "done" && "line-through opacity-60")}>{t.title}</span>
-                    )}
-                  </div>
-                </td>
-                <td
-                  className="cursor-pointer p-2 text-xs capitalize text-muted"
-                  onClick={() => startEdit(t, "status", t.status)}
-                >
-                  {editCell?.id === t.id && editCell.field === "status" ? (
-                    <select
-                      autoFocus
-                      className="w-full rounded border border-primary/50 bg-background px-1 py-0.5 text-xs"
-                      value={editValue}
-                      onChange={(e) => {
-                        setEditValue(e.target.value);
-                        inlineEdit.mutate({ id: t.id, field: "status", value: e.target.value });
-                      }}
-                      onBlur={() => setEditCell(null)}
-                    >
-                      {(["backlog", "todo", "in_progress", "done", "blocked", "cancelled"] as const).map((s) => (
-                        <option key={s} value={s}>
-                          {s.replace("_", " ")}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    t.status.replace("_", " ")
-                  )}
-                </td>
-                <td
-                  className="cursor-pointer p-2 text-xs capitalize text-muted"
-                  onClick={() => startEdit(t, "priority", t.priority)}
-                >
-                  {editCell?.id === t.id && editCell.field === "priority" ? (
-                    <select
-                      autoFocus
-                      className="w-full rounded border border-primary/50 bg-background px-1 py-0.5 text-xs capitalize"
-                      value={editValue}
-                      onChange={(e) => {
-                        inlineEdit.mutate({ id: t.id, field: "priority", value: e.target.value });
-                      }}
-                      onBlur={() => setEditCell(null)}
-                    >
-                      {(["urgent", "high", "normal", "low"] as const).map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    t.priority
-                  )}
-                </td>
-                <td
-                  className="cursor-pointer p-2 text-xs text-muted"
-                  onClick={() => startEdit(t, "physicalEnergy", t.physicalEnergy ?? "medium")}
-                >
-                  {editCell?.id === t.id && editCell.field === "physicalEnergy" ? (
-                    <select
-                      autoFocus
-                      className="w-full rounded border border-primary/50 bg-background px-1 py-0.5 text-xs"
-                      value={editValue}
-                      onChange={(e) => {
-                        inlineEdit.mutate({ id: t.id, field: "physicalEnergy", value: e.target.value });
-                      }}
-                      onBlur={() => setEditCell(null)}
-                    >
-                      {(["low", "medium", "high"] as const).map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    displayPhysicalEnergy(t)
-                  )}
-                </td>
-                <td
-                  className="cursor-pointer p-2 text-xs text-muted"
-                  onClick={() => startEdit(t, "workDepth", t.workDepth ?? "normal")}
-                >
-                  {editCell?.id === t.id && editCell.field === "workDepth" ? (
-                    <select
-                      autoFocus
-                      className="w-full rounded border border-primary/50 bg-background px-1 py-0.5 text-xs capitalize"
-                      value={editValue}
-                      onChange={(e) => {
-                        inlineEdit.mutate({ id: t.id, field: "workDepth", value: e.target.value });
-                      }}
-                      onBlur={() => setEditCell(null)}
-                    >
-                      {(["shallow", "normal", "deep"] as const).map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    displayWorkDepth(t)
-                  )}
-                </td>
-                <td
-                  className="cursor-pointer p-2 text-xs text-muted"
-                  onClick={() => startEdit(t, "energyLevel", t.energyLevel)}
-                >
-                  {editCell?.id === t.id && editCell.field === "energyLevel" ? (
-                    <select
-                      autoFocus
-                      className="w-full rounded border border-primary/50 bg-background px-1 py-0.5 text-xs"
-                      value={editValue}
-                      onChange={(e) => {
-                        inlineEdit.mutate({ id: t.id, field: "energyLevel", value: e.target.value });
-                      }}
-                      onBlur={() => setEditCell(null)}
-                    >
-                      {(["deep_work", "shallow", "admin", "quick_win"] as const).map((p) => (
-                        <option key={p} value={p}>
-                          {cognitiveDisplay(p)}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    cognitiveDisplay(t.energyLevel)
-                  )}
-                </td>
-                <td
-                  className="p-2 text-xs text-muted"
-                >
-                  {/* Show earliest scheduled subtask date */}
-                  {(t._subtasks ?? [])
-                    .map((s) => s.scheduledDate)
-                    .filter((d): d is string => Boolean(d))
-                    .sort()[0] ?? "—"}
-                </td>
-                <td
-                  className="cursor-pointer p-2 text-xs text-muted"
-                  onClick={() => startEdit(t, "dueDate", normalizeYmd(t.dueDate) ?? "")}
-                >
-                  {editCell?.id === t.id && editCell.field === "dueDate" ? (
-                    <input
-                      type="date"
-                      autoFocus
-                      className="w-full rounded border border-primary/50 bg-background px-1 py-0.5 text-xs"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") commitEdit(t.id, "dueDate", editValue);
-                        if (e.key === "Escape") setEditCell(null);
-                      }}
-                      onBlur={() => {
-                        const v = editValue.trim();
-                        const prev = normalizeYmd(t.dueDate) ?? "";
-                        if (v !== prev) commitEdit(t.id, "dueDate", v);
-                        else setEditCell(null);
-                      }}
-                    />
-                  ) : (
-                    normalizeYmd(t.dueDate) ?? "—"
-                  )}
-                </td>
-                <td className="p-2">
-                  <div className="flex flex-wrap gap-1">
-                    {(t._tags ?? []).slice(0, 3).map((tag) => (
-                      <TagChip key={tag.id} name={tag.name} color={tag.color} size="xs" />
-                    ))}
-                  </div>
-                </td>
-                <td className="p-2">
-                  <TimerButton taskId={t.id} compact />
-                </td>
-                <td className="p-2 text-right">
-                  <button
-                    type="button"
-                    className="rounded p-1 text-muted hover:bg-red-500/15 hover:text-red-300"
-                    title="Delete task"
-                    disabled={del.isPending}
-                    onClick={() => {
-                      if (!confirm(`Delete “${t.title}”?`)) return;
-                      del.mutate({ id: t.id, title: t.title });
-                    }}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </td>
-              </tr>
+              <TaskTableRow 
+                key={t.id} 
+                task={t} 
+                index={i} 
+                userId={userId} 
+                todayYmd={todayYmd} 
+                selected={Boolean(sel[t.id])} 
+                onSelectToggle={(checked) => setSel((s) => ({ ...s, [t.id]: checked }))} 
+              />
             ))}
           </tbody>
         </table>

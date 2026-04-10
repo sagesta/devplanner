@@ -321,16 +321,22 @@ export function KanbanBoard() {
     enabled: Boolean(userId),
   });
 
-  const q = useQuery({
-    queryKey: ["tasks", userId],
-    queryFn: () => fetchTasks(),
-    enabled: Boolean(userId),
-  });
-
   const sprintsQ = useQuery({
     queryKey: ["sprints", userId],
     queryFn: () => fetchSprints(),
     enabled: Boolean(userId),
+  });
+
+  const activeSprint = useMemo(() => {
+    if (!sprintsQ.data?.sprints) return null;
+    // Removed strict date limits so any 'active' sprint displays its tasks
+    return sprintsQ.data.sprints.find(s => s.status === 'active');
+  }, [sprintsQ.data?.sprints]);
+
+  const q = useQuery({
+    queryKey: ["sprintTasks", activeSprint?.id],
+    queryFn: () => fetchTasks(activeSprint!.id),
+    enabled: Boolean(activeSprint?.id),
   });
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -425,12 +431,7 @@ export function KanbanBoard() {
     [q.data, m]
   );
 
-  const activeSprint = useMemo(() => {
-    if (!sprintsQ.data?.sprints) return null;
-    return sprintsQ.data.sprints.find(s => s.status === 'active' && s.startDate <= todayYmd && s.endDate >= todayYmd);
-  }, [sprintsQ.data?.sprints, todayYmd]);
-
-  const roots = (q.data ?? []).filter((t) => t.sprintId === activeSprint?.id);
+  const roots = q.data ?? [];
 
   const areaMap = new Map<string, AreaRow>();
   for (const a of areasQ.data ?? []) {
