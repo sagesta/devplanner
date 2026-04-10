@@ -121,7 +121,8 @@ export function TaskDetailPanel({
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["task", taskId] });
-      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
+      void qc.invalidateQueries({ queryKey: ["tasks"] });
       void qc.invalidateQueries({ queryKey: ["backlog", userId] });
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
     },
@@ -414,9 +415,10 @@ export function TaskDetailPanel({
                 <label className="block text-xs text-muted">
                   Due Date
                   <input
+                    key={dueDate || "empty"}
                     type="date"
                     className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-2 text-sm text-foreground"
-                    value={dueDate || ""}
+                    defaultValue={dueDate || undefined}
                     onChange={(e) => setDueDate(e.target.value)}
                   />
                   <button

@@ -201,7 +201,8 @@ function InlineAddTask({
       setStartT("");
       setEndT("");
       setRecurrence("");
-      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
+      void qc.invalidateQueries({ queryKey: ["tasks"] });
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
       inputRef.current?.focus();
     },
@@ -209,7 +210,7 @@ function InlineAddTask({
   });
 
   return (
-    <div className="animate-slideIn space-y-2 rounded-md border border-white/10 bg-background/40 p-2">
+    <div className="inline-add-container animate-slideIn space-y-2 rounded-md border border-white/10 bg-background/40 p-2">
       <div className="flex gap-1.5">
         <input
           ref={inputRef}
@@ -221,6 +222,11 @@ function InlineAddTask({
           onKeyDown={(e) => {
             if (e.key === "Enter" && title.trim()) m.mutate();
             if (e.key === "Escape") onDone();
+          }}
+          onBlur={(e) => {
+             // Let close button or other inner actions fire first before blindly closing/mutating
+             if (e.relatedTarget && e.relatedTarget.closest('.inline-add-container')) return;
+             if (title.trim() && !m.isPending) m.mutate();
           }}
         />
         <button
