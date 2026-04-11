@@ -280,6 +280,8 @@ export function TaskDetailPanel({
                         onClick={() => toggleSubStatus.mutate(s)}
                       />
                       <input
+                        id={`subtask-${s.id}-name`}
+                        name={`subtask-${s.id}-name`}
                         className={cn(
                           "flex-1 bg-transparent px-1 min-w-0 text-sm outline-none placeholder:text-muted/50",
                           s.completed && "line-through text-muted"

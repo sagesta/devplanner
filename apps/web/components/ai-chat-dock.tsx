@@ -387,6 +387,7 @@ export function AiChatDock() {
           void qc.invalidateQueries({ queryKey: ["backlog"] });
           void qc.invalidateQueries({ queryKey: ["tasks-today"] });
           void qc.invalidateQueries({ queryKey: ["task"] });
+          void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
         }
       } else {
         const j = (await res.json()) as { reply?: string };

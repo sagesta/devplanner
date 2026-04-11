@@ -16,7 +16,7 @@ export function useAddToSprint() {
     onSuccess: (data, { sprintId }) => {
       toast.success("Added to sprint");
       // Invalidate the active sprint board so it immediately fetches the new task
-      void qc.invalidateQueries({ queryKey: ["sprintTasks", sprintId] });
+      void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
       // Also invalidate backlog and generic tasks
       void qc.invalidateQueries({ queryKey: ["backlog"] });
       void qc.invalidateQueries({ queryKey: ["tasks"] });

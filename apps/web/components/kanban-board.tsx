@@ -849,13 +849,22 @@ function TaskDrawer({
   const spreadSubs = useMutation({
      mutationFn: async () => {
        if (!q.data) return null;
-       const unscheduled = q.data.subtasks.filter(s => !s.scheduledDate && !s.completed);
-       if (unscheduled.length === 0 || !spreadStart || !spreadEnd) return null;
-       // We use spread endpoint to create subtasks, but to avoid duplication we must first DELETE the unscheduled ones!
-       // Or even better, just let the AI spread tool handle actual assignment instead of building a whole UI here,
-       // but as requested, here is a rudimentary spread action:
-       await Promise.all(unscheduled.map(s => deleteSubtask(s.id)));
-       return postSubtasksSpread(taskId, unscheduled.map(s => s.title), spreadStart, spreadEnd, 3);
+       const unscheduled = q.data.subtasks.filter((s: SubtaskRow) => !s.scheduledDate && !s.completed);
+       if (unscheduled.length === 0 || !spreadStart || !spreadEnd) {
+         toast.error("Invalid range or no unscheduled subtasks");
+         return null;
+       }
+       const start = new Date(spreadStart);
+       const end = new Date(spreadEnd);
+       const diff = end.getTime() - start.getTime();
+       const inc = unscheduled.length > 1 ? diff / (unscheduled.length - 1) : 0;
+       
+       await Promise.all(unscheduled.map((s: SubtaskRow, i: number) => {
+         const date = new Date(start.getTime() + inc * i);
+         const dateStr = date.toISOString().split('T')[0];
+         return patchSubtask(s.id, { scheduledDate: dateStr });
+       }));
+       return true;
      },
      onSuccess: () => {
         setShowSpread(false);
@@ -1138,6 +1147,8 @@ function TaskDrawer({
                   />
                   {/* Title */}
                   <input
+                    id={`subtask-${s.id}-name`}
+                    name={`subtask-${s.id}-name`}
                     className={cn(
                       "flex-1 bg-transparent px-1 min-w-0 text-sm outline-none placeholder:text-muted/50",
                       s.completed && "line-through text-muted"
@@ -1153,6 +1164,8 @@ function TaskDrawer({
                   />
                   {/* Date */}
                   <input
+                    id={`subtask-${s.id}-date`}
+                    name={`subtask-${s.id}-date`}
                     type="date"
                     className="w-28 bg-transparent text-[11px] text-muted outline-none hover:text-foreground cursor-pointer"
                     defaultValue={s.scheduledDate ?? ""}

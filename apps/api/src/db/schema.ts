@@ -183,6 +183,8 @@ export const subtasks = pgTable(
       .references(() => tasks.id, { onDelete: "cascade" }),
     title: varchar("title", { length: 500 }).notNull(),
     completed: boolean("completed").notNull().default(false),
+    scheduledDate: date("scheduled_date"),
+    scheduledTime: varchar("scheduled_time", { length: 32 }),
     estimatedMinutes: integer("estimated_minutes"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

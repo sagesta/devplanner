@@ -12,12 +12,16 @@ const createBody = z.object({
   taskId: z.string().uuid(),
   title: z.string().min(1).max(500),
   estimatedMinutes: z.number().int().nullable().optional(),
+  scheduledDate: z.string().nullable().optional(),
+  scheduledTime: z.string().nullable().optional(),
 });
 
 const patchBody = z.object({
   title: z.string().min(1).max(500).optional(),
   completed: z.boolean().optional(),
   estimatedMinutes: z.number().int().nullable().optional(),
+  scheduledDate: z.string().nullable().optional(),
+  scheduledTime: z.string().nullable().optional(),
 });
 
 const bulkBody = z.object({
@@ -50,6 +54,8 @@ export const subtasksRoutes = new Hono<AppEnv>()
       taskId: v.taskId,
       title: v.title,
       estimatedMinutes: v.estimatedMinutes ?? null,
+      scheduledDate: v.scheduledDate ?? null,
+      scheduledTime: v.scheduledTime ?? null,
     }).returning();
 
     await rollupParentTaskStatus(db, v.taskId);
@@ -82,6 +88,8 @@ export const subtasksRoutes = new Hono<AppEnv>()
       updates.completedAt = v.completed ? new Date() : null;
     }
     if (v.estimatedMinutes !== undefined) updates.estimatedMinutes = v.estimatedMinutes;
+    if (v.scheduledDate !== undefined) updates.scheduledDate = v.scheduledDate;
+    if (v.scheduledTime !== undefined) updates.scheduledTime = v.scheduledTime;
 
     const [row] = await db.update(subtasks).set(updates).where(eq(subtasks.id, id)).returning();
     
