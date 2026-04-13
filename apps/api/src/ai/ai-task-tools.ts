@@ -269,6 +269,24 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
   {
     type: "function",
     function: {
+      name: "moveSubtasks",
+      description: "Move an array of subtasks to a different parent task. Use this to reorganize subtasks into different Day or Phase tasks.",
+      parameters: {
+        type: "object",
+        properties: {
+          subtaskIds: {
+            type: "array",
+            items: { type: "string" }
+          },
+          newParentTaskId: { type: "string" }
+        },
+        required: ["subtaskIds", "newParentTaskId"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "scheduleTask",
       description: "Set the scheduledDate on a task that has no subtasks (by creating an implicit identical subtask).",
       parameters: {
@@ -470,8 +488,8 @@ export async function executePlannerTool(
               ? obj.physicalEnergy
               : "medium",
           dueDate: liftYmd(obj.dueDate),
-          recurrenceRule: typeof obj.recurrenceRule === "string" ? obj.recurrenceRule : null,
-          sprintId: typeof obj.sprintId === "string" ? obj.sprintId : null,
+          recurrenceRule: typeof obj.recurrenceRule === "string" && obj.recurrenceRule.trim() ? obj.recurrenceRule : null,
+          sprintId: typeof obj.sprintId === "string" && obj.sprintId.trim() ? obj.sprintId.trim() : null,
           description: typeof obj.description === "string" ? obj.description : null,
         })
         .returning();
@@ -705,6 +723,35 @@ export async function executePlannerTool(
       await db.delete(subtasks).where(eq(subtasks.id, subtaskId));
       await rollupParentTaskStatus(db, existing.taskId);
       return { ok: true, deletedId: subtaskId };
+    }
+    case "moveSubtasks": {
+      const newParentTaskId = typeof obj.newParentTaskId === "string" ? obj.newParentTaskId : "";
+      if (!newParentTaskId) return { error: "newParentTaskId required" };
+      const sIds = Array.isArray(obj.subtaskIds) ? obj.subtaskIds.filter(id => typeof id === "string") : [];
+      if (!sIds.length) return { error: "subtaskIds array required and must not be empty" };
+
+      const existing = await db.query.tasks.findFirst({
+        where: and(eq(tasks.id, newParentTaskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)),
+      });
+      if (!existing) return { error: "new parent task not found" };
+
+      const toMove = await db.query.subtasks.findMany({
+         where: inArray(subtasks.id, sIds)
+      });
+      if (!toMove.length) return { error: "no valid subtasks found to move" };
+
+      const oldParentIds = [...new Set(toMove.map(s => s.taskId))];
+
+      await db.update(subtasks)
+        .set({ taskId: newParentTaskId })
+        .where(inArray(subtasks.id, sIds));
+
+      for (const opid of oldParentIds) {
+         if (opid !== newParentTaskId) await rollupParentTaskStatus(db, opid);
+      }
+      await rollupParentTaskStatus(db, newParentTaskId);
+
+      return { ok: true, movedCount: toMove.length };
     }
     case "assignTaskToSprint": {
       const taskId = typeof obj.taskId === "string" ? obj.taskId : "";

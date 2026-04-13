@@ -143,6 +143,7 @@ async function runPlannerToolLoop(
     `\n\n═══ WORKFLOW RULES ═══` +
     `\n- Break down a task: call listTasks → createSubtasks with meaningful steps.` +
     `\n- Spread subtasks over days: use spreadSubtasksAcrossDays (divides evenly across numDays).` +
+    `\n- Reorganize / Split Tasks: If asked to actually split a large list of subtasks into separate Day/Phase tasks, create those standalone tasks, then use moveSubtasks to assign subtasks to them.` +
     `\n- Bulk delete: listTasks with status filter → deleteTask for each.` +
     `\n- Always call listSprints before assigning tasks to sprints.` +
     `\n- Overdue = dueDate before today AND status != done.` +
