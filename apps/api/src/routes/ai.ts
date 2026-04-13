@@ -32,6 +32,15 @@ const chatBody = z.object({
     .optional(),
   /** Task IDs the user has selected or is focused on */
   selected_task_ids: z.array(z.string()).optional(),
+  /** Conversational history (to preserve context across multiple turns) */
+  history: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string(),
+      })
+    )
+    .optional(),
 });
 
 const ALLOWED_CHAT_MODELS = new Set(["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4"]);
@@ -51,6 +60,7 @@ async function runPlannerToolLoop(
     currentPhysicalEnergy?: "low" | "medium" | "high";
     current_view?: string;
     selected_task_ids?: string[];
+    history?: { role: "user" | "assistant"; content: string }[];
   }
 ): Promise<{ text: string; approxChars: number }> {
   const todayIso = new Date().toISOString().split("T")[0]!;
@@ -153,8 +163,15 @@ async function runPlannerToolLoop(
 
   const fullPrompt = systemPrompt + ragBlock;
 
+  const priorMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
+    (opts?.history ?? []).map((m) => ({
+      role: m.role,
+      content: m.content || "(No response)",
+    }));
+
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: fullPrompt },
+    ...priorMessages,
     { role: "user", content: userMessage.slice(0, 8000) },
   ];
 
@@ -371,6 +388,7 @@ export const aiRoutes = new Hono<AppEnv>()
             currentPhysicalEnergy: body.currentPhysicalEnergy,
             current_view: body.current_view,
             selected_task_ids: body.selected_task_ids,
+            history: body.history,
           });
           const chunkSize = 24;
           for (let i = 0; i < text.length; i += chunkSize) {

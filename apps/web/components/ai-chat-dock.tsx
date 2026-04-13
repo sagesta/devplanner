@@ -343,6 +343,7 @@ export function AiChatDock() {
             selectedTasks.length > 0
               ? selectedTasks.map((t) => t.id)
               : undefined,
+          history: messages.slice(-10),
         }),
       });
 
