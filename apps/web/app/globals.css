@@ -20,6 +20,12 @@
   --danger: #ef4444;
   --color-error: var(--danger);
   --glass: rgba(28, 27, 25, 0.85);
+  /* Utility-level aliases used by inline opacity helpers */
+  --border-alpha: rgba(255, 255, 255, 0.1);
+  --border-alpha-faint: rgba(255, 255, 255, 0.05);
+  --surface-alpha: rgba(255, 255, 255, 0.05);
+  --surface-alpha-md: rgba(255, 255, 255, 0.1);
+  --hover-alpha: rgba(255, 255, 255, 0.05);
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-spring: 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -179,11 +185,29 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* ─── Light theme ──────────────────────────────────────────────── */
 html[data-theme="light"] {
-  --bg: #f7f6f2;
+  color-scheme: light;
+  /* Backgrounds */
+  --bg: #f4f3ef;
   --surface: #ffffff;
-  --foreground: #171614;
-  --muted: #5c5a54;
-  --glass: rgba(255, 255, 255, 0.85);
+  /* Desaturated primary — vivid teal is eye-searing on white */
+  --primary: #0a6e74;
+  --primary-hover: #0d8a91;
+  /* Text */
+  --foreground: #18170f;
+  --muted: #6b6860;
+  /* Accents */
+  --accent: #4f52c8;
+  --success: #0d9e6b;
+  --warning: #c47d05;
+  --danger: #cc3333;
+  /* Glass / overlay */
+  --glass: rgba(255, 255, 255, 0.9);
+  /* Opacity utility aliases (flipped for light) */
+  --border-alpha: rgba(0, 0, 0, 0.1);
+  --border-alpha-faint: rgba(0, 0, 0, 0.05);
+  --surface-alpha: rgba(0, 0, 0, 0.04);
+  --surface-alpha-md: rgba(0, 0, 0, 0.08);
+  --hover-alpha: rgba(0, 0, 0, 0.06);
 }
 
 html[data-theme="light"] body {
@@ -191,48 +215,137 @@ html[data-theme="light"] body {
   color: var(--foreground);
 }
 
-html[data-theme="light"] .bg-background {
-  background-color: var(--bg) !important;
+/* ── Tailwind bg/text/border utilities that embed literal white/black alphas ── */
+/* These don't pick up CSS variables so we override them directly.             */
+
+html[data-theme="light"] .bg-background { background-color: var(--bg) !important; }
+html[data-theme="light"] .bg-surface    { background-color: var(--surface) !important; }
+html[data-theme="light"] .text-foreground { color: var(--foreground) !important; }
+html[data-theme="light"] .text-muted    { color: var(--muted) !important; }
+
+/* white opacity → dark opacity equivalents */
+html[data-theme="light"] .bg-white\/5  { background-color: rgba(0,0,0,0.04) !important; }
+html[data-theme="light"] .bg-white\/10 { background-color: rgba(0,0,0,0.07) !important; }
+html[data-theme="light"] .bg-white\/15 { background-color: rgba(0,0,0,0.10) !important; }
+html[data-theme="light"] .bg-white\/20 { background-color: rgba(0,0,0,0.13) !important; }
+html[data-theme="light"] .bg-black\/20 { background-color: rgba(0,0,0,0.08) !important; }
+html[data-theme="light"] .bg-black\/40 { background-color: rgba(0,0,0,0.18) !important; }
+html[data-theme="light"] .bg-black\/60 { background-color: rgba(0,0,0,0.35) !important; }
+html[data-theme="light"] .bg-black\/80 { background-color: rgba(0,0,0,0.55) !important; }
+
+html[data-theme="light"] .border-white\/5  { border-color: rgba(0,0,0,0.05) !important; }
+html[data-theme="light"] .border-white\/10 { border-color: rgba(0,0,0,0.09) !important; }
+html[data-theme="light"] .border-white\/15 { border-color: rgba(0,0,0,0.12) !important; }
+html[data-theme="light"] .border-white\/20 { border-color: rgba(0,0,0,0.15) !important; }
+
+html[data-theme="light"] .hover\:bg-white\/5:hover  { background-color: rgba(0,0,0,0.05) !important; }
+html[data-theme="light"] .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.08) !important; }
+html[data-theme="light"] .hover\:border-white\/15:hover { border-color: rgba(0,0,0,0.12) !important; }
+
+/* Surface/bg opacity variants used in header/backdrop */
+html[data-theme="light"] .bg-surface\/40 { background-color: rgba(255,255,255,0.7) !important; }
+html[data-theme="light"] .bg-surface\/80 { background-color: rgba(255,255,255,0.9) !important; }
+
+/* text opacity variants */
+html[data-theme="light"] .text-muted\/60  { color: rgba(107,104,96,0.70) !important; }
+html[data-theme="light"] .text-muted\/80  { color: rgba(107,104,96,0.85) !important; }
+html[data-theme="light"] .text-white\/70  { color: rgba(24,23,15,0.70)  !important; }
+html[data-theme="light"] .text-white\/50  { color: rgba(24,23,15,0.50)  !important; }
+
+/* Card hover — swap inverted border/shadow */
+html[data-theme="light"] .card-hover:hover {
+  border-color: rgba(0,0,0,0.14) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important;
 }
 
-html[data-theme="light"] .bg-surface {
-  background-color: var(--surface) !important;
-}
-
-html[data-theme="light"] .text-muted {
-  color: var(--muted) !important;
-}
-
-html[data-theme="light"] .border-white\/10 {
-  border-color: rgba(0, 0, 0, 0.08) !important;
-}
-
-html[data-theme="light"] .border-white\/5 {
-  border-color: rgba(0, 0, 0, 0.04) !important;
-}
-
-html[data-theme="light"] .bg-white\/10 {
-  background-color: rgba(0, 0, 0, 0.06) !important;
-}
-
-html[data-theme="light"] .bg-white\/5 {
-  background-color: rgba(0, 0, 0, 0.03) !important;
-}
-
-html[data-theme="light"] .hover\:bg-white\/5:hover {
-  background-color: rgba(0, 0, 0, 0.05) !important;
-}
-
+/* Shimmer in light */
 html[data-theme="light"] .animate-shimmer {
   background: linear-gradient(
     90deg,
-    rgba(0, 0, 0, 0.04) 25%,
-    rgba(0, 0, 0, 0.08) 50%,
-    rgba(0, 0, 0, 0.04) 75%
+    rgba(0, 0, 0, 0.03) 25%,
+    rgba(0, 0, 0, 0.07) 50%,
+    rgba(0, 0, 0, 0.03) 75%
   );
   background-size: 200% 100%;
 }
 
+/* Scrollbar */
 html[data-theme="light"] ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.18);
 }
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.30);
+}
+
+/* Glass component */
+html[data-theme="light"] .glass {
+  background: var(--glass);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Primary chip / badge opacity variants */
+html[data-theme="light"] .bg-primary\/10 { background-color: rgba(10,110,116,0.10) !important; }
+html[data-theme="light"] .bg-primary\/15 { background-color: rgba(10,110,116,0.14) !important; }
+html[data-theme="light"] .bg-primary\/20 { background-color: rgba(10,110,116,0.18) !important; }
+html[data-theme="light"] .bg-primary\/80 { background-color: rgba(10,110,116,0.85) !important; }
+
+/* ── Task card & component fixes for light ─────────────────────────── */
+
+/* shadow-sm / shadow-md / shadow-lg — keep subtle on white */
+html[data-theme="light"] .shadow-sm  { box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05) !important; }
+html[data-theme="light"] .shadow-md  { box-shadow: 0 4px 8px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06) !important; }
+html[data-theme="light"] .shadow-lg  { box-shadow: 0 8px 20px rgba(0,0,0,0.10) !important; }
+html[data-theme="light"] .shadow-xl  { box-shadow: 0 12px 28px rgba(0,0,0,0.12) !important; }
+html[data-theme="light"] .shadow-2xl { box-shadow: 0 20px 40px rgba(0,0,0,0.14) !important; }
+
+/* Task card hover — override the dark shadow-black/20 */
+html[data-theme="light"] .hover\:shadow-black\/20:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10) !important;
+}
+
+/* Dashed depth/energy labels on task cards */
+html[data-theme="light"] .border-dashed.border-white\/20 { border-color: rgba(0,0,0,0.15) !important; }
+html[data-theme="light"] .hover\:border-white\/50:hover  { border-color: rgba(0,0,0,0.30) !important; }
+
+/* Overdue card ring */
+html[data-theme="light"] .border-red-500\/35 { border-color: rgba(239,68,68,0.40) !important; }
+html[data-theme="light"] .ring-red-500\/15   { --tw-ring-color: rgba(239,68,68,0.18) !important; }
+
+/* Priority badges — text colors need darkening on white BG */
+html[data-theme="light"] .text-red-300    { color: #b91c1c !important; }
+html[data-theme="light"] .text-orange-300 { color: #c2410c !important; }
+html[data-theme="light"] .text-zinc-300   { color: #52525b !important; }
+html[data-theme="light"] .text-zinc-500   { color: #71717a !important; }
+
+/* Priority badge backgrounds — same as dark (semi-transparent with hue, fine on white) */
+html[data-theme="light"] .bg-red-500\/20    { background-color: rgba(239,68,68,0.12) !important; }
+html[data-theme="light"] .bg-orange-500\/20 { background-color: rgba(249,115,22,0.12) !important; }
+html[data-theme="light"] .bg-zinc-500\/20   { background-color: rgba(113,113,122,0.10) !important; }
+html[data-theme="light"] .bg-zinc-700\/20   { background-color: rgba(63,63,70,0.08) !important; }
+
+/* Overdue tag */
+html[data-theme="light"] .text-red-200 { color: #991b1b !important; }
+
+/* Select/input light mode  */
+html[data-theme="light"] select,
+html[data-theme="light"] input[type="text"],
+html[data-theme="light"] textarea {
+  background-color: var(--surface);
+  color: var(--foreground);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+/* Amber warning banner (no API key) — keep readable */
+html[data-theme="light"] .border-amber-500\/35 { border-color: rgba(245,158,11,0.40) !important; }
+html[data-theme="light"] .bg-amber-500\/10     { background-color: rgba(245,158,11,0.10) !important; }
+html[data-theme="light"] .text-amber-100\/95   { color: #92400e !important; }
+html[data-theme="light"] .text-amber-50        { color: #78350f !important; }
+
+/* bg-background/80, bg-background/90, bg-background/50 */
+html[data-theme="light"] .bg-background\/50 { background-color: rgba(244,243,239,0.6) !important; }
+html[data-theme="light"] .bg-background\/80 { background-color: rgba(244,243,239,0.85) !important; }
+html[data-theme="light"] .bg-background\/90 { background-color: rgba(244,243,239,0.95) !important; }
+
+/* SubtaskBar progress track */
+html[data-theme="light"] .bg-white\/10 { background-color: rgba(0,0,0,0.07) !important; }
+

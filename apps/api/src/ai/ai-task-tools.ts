@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, gte, ilike, inArray, isNull, lte } from "drizzle-orm";
 import type OpenAI from "openai";
 import { db } from "../db/client.js";
 import { areas, sprints, tasks, subtasks } from "../db/schema.js";
@@ -324,6 +324,62 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
         required: ["name", "startDate", "endDate"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "getProgressStats",
+      description:
+        "Compute weekly, monthly and/or sprint-level task completion percentages for donut/progress charts. " +
+        "Subtasks are the primary units: a parent is complete only when ALL its subtasks are done. " +
+        "Standalone tasks (no subtasks) count as one unit each.",
+      parameters: {
+        type: "object",
+        properties: {
+          scope: {
+            type: "string",
+            enum: ["week", "month", "sprint", "all"],
+            description: "Which scope to compute. 'all' returns week + month + active sprint.",
+          },
+          sprintId: {
+            type: "string",
+            description: "Optional sprint ID to scope stats to a specific sprint.",
+          },
+          now: {
+            type: "string",
+            description: "ISO timestamp override for 'today' (default: server now).",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "spreadSubtasksAcrossDays",
+      description:
+        "Distribute a task's subtasks evenly across N consecutive days starting from startDate. " +
+        "Returns a day-by-day plan with subtask assignments so the agent can narrate the schedule. " +
+        "Does NOT mutate any dates (subtasks have no scheduledDate field); the agent should explain " +
+        "which subtasks belong to which day based on the returned distribution.",
+      parameters: {
+        type: "object",
+        properties: {
+          parentTaskId: { type: "string" },
+          startDate: { type: "string", description: "YYYY-MM-DD start date" },
+          numDays: { type: "integer", minimum: 1, maximum: 90 },
+          subtasksPerDay: {
+            type: "integer",
+            description: "Optional hard cap per day; excess overflows into later days.",
+          },
+          includeCompleted: {
+            type: "boolean",
+            description: "Include already-completed subtasks. Default false.",
+          },
+        },
+        required: ["parentTaskId", "startDate", "numDays"],
+      },
+    },
   },
 ];
 
@@ -691,6 +747,179 @@ export async function executePlannerTool(
       if (!row) return { error: "failed to create sprint" };
       return { ok: true, sprint: { id: row.id, name: row.name, status: row.status } };
     }
+    case "getProgressStats": {
+      // Validate/parse the optional 'now' override
+      const rawNow = obj.now && typeof obj.now === "string" ? obj.now : "";
+      const nowTs = rawNow ? new Date(rawNow) : new Date();
+      if (isNaN(nowTs.getTime())) return { error: "Invalid 'now' timestamp" };
+      const scope = typeof obj.scope === "string" ? obj.scope : "all";
+
+      // ── Date windows (ISO date strings YYYY-MM-DD) ─────────────────
+      function weekBounds(d: Date) {
+        const day = d.getDay(); // 0=Sun
+        const diffToMon = day === 0 ? -6 : 1 - day;
+        const mon = new Date(d);
+        mon.setDate(d.getDate() + diffToMon);
+        mon.setHours(0, 0, 0, 0);
+        const sun = new Date(mon);
+        sun.setDate(mon.getDate() + 6);
+        sun.setHours(23, 59, 59, 999);
+        return { start: mon.toISOString().slice(0, 10), end: sun.toISOString().slice(0, 10) };
+      }
+      function monthBounds(d: Date) {
+        const start = new Date(d.getFullYear(), d.getMonth(), 1);
+        const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+        return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+      }
+
+      // ── Aggregation helper ─────────────────────────────────────────
+      // Uses gte + lte (not between) to be safe with Drizzle date columns
+      type ScopeFilter =
+        | ReturnType<typeof eq>
+        | ReturnType<typeof gte>
+        | ReturnType<typeof lte>
+        | ReturnType<typeof isNull>;
+
+      async function computeStats(...scopeConditions: ScopeFilter[]) {
+        const scopeTasks = await db.query.tasks.findMany({
+          where: and(
+            eq(tasks.userId, userId),
+            isNull(tasks.deletedAt),
+            ...scopeConditions,
+          ),
+          with: { subtasks: true },
+        });
+
+        let totalUnits = 0;
+        let completedUnits = 0;
+
+        for (const t of scopeTasks) {
+          if (t.subtasks.length === 0) {
+            // Standalone task — counts as 1 unit
+            totalUnits += 1;
+            if (t.status === "done") completedUnits += 1;
+          } else {
+            // Has subtasks — each subtask is its own unit
+            totalUnits += t.subtasks.length;
+            completedUnits += t.subtasks.filter((s) => s.completed).length;
+          }
+        }
+
+        const pct = totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0;
+        return {
+          total_units: totalUnits,
+          completed_units: completedUnits,
+          completion_percentage: pct,
+          donut_segments: { completed: pct, remaining: 100 - pct },
+        };
+      }
+
+      const result: Record<string, unknown> = {};
+
+      if (scope === "week" || scope === "all") {
+        const { start, end } = weekBounds(nowTs);
+        result.weekly = await computeStats(
+          gte(tasks.dueDate, start),
+          lte(tasks.dueDate, end),
+        );
+      }
+      if (scope === "month" || scope === "all") {
+        const { start, end } = monthBounds(nowTs);
+        result.monthly = await computeStats(
+          gte(tasks.dueDate, start),
+          lte(tasks.dueDate, end),
+        );
+      }
+      if (scope === "sprint" || scope === "all") {
+        const sprintId = typeof obj.sprintId === "string" ? obj.sprintId.trim() : null;
+        if (sprintId) {
+          result.sprint = await computeStats(eq(tasks.sprintId, sprintId));
+        } else {
+          // Find the active sprint for this user
+          const activeSprint = await db.query.sprints.findFirst({
+            where: and(eq(sprints.userId, userId), eq(sprints.status, "active")),
+          });
+          if (activeSprint) {
+            result.sprint = await computeStats(eq(tasks.sprintId, activeSprint.id));
+            result.sprint_id = activeSprint.id;
+            result.sprint_name = activeSprint.name;
+          } else {
+            result.sprint = null;
+            result.sprint_note = "No active sprint found.";
+          }
+        }
+      }
+
+      return result;
+    }
+
+    case "spreadSubtasksAcrossDays": {
+      const parentTaskId = typeof obj.parentTaskId === "string" ? obj.parentTaskId : "";
+      if (!parentTaskId) return { error: "parentTaskId required" };
+
+      const startDate = typeof obj.startDate === "string" ? obj.startDate : "";
+      if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate))
+        return { error: "startDate must be YYYY-MM-DD" };
+
+      const numDays = Math.min(Math.max(Number(obj.numDays) || 7, 1), 90);
+      const subtasksPerDayCap =
+        typeof obj.subtasksPerDay === "number" && obj.subtasksPerDay > 0
+          ? obj.subtasksPerDay
+          : null;
+      const includeCompleted = obj.includeCompleted === true;
+
+      const parent = await db.query.tasks.findFirst({
+        where: and(eq(tasks.id, parentTaskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)),
+      });
+      if (!parent) return { error: "parent task not found" };
+
+      const allSubs = await db.query.subtasks.findMany({
+        where: eq(subtasks.taskId, parentTaskId),
+        orderBy: (s, { asc: sasc }) => [sasc(s.createdAt)],
+      });
+
+      const pool = includeCompleted ? allSubs : allSubs.filter((s) => !s.completed);
+      if (!pool.length) return { error: "no subtasks to spread" };
+
+      // Compute even bucket size
+      const evenSplit = Math.ceil(pool.length / numDays);
+      const perDay = subtasksPerDayCap ? Math.min(evenSplit, subtasksPerDayCap) : evenSplit;
+
+      // Assign subtasks to day buckets
+      const distributionSummary: Record<string, number> = {};
+      const assignedSubtasks: { id: string; title: string; day: string; dayIndex: number }[] = [];
+
+      let subtaskIdx = 0;
+      for (let d = 0; d < numDays && subtaskIdx < pool.length; d++) {
+        const dayDate = new Date(startDate + "T00:00:00");
+        dayDate.setDate(dayDate.getDate() + d);
+        const dayStr = dayDate.toISOString().slice(0, 10);
+        const count = Math.min(perDay, pool.length - subtaskIdx);
+        distributionSummary[dayStr] = count;
+        for (let i = 0; i < count; i++) {
+          const s = pool[subtaskIdx++]!;
+          assignedSubtasks.push({ id: s.id, title: s.title, day: dayStr, dayIndex: d + 1 });
+        }
+      }
+
+      // Fill remaining days with 0
+      for (let d = 0; d < numDays; d++) {
+        const dayDate = new Date(startDate + "T00:00:00");
+        dayDate.setDate(dayDate.getDate() + d);
+        const dayStr = dayDate.toISOString().slice(0, 10);
+        if (!(dayStr in distributionSummary)) distributionSummary[dayStr] = 0;
+      }
+
+      return {
+        parent_task: { id: parent.id, title: parent.title },
+        total_subtasks: pool.length,
+        num_days: numDays,
+        per_day: perDay,
+        assigned_subtasks: assignedSubtasks,
+        distribution_summary: distributionSummary,
+      };
+    }
+
     default:
       return { error: `unknown tool ${name}` };
 

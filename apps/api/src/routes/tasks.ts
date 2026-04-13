@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/client.js";
 import { areas, tags, taskTags, tasks, subtasks } from "../db/schema.js";
+import { generateAndStoreEmbedding, buildEmbeddingText, deleteStaleEmbedding } from "../ai/embeddings.js";
 import { enqueueTaskCalendarSync } from "../queues/definitions.js";
 import type { AppEnv } from "../types.js";
 
@@ -281,6 +282,8 @@ export const taskRoutes = new Hono<AppEnv>()
         googleEventId: t.googleEventId,
         action: "create",
       }).catch(() => {});
+      // Fire-and-forget embedding for RAG
+      generateAndStoreEmbedding(t.id, buildEmbeddingText(t.title)).catch(() => {});
     }
     // If scheduledDate provided, create one subtask per inserted task
     if (parsed.data.scheduledDate) {
@@ -465,8 +468,11 @@ export const taskRoutes = new Hono<AppEnv>()
       googleEventId: row.googleEventId,
       action: "create",
     }).catch(() => {});
-
-
+    // Fire-and-forget embedding for RAG
+    generateAndStoreEmbedding(
+      row.id,
+      buildEmbeddingText(row.title, row.description)
+    ).catch(() => {});
 
     return c.json({
       task: withTaskApiFields(row),
@@ -526,6 +532,13 @@ export const taskRoutes = new Hono<AppEnv>()
       googleEventId: row.googleEventId,
       action: "update",
     }).catch(() => {});
+    // Re-embed if title or description changed
+    if (v.title !== undefined || v.description !== undefined) {
+      generateAndStoreEmbedding(
+        row.id,
+        buildEmbeddingText(row.title, row.description)
+      ).catch(() => {});
+    }
     return c.json({ task: withTaskApiFields(row) });
   })
   .delete("/:id", async (c) => {
@@ -550,5 +563,7 @@ export const taskRoutes = new Hono<AppEnv>()
       googleEventId: row.googleEventId,
       action: "delete",
     }).catch(() => {});
+    // Cleanup stale embedding
+    deleteStaleEmbedding(row.id).catch(() => {});
     return c.json({ ok: true });
   });
