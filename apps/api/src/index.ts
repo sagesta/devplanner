@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { pool } from "./db/client.js";
+import { runMigrations } from "./db/migrate.js";
 import { validateEnv } from "./lib/validateEnv.js";
 import { aiRateLimit } from "./middleware/aiRateLimit.js";
 import { requireAuth } from "./middleware/requireAuth.js";
@@ -113,7 +114,13 @@ app.route("/api/tags", tagRoutes);
 app.route("/api/subtasks", subtasksRoutes);
 app.route("/api/backlog", backlogRoutes);
 
+// ─── Startup ──────────────────────────────────────────────────────
 const port = Number(process.env.PORT) || 3001;
 const hostname = process.env.HOST?.trim() || "0.0.0.0";
+
+// Run idempotent schema migrations before accepting traffic.
+// Safe to run on every boot — all statements use IF NOT EXISTS.
+await runMigrations(pool);
+
 console.log(`DevPlanner API listening on http://${hostname}:${port}`);
 serve({ fetch: app.fetch, port, hostname });
