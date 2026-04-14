@@ -120,7 +120,7 @@ export async function fetchTasks(sprintId?: string): Promise<TaskRow[]> {
 }
 
 export async function fetchBacklog(): Promise<TaskRow[]> {
-  const data = await fetchJson<{ tasks: TaskRow[] }>(apiUrl("/api/tasks/backlog"));
+  const data = await fetchJson<{ tasks: TaskRow[] }>(apiUrl("/api/backlog"));
   return data.tasks;
 }
 

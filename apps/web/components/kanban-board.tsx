@@ -857,16 +857,21 @@ function TaskDrawer({
          toast.error("Invalid range or no unscheduled subtasks");
          return null;
        }
-       const start = new Date(spreadStart);
-       const end = new Date(spreadEnd);
+       // Parse date strings as LOCAL dates (avoid UTC midnight → day-before bug in UTC+ timezones)
+       function localDateFromYmd(ymd: string): Date {
+         const [y, mo, d] = ymd.split("-").map(Number);
+         return new Date(y, mo - 1, d);
+       }
+       const start = localDateFromYmd(spreadStart);
+       const end   = localDateFromYmd(spreadEnd);
        const diff = end.getTime() - start.getTime();
        const inc = unscheduled.length > 1 ? diff / (unscheduled.length - 1) : 0;
        
        await Promise.all(unscheduled.map((s: SubtaskRow, i: number) => {
          const date = new Date(start.getTime() + inc * i);
-         const y = date.getFullYear();
+         const y  = date.getFullYear();
          const mo = String(date.getMonth() + 1).padStart(2, "0");
-         const d = String(date.getDate()).padStart(2, "0");
+         const d  = String(date.getDate()).padStart(2, "0");
          const dateStr = `${y}-${mo}-${d}`;
          return patchSubtask(s.id, { scheduledDate: dateStr });
        }));
@@ -878,6 +883,8 @@ function TaskDrawer({
         setSpreadEnd("");
         void qc.invalidateQueries({ queryKey: ["task", taskId] });
         void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+        void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
+        void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
      },
      onError: (e: Error) => toast.error(e.message)
   });

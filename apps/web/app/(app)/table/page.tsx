@@ -23,6 +23,8 @@ type SortKey =
 type SortDir = "asc" | "desc";
 
 const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
+// Cognitive load rank: deep_work = most demanding → shown first ascending
+const COGNITIVE_ORDER: Record<string, number> = { deep_work: 0, shallow: 1, admin: 2, quick_win: 3 };
 
 function localISODate(d = new Date()) {
   const y = d.getFullYear();
@@ -69,7 +71,7 @@ export default function TablePage() {
           cmp = (PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2);
           break;
         case "energyLevel":
-          cmp = a.energyLevel.localeCompare(b.energyLevel);
+          cmp = (COGNITIVE_ORDER[a.energyLevel] ?? 99) - (COGNITIVE_ORDER[b.energyLevel] ?? 99);
           break;
         case "workDepth":
           cmp = displayWorkDepth(a).localeCompare(displayWorkDepth(b));
