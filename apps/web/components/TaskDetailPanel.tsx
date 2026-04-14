@@ -13,7 +13,6 @@ import {
   createSubtask,
   patchSubtask,
   deleteSubtask,
-  postSubtasksSpread,
   type SubtaskRow,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -56,11 +55,13 @@ export function TaskDetailPanel({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [scheduledDate, setScheduledDate] = useState("");
   const [recurrence, setRecurrence] = useState("");
   const [areaId, setAreaId] = useState("");
   const [priority, setPriority] = useState("normal");
   const [workDepth, setWorkDepth] = useState<string>("normal");
   const [physicalEnergy, setPhysicalEnergy] = useState<string>("medium");
+  const [energyLevel, setEnergyLevel] = useState<string>("shallow");
   const [status, setStatus] = useState<string>("todo");
 
   useEffect(() => {
@@ -69,6 +70,7 @@ export function TaskDetailPanel({
     setTitle(t.title);
     setDescription(t.description ?? "");
     setDueDate(t.dueDate ?? "");
+    setScheduledDate(t.scheduledDate ?? "");
     const rr = t.recurrenceRule ?? "";
     if (!rr) setRecurrence("");
     else if (RECURRENCE_PRESETS.some((p) => p.value === rr)) setRecurrence(rr);
@@ -77,6 +79,7 @@ export function TaskDetailPanel({
     setPriority(t.priority ?? "normal");
     setWorkDepth(t.workDepth ?? "normal");
     setPhysicalEnergy(t.physicalEnergy ?? "medium");
+    setEnergyLevel(t.energyLevel ?? "shallow");
     setStatus(t.status);
   }, [q.data?.task]);
 
@@ -280,6 +283,7 @@ export function TaskDetailPanel({
                         onClick={() => toggleSubStatus.mutate(s)}
                       />
                       <input
+                        key={s.title || "title"}
                         id={`subtask-${s.id}-name`}
                         name={`subtask-${s.id}-name`}
                         className={cn(
@@ -398,6 +402,28 @@ export function TaskDetailPanel({
                   </select>
                 </label>
                 <label className="block text-xs text-muted">
+                  Cognitive energy
+                  <select
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-2 text-sm text-foreground capitalize"
+                    value={energyLevel}
+                    onChange={(e) => {
+                      setEnergyLevel(e.target.value);
+                      updateTaskDetails.mutate({ energyLevel: e.target.value });
+                    }}
+                  >
+                    {[
+                      { value: "deep_work", label: "Deep work" },
+                      { value: "shallow", label: "Low focus" },
+                      { value: "admin", label: "Routine" },
+                      { value: "quick_win", label: "Quick win" },
+                    ].map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-xs text-muted">
                   Area
                   <select
                     className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-2 text-sm text-foreground"
@@ -415,6 +441,16 @@ export function TaskDetailPanel({
                   </select>
                 </label>
                 <label className="block text-xs text-muted">
+                  Schedule Date
+                  <input
+                    key={scheduledDate || "empty-sched"}
+                    type="date"
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-2 text-sm text-foreground"
+                    defaultValue={scheduledDate || undefined}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                  />
+                </label>
+                <label className="block text-xs text-muted">
                   Due Date
                   <input
                     key={dueDate || "empty"}
@@ -425,7 +461,7 @@ export function TaskDetailPanel({
                   />
                   <button
                     onClick={() => {
-                      updateTaskDetails.mutate({ dueDate: dueDate || null });
+                      updateTaskDetails.mutate({ dueDate: dueDate || null, scheduledDate: scheduledDate || null });
                       toast.success("Saved");
                     }}
                     className="mt-2 w-full rounded bg-primary px-2 py-1.5 text-xs text-white hover:bg-primary-hover transition-colors"

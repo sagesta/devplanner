@@ -6,20 +6,11 @@ import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { deleteTask, fetchTasks, patchTask, postBulkStatus, restoreTask, type TaskRow } from "@/lib/api";
+import { deleteTask, fetchTasks, patchTask, postBulkStatus } from "@/lib/api";
 import { SkeletonRow } from "@/lib/skeleton";
-import { StatusDot } from "@/components/task-card";
-import { TagChip } from "@/components/TagChip";
-import { TimerButton } from "@/components/TimerButton";
 import { normalizeYmd } from "@/lib/timeline-utils";
-import { cn, displayPhysicalEnergy, displayWorkDepth, isTaskOverdue } from "@/lib/utils";
+import { displayPhysicalEnergy, displayWorkDepth } from "@/lib/utils";
 import { TaskTableRow } from "@/components/TaskTableRow";
-const STATUS_CYCLE: Record<string, string> = {
-  backlog: "todo",
-  todo: "in_progress",
-  in_progress: "done",
-  done: "backlog",
-};
 
 type SortKey =
   | "title"
@@ -32,17 +23,6 @@ type SortKey =
 type SortDir = "asc" | "desc";
 
 const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
-
-const COGNITIVE_LABEL: Record<string, string> = {
-  deep_work: "Deep work",
-  shallow: "Low focus",
-  admin: "Routine",
-  quick_win: "Quick win",
-};
-
-function cognitiveDisplay(v: string): string {
-  return COGNITIVE_LABEL[v] ?? v.replace(/_/g, " ");
-}
 
 function localISODate(d = new Date()) {
   const y = d.getFullYear();
@@ -117,30 +97,6 @@ export default function TablePage() {
   const statusMut = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => patchTask(id, { status }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["tasks", userId] }),
-  });
-
-  const del = useMutation({
-    mutationFn: ({ id, title }: { id: string; title: string }) => deleteTask(id),
-    onSuccess: (_void, { id, title }) => {
-      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
-      void qc.invalidateQueries({ queryKey: ["tasks-today"] });
-      toast.success(`“${title}” deleted`, {
-        duration: 5000,
-        action: {
-          label: "Undo",
-          onClick: () => {
-            void restoreTask(id)
-              .then(() => {
-                toast.success("Task restored");
-                void qc.invalidateQueries({ queryKey: ["tasks", userId] });
-                void qc.invalidateQueries({ queryKey: ["tasks-today"] });
-              })
-              .catch((err: unknown) => toast.error(String(err)));
-          },
-        },
-      });
-    },
-    onError: (e: Error) => toast.error(e.message),
   });
 
   const bulk = useMutation({

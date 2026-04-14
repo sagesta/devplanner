@@ -142,6 +142,7 @@ export const tasks = pgTable(
     physicalEnergy: physicalEnergyEnum("physical_energy"),
     taskType: taskTypeEnum("task_type").notNull().default("main"),
     dueDate: date("due_date"),
+    scheduledDate: date("scheduled_date"),
     recurrenceRule: text("recurrence_rule"),
     caldavUid: uuid("caldav_uid").defaultRandom(),
     /** RFC5545 UID from the calendar (imports + stable identity for round-trip). */

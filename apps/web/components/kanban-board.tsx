@@ -33,7 +33,6 @@ import {
   createSubtask,
   patchSubtask,
   deleteSubtask,
-  postSubtasksSpread,
   type AreaRow,
   type TaskRow,
   type SubtaskRow,
@@ -787,11 +786,13 @@ function TaskDrawer({
 
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [scheduledDate, setScheduledDate] = useState("");
   const [recurrence, setRecurrence] = useState("");
   const [areaId, setAreaId] = useState("");
   const [priority, setPriority] = useState("normal");
   const [workDepth, setWorkDepth] = useState<string>("normal");
   const [physicalEnergy, setPhysicalEnergy] = useState<string>("medium");
+  const [energyLevel, setEnergyLevel] = useState<string>("shallow");
   const [showSpread, setShowSpread] = useState(false);
   const [spreadStart, setSpreadStart] = useState("");
   const [spreadEnd, setSpreadEnd] = useState("");
@@ -800,6 +801,7 @@ function TaskDrawer({
     const t = q.data?.task;
     if (!t) return;
     setDueDate(t.dueDate ?? "");
+    setScheduledDate(t.scheduledDate ?? "");
     const rr = t.recurrenceRule ?? "";
     if (!rr) setRecurrence("");
     else if (RECURRENCE_PRESETS.some((p) => p.value === rr)) setRecurrence(rr);
@@ -808,6 +810,7 @@ function TaskDrawer({
     setPriority(t.priority ?? "normal");
     setWorkDepth(t.workDepth ?? "normal");
     setPhysicalEnergy(t.physicalEnergy ?? "medium");
+    setEnergyLevel(t.energyLevel ?? "shallow");
   }, [q.data?.task]);
 
   const addSub = useMutation({
@@ -861,10 +864,13 @@ function TaskDrawer({
        
        await Promise.all(unscheduled.map((s: SubtaskRow, i: number) => {
          const date = new Date(start.getTime() + inc * i);
-         const dateStr = date.toISOString().split('T')[0];
+         const y = date.getFullYear();
+         const mo = String(date.getMonth() + 1).padStart(2, "0");
+         const d = String(date.getDate()).padStart(2, "0");
+         const dateStr = `${y}-${mo}-${d}`;
          return patchSubtask(s.id, { scheduledDate: dateStr });
        }));
-       return true;
+        return true;
      },
      onSuccess: () => {
         setShowSpread(false);
@@ -872,7 +878,8 @@ function TaskDrawer({
         setSpreadEnd("");
         void qc.invalidateQueries({ queryKey: ["task", taskId] });
         void qc.invalidateQueries({ queryKey: ["tasks", userId] });
-     }
+     },
+     onError: (e: Error) => toast.error(e.message)
   });
 
   const saveMeta = useMutation({
@@ -884,11 +891,13 @@ function TaskDrawer({
       else recurrenceRule = recurrence;
       return patchTask(taskId, {
         dueDate: dueDate || null,
+        scheduledDate: scheduledDate || null,
         recurrenceRule,
         areaId: areaId || q.data.task.areaId,
         priority: priority as "urgent" | "high" | "normal" | "low",
         workDepth: workDepth as "shallow" | "normal" | "deep",
         physicalEnergy: physicalEnergy as "low" | "medium" | "high",
+        energyLevel: energyLevel as "deep_work" | "shallow" | "admin" | "quick_win",
       });
     },
     onSuccess: () => {
@@ -1041,6 +1050,25 @@ function TaskDrawer({
                     ))}
                   </select>
                 </label>
+                <label className="col-span-2 block text-[11px] text-muted">
+                  Cognitive energy
+                  <select
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                    value={energyLevel}
+                    onChange={(e) => setEnergyLevel(e.target.value)}
+                  >
+                    {[
+                      { value: "deep_work", label: "Deep work" },
+                      { value: "shallow", label: "Low focus" },
+                      { value: "admin", label: "Routine" },
+                      { value: "quick_win", label: "Quick win" },
+                    ].map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
               <label className="block text-[11px] text-muted">
                 Area
@@ -1055,6 +1083,15 @@ function TaskDrawer({
                     </option>
                   ))}
                 </select>
+              </label>
+              <label className="block text-[11px] text-muted">
+                Schedule Date
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                  value={scheduledDate}
+                  onChange={(e) => setScheduledDate(e.target.value)}
+                />
               </label>
               <label className="block text-[11px] text-muted">
                 Due Date
@@ -1147,6 +1184,7 @@ function TaskDrawer({
                   />
                   {/* Title */}
                   <input
+                    key={s.title || "title"}
                     id={`subtask-${s.id}-name`}
                     name={`subtask-${s.id}-name`}
                     className={cn(
@@ -1164,6 +1202,7 @@ function TaskDrawer({
                   />
                   {/* Date */}
                   <input
+                    key={s.scheduledDate || "date"}
                     id={`subtask-${s.id}-date`}
                     name={`subtask-${s.id}-date`}
                     type="date"

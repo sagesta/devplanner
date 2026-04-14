@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/client.js";
@@ -85,7 +85,7 @@ const bulkScheduleBody = z.object({
 const PATCH_FIELDS = [
   "title", "description", "projectId", "sprintId", "areaId",
   "priority", "energyLevel", "workDepth", "physicalEnergy",
-  "dueDate","recurrenceRule", "tags",
+  "dueDate", "scheduledDate", "recurrenceRule", "tags",
 ] as const;
 
 export const taskRoutes = new Hono<AppEnv>()
@@ -175,7 +175,7 @@ export const taskRoutes = new Hono<AppEnv>()
     const hasParam = Boolean(dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam));
     const dt = hasParam ? dateParam! : serverTodayYmd();
 
-    let baseFilter = eq(tasks.dueDate, dt) as any;
+    let baseFilter = or(eq(tasks.dueDate, dt), eq(tasks.scheduledDate, dt)) as any;
 
     const rows = await db.query.tasks.findMany({
       where: and(eq(tasks.userId, userId), taskActive, baseFilter),
@@ -381,7 +381,7 @@ export const taskRoutes = new Hono<AppEnv>()
     if (!validTasks.length) return c.json({ updated: 0 });
 
     if (validTasks.length > 0) {
-      await db.update(tasks).set({ dueDate: scheduledDate })
+      await db.update(tasks).set({ scheduledDate: scheduledDate })
         .where(inArray(tasks.id, validTasks.map(t => t.id)));
     }
 
@@ -456,6 +456,7 @@ export const taskRoutes = new Hono<AppEnv>()
         physicalEnergy: v.physicalEnergy ?? "medium",
         description: v.description ?? null,
         dueDate: v.dueDate ?? null,
+        scheduledDate: v.scheduledDate ?? null,
         recurrenceRule: v.recurrenceRule ?? null,
         tags: v.tags ?? null,
       })

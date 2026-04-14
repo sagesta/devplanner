@@ -7,12 +7,14 @@ export function cn(...inputs: ClassValue[]) {
 
 /** Overdue = due date is before today and task is not finished. */
 export function isTaskOverdue(
-  task: { dueDate: string | null; status: string },
+  task: { dueDate: string | null; scheduledDate?: string | null; status: string },
   todayYmd: string
 ): boolean {
   if (task.status === "done" || task.status === "cancelled") return false;
   const due = task.dueDate?.trim();
+  const sched = task.scheduledDate?.trim();
   if (due && due.localeCompare(todayYmd) < 0) return true;
+  if (sched && sched.localeCompare(todayYmd) < 0) return true;
   return false;
 }
 

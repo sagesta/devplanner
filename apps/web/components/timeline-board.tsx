@@ -495,8 +495,8 @@ export function TimelineBoard() {
           .filter((d): d is string => !!d)
           .sort();
 
-        const startYmd = scheduledDates[0] ?? normalizeYmd(task.dueDate) ?? null;
-        const endYmd = scheduledDates[scheduledDates.length - 1] ?? normalizeYmd(task.dueDate) ?? null;
+        const startYmd = scheduledDates[0] ?? normalizeYmd(task.scheduledDate) ?? normalizeYmd(task.dueDate) ?? null;
+        const endYmd = scheduledDates[scheduledDates.length - 1] ?? normalizeYmd(task.scheduledDate) ?? normalizeYmd(task.dueDate) ?? null;
 
         // Determine if anything is in view
         const inView =
@@ -526,8 +526,8 @@ export function TimelineBoard() {
           }
         }
       } else {
-        // Flat task with no subtasks — show on its dueDate
-        const anchor = normalizeYmd(task.dueDate);
+        // Flat task with no subtasks — show on its scheduledDate or dueDate
+        const anchor = normalizeYmd(task.scheduledDate) ?? normalizeYmd(task.dueDate);
         if (anchor && days.includes(anchor)) {
           taskBands.push({
             task,
@@ -569,9 +569,9 @@ export function TimelineBoard() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ["tasks", userId] }),
   });
 
-  const taskDueDateMut = useMutation({
+  const taskScheduleMut = useMutation({
     mutationFn: ({ taskId, newYmd }: { taskId: string; newYmd: string }) =>
-      patchTask(taskId, { dueDate: newYmd }),
+      patchTask(taskId, { scheduledDate: newYmd }),
     onError: (e: Error) => toast.error(e.message),
     onSettled: () => void qc.invalidateQueries({ queryKey: ["tasks", userId] }),
   });
@@ -585,9 +585,9 @@ export function TimelineBoard() {
     (taskId: string, startIdx: number, deltaDays: number) => {
       const newIdx = clamp(startIdx + deltaDays, 0, NUM_DAYS - 1);
       const newYmd = days[newIdx];
-      if (newYmd) taskDueDateMut.mutate({ taskId, newYmd });
+      if (newYmd) taskScheduleMut.mutate({ taskId, newYmd });
     },
-    [days, taskDueDateMut, NUM_DAYS]
+    [days, taskScheduleMut, NUM_DAYS]
   );
 
   // DnD for unscheduled chips → drop onto day header
@@ -601,7 +601,7 @@ export function TimelineBoard() {
     if (!over?.startsWith("timeline-day-")) return;
     const ymd = over.replace("timeline-day-", "");
     if (id.startsWith("task-")) {
-      taskDueDateMut.mutate({ taskId: id.replace("task-", ""), newYmd: ymd });
+      taskScheduleMut.mutate({ taskId: id.replace("task-", ""), newYmd: ymd });
     }
   };
 

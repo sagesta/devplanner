@@ -154,13 +154,13 @@ export function TaskTableRow({
           {cognitiveDisplay(task.energyLevel)}
         </td>
         <td className="p-2 text-xs text-muted">
+          {normalizeYmd(task.dueDate) ?? "—"}
+        </td>
+        <td className="p-2 text-xs text-muted">
           {(task._subtasks ?? [])
             .map((s) => s.scheduledDate)
             .filter((d): d is string => Boolean(d))
             .sort()[0] ?? "—"}
-        </td>
-        <td className="p-2 text-xs text-muted">
-          {normalizeYmd(task.dueDate) ?? "—"}
         </td>
         <td className="p-2">
           <div className="flex flex-wrap gap-1">

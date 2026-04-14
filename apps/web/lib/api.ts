@@ -39,6 +39,7 @@ export type TaskRow = {
   priority: string;
   energyLevel: string;
   dueDate: string | null;
+  scheduledDate?: string | null;
   sprintId: string | null;
   icalUid?: string | null;
   caldavResourceFilename?: string | null;
