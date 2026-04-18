@@ -3,7 +3,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { AddToSprintButton } from "@/components/AddToSprintButton";
 import { ChevronDown, ChevronRight, Inbox, CheckCircle2, Trash2, Plus, Circle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -53,7 +52,7 @@ export default function BacklogPage() {
   const userId = useAppUserId();
   const qc = useQueryClient();
   const [areaFilter, setAreaFilter] = useState<AreaFilter>("all");
-  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [newSubtaskTitles, setNewSubtaskTitles] = useState<Record<string, string>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const todayYmd = localISODate();
 
@@ -87,8 +86,8 @@ export default function BacklogPage() {
   const addSubtaskM = useMutation({
     mutationFn: ({ taskId, title }: { taskId: string; title: string }) =>
       createSubtask({ taskId, title }),
-    onSuccess: () => {
-      setNewSubtaskTitle("");
+    onSuccess: (_data, vars) => {
+      setNewSubtaskTitles((prev) => ({ ...prev, [vars.taskId]: "" }));
       void qc.invalidateQueries({ queryKey: ["backlog", userId] });
     },
   });
@@ -226,7 +225,6 @@ export default function BacklogPage() {
                           <TagChip key={tag.id} name={tag.name} color={tag.color} size="xs" />
                         ))}
                         <TimerButton taskId={t.id} compact />
-                        <AddToSprintButton taskId={t.id} />
                         <select
                           className="max-w-[140px] rounded-md border border-white/10 bg-primary/10 text-primary px-2 py-1 text-[11px] font-medium transition-colors hover:bg-primary/20"
                           value={t.sprintId ?? ""}
@@ -443,12 +441,13 @@ export default function BacklogPage() {
                                 type="text"
                                 placeholder="+ Add subtask..."
                                 className="flex-1 rounded-md border border-white/5 bg-background px-3 py-1.5 text-xs focus:border-primary/50 focus:outline-none"
-                                value={newSubtaskTitle}
-                                onChange={e => setNewSubtaskTitle(e.target.value)}
+                                value={newSubtaskTitles[t.id] ?? ""}
+                                onChange={e => setNewSubtaskTitles((prev) => ({ ...prev, [t.id]: e.target.value }))}
                                 onKeyDown={e => {
-                                  if (e.key === "Enter" && newSubtaskTitle.trim()) {
+                                  const val = newSubtaskTitles[t.id] ?? "";
+                                  if (e.key === "Enter" && val.trim()) {
                                     e.preventDefault();
-                                    addSubtaskM.mutate({ taskId: t.id, title: newSubtaskTitle.trim() });
+                                    addSubtaskM.mutate({ taskId: t.id, title: val.trim() });
                                   }
                                 }}
                               />

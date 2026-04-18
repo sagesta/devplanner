@@ -43,7 +43,7 @@ export default function TablePage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const q = useQuery({
-    queryKey: ["tasks", userId, "table"],
+    queryKey: ["tasks", userId],
     queryFn: () => fetchTasks(),
     enabled: Boolean(userId),
   });
