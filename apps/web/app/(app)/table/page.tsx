@@ -9,7 +9,7 @@ import { useAppUserId } from "@/hooks/use-app-user-id";
 import { deleteTask, fetchTasks, patchTask, postBulkStatus } from "@/lib/api";
 import { SkeletonRow } from "@/lib/skeleton";
 import { normalizeYmd } from "@/lib/timeline-utils";
-import { displayPhysicalEnergy, displayWorkDepth } from "@/lib/utils";
+import { cn, displayPhysicalEnergy, displayWorkDepth } from "@/lib/utils";
 import { TaskTableRow } from "@/components/TaskTableRow";
 
 type SortKey =
