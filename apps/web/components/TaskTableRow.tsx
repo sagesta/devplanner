@@ -46,6 +46,7 @@ export function TaskTableRow({
   onSelectToggle: (checked: boolean) => void;
 }) {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [confirmIndDelete, setConfirmIndDelete] = useState(false);
   const qc = useQueryClient();
 
   const statusMut = useMutation({
@@ -175,11 +176,16 @@ export function TaskTableRow({
         <td className="p-2 text-right action-button">
           <button
             type="button"
-            className="rounded p-1 text-muted hover:bg-red-500/15 hover:text-red-300 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-            title="Delete task"
+            className={cn("rounded p-1 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity", confirmIndDelete ? "text-red-500 bg-red-500/10" : "text-muted hover:bg-red-500/15 hover:text-red-300")}
+            title={confirmIndDelete ? "Are you sure?" : "Delete task"}
             disabled={del.isPending}
             onClick={() => {
-              if (!confirm(`Delete “${task.title}”?`)) return;
+              if (!confirmIndDelete) {
+                setConfirmIndDelete(true);
+                setTimeout(() => setConfirmIndDelete(false), 3000);
+                return;
+              }
+              setConfirmIndDelete(false);
               del.mutate();
             }}
           >

@@ -30,6 +30,7 @@ export default function SprintsPage() {
   const [endErr, setEndErr] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const startDateRef = useRef<HTMLInputElement>(null);
   const endDateRef = useRef<HTMLInputElement>(null);
 
@@ -359,14 +360,21 @@ export default function SprintsPage() {
               <button
                 type="button"
                 disabled={deleteMut.isPending}
-                className="rounded-md border border-red-500/20 px-2.5 py-1 text-[10px] text-red-400/70 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40 transition-colors flex items-center gap-1 ml-auto"
+                className={cn("rounded-md border px-2.5 py-1 text-[10px] disabled:opacity-40 transition-colors flex items-center gap-1 ml-auto",
+                  deletingId === s.id ? "border-red-500 text-red-500 bg-red-500/10 font-bold" : "border-red-500/20 text-red-400/70 hover:bg-red-500/10 hover:text-red-300"
+                )}
                 onClick={() => {
-                  if (!confirm(`Delete sprint "${s.name}"? Tasks must be moved to backlog first.`)) return;
+                  if (deletingId !== s.id) {
+                    setDeletingId(s.id);
+                    setTimeout(() => setDeletingId(null), 3000);
+                    return;
+                  }
+                  setDeletingId(null);
                   deleteMut.mutate(s.id);
                 }}
               >
                 <Trash2 size={10} />
-                Delete
+                {deletingId === s.id ? "Confirm?" : "Delete"}
               </button>
             </div>
           </div>

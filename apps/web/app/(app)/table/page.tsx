@@ -41,6 +41,7 @@ export default function TablePage() {
   const [sel, setSel] = useState<Record<string, boolean>>({});
   const [sortKey, setSortKey] = useState<SortKey>("dueDate");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const q = useQuery({
     queryKey: ["tasks", userId],
@@ -170,12 +171,17 @@ export default function TablePage() {
             <div className="h-3 w-[1px] bg-primary/20" />
             <button
               type="button"
-              className="text-[11px] font-medium text-danger hover:text-red-400 transition-colors disabled:opacity-40"
+              className={cn("text-[11px] font-medium transition-colors disabled:opacity-40", confirmBulkDelete ? "text-red-500 font-bold" : "text-danger hover:text-red-400")}
               disabled={bulk.isPending}
               onClick={() => {
-                if (!confirm(`Delete ${selCount} tasks?`)) return;
+                if (!confirmBulkDelete) {
+                  setConfirmBulkDelete(true);
+                  setTimeout(() => setConfirmBulkDelete(false), 3000);
+                  return;
+                }
                 const ids = Object.entries(sel).filter(([, v]) => v).map(([k]) => k);
                 if (!ids.length) return;
+                setConfirmBulkDelete(false);
                 // Run deletes sequentially
                 Promise.all(ids.map(id => deleteTask(id))).then(() => {
                   toast.success(`Deleted ${selCount} tasks`);
@@ -184,7 +190,7 @@ export default function TablePage() {
                 }).catch((e: Error) => toast.error(e.message));
               }}
             >
-              Delete
+              {confirmBulkDelete ? "Sure?" : "Delete"}
             </button>
           </div>
         )}
