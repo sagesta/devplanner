@@ -254,8 +254,8 @@ export function AiChatDock() {
   const effectiveModel = useMemo(() => {
     const allowed = config?.allowedChatModels?.length
       ? config.allowedChatModels
-      : ["gpt-4o-mini"];
-    const def = config?.defaultChatModel ?? "gpt-4o-mini";
+      : ["gpt-5-nano"];
+    const def = config?.defaultChatModel ?? "gpt-5-nano";
     const pick = model || def;
     return allowed.includes(pick) ? pick : def;
   }, [model, config]);
@@ -567,11 +567,7 @@ export function AiChatDock() {
                   onChange={(e) => persistModel(e.target.value)}
                 >
                   {(
-                    config?.allowedChatModels ?? [
-                      "gpt-4o-mini",
-                      "gpt-4o",
-                      "gpt-4-turbo",
-                    ]
+                    config?.allowedChatModels ?? ["gpt-5-nano"]
                   ).map((m) => (
                     <option key={m} value={m}>
                       {m}

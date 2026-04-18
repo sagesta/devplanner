@@ -44,10 +44,10 @@ const chatBody = z.object({
     .optional(),
 });
 
-const ALLOWED_CHAT_MODELS = new Set(["chatgpt-5-nano", "gpt-5-nano", "gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4"]);
+const ALLOWED_CHAT_MODELS = new Set(["gpt-5-nano"]);
 
 function resolveChatModel(requested?: string): string {
-  const fallback = process.env.OPENAI_SMART_MODEL ?? "chatgpt-5-nano";
+  const fallback = process.env.OPENAI_SMART_MODEL ?? "gpt-5-nano";
   if (requested && ALLOWED_CHAT_MODELS.has(requested)) return requested;
   return fallback;
 }
@@ -209,7 +209,7 @@ export const aiRoutes = new Hono<AppEnv>()
     }
     const userId = c.get("userId");
     const { title, context } = parsed.data;
-    const model = process.env.OPENAI_SMART_MODEL ?? "chatgpt-5-nano";
+    const model = process.env.OPENAI_SMART_MODEL ?? "gpt-5-nano";
     try {
       const { raw: text } = await openaiJsonCompletion({
         userId,
@@ -246,7 +246,7 @@ export const aiRoutes = new Hono<AppEnv>()
   .get("/config", (c) => {
     return c.json({
       openaiKeySet: Boolean(process.env.OPENAI_API_KEY?.trim()),
-      defaultChatModel: process.env.OPENAI_SMART_MODEL ?? "chatgpt-5-nano",
+      defaultChatModel: process.env.OPENAI_SMART_MODEL ?? "gpt-5-nano",
       allowedChatModels: [...ALLOWED_CHAT_MODELS],
     });
   })
