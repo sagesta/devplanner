@@ -113,41 +113,45 @@ async function runPlannerToolLoop(
   let approxChars = userMessage.length;
 
   for (let round = 0; round < 8; round++) {
-    const resp = await client.chat.completions.create({
-      model,
-      messages,
-      tools: PLANNER_CHAT_TOOLS,
-      tool_choice: "auto",
-      max_completion_tokens: 2000,
-    });
-    const msg = resp.choices[0]?.message;
-    if (!msg) break;
+    try {
+      const resp = await client.chat.completions.create({
+        model,
+        messages,
+        tools: PLANNER_CHAT_TOOLS,
+        tool_choice: "auto",
+        max_completion_tokens: 2000,
+      });
+      const msg = resp.choices[0]?.message;
+      if (!msg) break;
 
-    if (msg.tool_calls?.length) {
-      messages.push(msg);
-      for (const tc of msg.tool_calls) {
-        if (tc.type !== "function") continue;
-        let args: unknown = {};
-        try {
-          args = JSON.parse(tc.function.arguments || "{}");
-        } catch {
-          args = {};
+      if (msg.tool_calls?.length) {
+        messages.push(msg);
+        for (const tc of msg.tool_calls) {
+          if (tc.type !== "function") continue;
+          let args: unknown = {};
+          try {
+            args = JSON.parse(tc.function.arguments || "{}");
+          } catch {
+            args = {};
+          }
+          const result = await executePlannerTool(tc.function.name, args, userId);
+          const out = JSON.stringify(result);
+          approxChars += out.length;
+          messages.push({
+            role: "tool",
+            tool_call_id: tc.id,
+            content: out,
+          });
         }
-        const result = await executePlannerTool(tc.function.name, args, userId);
-        const out = JSON.stringify(result);
-        approxChars += out.length;
-        messages.push({
-          role: "tool",
-          tool_call_id: tc.id,
-          content: out,
-        });
+        continue;
       }
-      continue;
-    }
 
-    const text = msg.content?.trim() ?? "";
-    approxChars += text.length;
-    return { text: text || "(No response)", approxChars };
+      const text = msg.content?.trim() ?? "";
+      approxChars += text.length;
+      return { text: text || "(No response - completed without text)", approxChars };
+    } catch (e) {
+      return { text: `[Inner API Error in Tool Loop: ${String(e)}]`, approxChars };
+    }
   }
 
   return { text: "Too many tool steps — try a simpler request.", approxChars };
@@ -352,7 +356,7 @@ export const aiRoutes = new Hono<AppEnv>()
         const resp = await client.chat.completions.create({
           model,
           stream: true,
-          max_tokens: 1500,
+          max_completion_tokens: 1500,
           messages: [
             {
               role: "system",
