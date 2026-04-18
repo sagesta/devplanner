@@ -118,7 +118,7 @@ async function runPlannerToolLoop(
       messages,
       tools: PLANNER_CHAT_TOOLS,
       tool_choice: "auto",
-      max_tokens: 2000,
+      max_completion_tokens: 2000,
     });
     const msg = resp.choices[0]?.message;
     if (!msg) break;

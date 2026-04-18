@@ -39,7 +39,7 @@ export async function openaiJsonCompletion(input: {
       const resp = await client.chat.completions.create({
         model: input.model,
         temperature: 0.2,
-        max_tokens: maxOut,
+        max_completion_tokens: maxOut,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: input.system },
