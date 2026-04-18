@@ -2,11 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { CalendarCheck, Plus, ArrowLeft } from "lucide-react";
+import { CalendarCheck, Plus, ArrowLeft, Pencil, Trash2, Check, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { createSprint, fetchSprints, patchSprint, fetchTasks, patchTask } from "@/lib/api";
+import { createSprint, deleteSprint, fetchSprints, patchSprint, fetchTasks, patchTask, type SprintRow } from "@/lib/api";
 import { Skeleton } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +28,8 @@ export default function SprintsPage() {
   const [goal, setGoal] = useState("");
   const [startErr, setStartErr] = useState(false);
   const [endErr, setEndErr] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
   const startDateRef = useRef<HTMLInputElement>(null);
   const endDateRef = useRef<HTMLInputElement>(null);
 
@@ -40,7 +42,20 @@ export default function SprintsPage() {
   const patchMut = useMutation({
     mutationFn: ({ id, body }: { id: string; body: { status?: string; name?: string; goal?: string | null } }) =>
       patchSprint(id, body),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["sprints", userId] }),
+    onSuccess: () => {
+      setEditingId(null);
+      void qc.invalidateQueries({ queryKey: ["sprints", userId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteSprint(id),
+    onSuccess: () => {
+      toast.success("Sprint deleted");
+      void qc.invalidateQueries({ queryKey: ["sprints", userId] });
+      void qc.invalidateQueries({ queryKey: ["backlog", userId] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -51,7 +66,7 @@ export default function SprintsPage() {
         startDate,
         endDate,
         goal: goal.trim() || null,
-        status: (q.data?.sprints && q.data.sprints.some(s => s.status === 'active')) ? "planned" : "active",
+        status: (q.data?.sprints && q.data.sprints.some(s => s.status === "active")) ? "planned" : "active",
       }),
     onSuccess: () => {
       toast.success("Sprint created");
@@ -210,24 +225,62 @@ export default function SprintsPage() {
             )}
           >
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
                   <CalendarCheck size={14} className={cn(
                     s.status === "active" ? "text-primary" : "text-muted"
                   )} />
-                  <h3 className="text-sm font-medium text-foreground">{s.name}</h3>
-                  <span className={cn(
-                    "rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider",
-                    STATUS_COLORS[s.status] ?? STATUS_COLORS.planned
-                  )}>
-                    {s.status}
-                  </span>
+
+                  {/* Inline rename */}
+                  {editingId === s.id ? (
+                    <div className="flex items-center gap-1.5 flex-1">
+                      <input
+                        autoFocus
+                        className="flex-1 min-w-0 rounded-md border border-primary/50 bg-background px-2 py-0.5 text-sm text-foreground focus:outline-none"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && editName.trim()) {
+                            patchMut.mutate({ id: s.id, body: { name: editName.trim() } });
+                          } else if (e.key === "Escape") {
+                            setEditingId(null);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="p-1 text-success hover:bg-success/10 rounded"
+                        onClick={() => {
+                          if (editName.trim()) patchMut.mutate({ id: s.id, body: { name: editName.trim() } });
+                        }}
+                      >
+                        <Check size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="p-1 text-muted hover:bg-white/10 rounded"
+                        onClick={() => setEditingId(null)}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="text-sm font-medium text-foreground">{s.name}</h3>
+                      <span className={cn(
+                        "rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider",
+                        STATUS_COLORS[s.status] ?? STATUS_COLORS.planned
+                      )}>
+                        {s.status}
+                      </span>
+                    </>
+                  )}
                 </div>
                 {s.goal && (
                   <p className="mt-1 text-xs text-muted">{s.goal}</p>
                 )}
               </div>
-              <div className="text-right">
+              <div className="text-right shrink-0">
                 <p className="text-xs text-muted">
                   {s.startDate} → {s.endDate}
                 </p>
@@ -250,7 +303,7 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={patchMut.isPending}
-                  className="rounded-md bg-primary/80 px-2.5 py-1 text-[10px] font-medium text-white hover:bg-primary disabled:opacity-40"
+                  className="rounded-md bg-primary/80 px-2.5 py-1 text-[10px] font-medium text-white hover:bg-primary disabled:opacity-40 transition-colors"
                   onClick={() => patchMut.mutate({ id: s.id, body: { status: "active" } })}
                 >
                   Set active
@@ -260,7 +313,7 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={patchMut.isPending}
-                  className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-foreground hover:bg-white/5 disabled:opacity-40"
+                  className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-foreground hover:bg-white/5 disabled:opacity-40 transition-colors"
                   onClick={() => patchMut.mutate({ id: s.id, body: { status: "planned" } })}
                 >
                   Unset active
@@ -270,7 +323,7 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={patchMut.isPending}
-                  className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-muted hover:bg-white/5 disabled:opacity-40"
+                  className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-muted hover:bg-white/5 disabled:opacity-40 transition-colors"
                   onClick={() => patchMut.mutate({ id: s.id, body: { status: "completed" } })}
                 >
                   Mark completed
@@ -280,12 +333,41 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={patchMut.isPending}
-                  className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-muted hover:bg-white/5 disabled:opacity-40"
+                  className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-muted hover:bg-white/5 disabled:opacity-40 transition-colors"
                   onClick={() => patchMut.mutate({ id: s.id, body: { status: "planned" } })}
                 >
                   Reopen
                 </button>
               )}
+
+              {/* Rename */}
+              {editingId !== s.id && (
+                <button
+                  type="button"
+                  className="rounded-md border border-white/10 px-2.5 py-1 text-[10px] text-muted hover:bg-white/5 hover:text-foreground transition-colors flex items-center gap-1"
+                  onClick={() => {
+                    setEditingId(s.id);
+                    setEditName(s.name);
+                  }}
+                >
+                  <Pencil size={10} />
+                  Rename
+                </button>
+              )}
+
+              {/* Delete */}
+              <button
+                type="button"
+                disabled={deleteMut.isPending}
+                className="rounded-md border border-red-500/20 px-2.5 py-1 text-[10px] text-red-400/70 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40 transition-colors flex items-center gap-1 ml-auto"
+                onClick={() => {
+                  if (!confirm(`Delete sprint "${s.name}"? Tasks must be moved to backlog first.`)) return;
+                  deleteMut.mutate(s.id);
+                }}
+              >
+                <Trash2 size={10} />
+                Delete
+              </button>
             </div>
           </div>
         ))}
@@ -294,7 +376,7 @@ export default function SprintsPage() {
   );
 }
 
-function SprintPlanning({ sprint, onBack, userId }: { sprint: any; onBack: () => void; userId: string }) {
+function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack: () => void; userId: string }) {
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["tasks", userId],
@@ -302,7 +384,7 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: any; onBack: () =>
   });
 
   const patchMut = useMutation({
-    mutationFn: ({ taskId, sprintId }: { taskId: string; sprintId: string | null }) => 
+    mutationFn: ({ taskId, sprintId }: { taskId: string; sprintId: string | null }) =>
       patchTask(taskId, { sprintId }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
@@ -329,7 +411,7 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: any; onBack: () =>
           <p className="text-xs text-muted">{sprint.startDate} → {sprint.endDate}</p>
         </div>
       </div>
-      
+
       <div className="flex flex-1 min-h-0 gap-4 flex-col md:flex-row">
         {/* Backlog Pane */}
         <div className="flex-1 flex flex-col rounded-xl border border-white/10 bg-surface min-h-[300px]">

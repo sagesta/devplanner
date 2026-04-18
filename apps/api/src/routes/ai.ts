@@ -185,7 +185,7 @@ export const aiRoutes = new Hono<AppEnv>()
     }
     const userId = c.get("userId");
     const { raw } = parsed.data;
-    const model = process.env.OPENAI_FAST_MODEL ?? "chatgpt-5-nano";
+    const model = process.env.OPENAI_FAST_MODEL ?? "gpt-5-nano";
     try {
       const { raw: text } = await openaiJsonCompletion({
         userId,

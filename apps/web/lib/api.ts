@@ -327,6 +327,12 @@ export async function patchSprint(
   });
 }
 
+export async function deleteSprint(sprintId: string) {
+  return fetchJson<{ ok: boolean }>(apiUrl(`/api/sprints/${sprintId}`), {
+    method: "DELETE",
+  });
+}
+
 // ─── AI ───────────────────────────────────────────────────────────
 export type AiConfigResponse = {
   openaiKeySet: boolean;

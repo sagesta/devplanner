@@ -129,4 +129,32 @@ export const sprintRoutes = new Hono<AppEnv>()
       return c.json({ error: "not found" }, 404);
     }
     return c.json({ sprint: row });
+  })
+  .delete("/:id", async (c) => {
+    const id = c.req.param("id");
+    const userId = c.get("userId");
+
+    // Safety check: prevent deletion if tasks are still assigned
+    const [assignedCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(tasks)
+      .where(and(eq(tasks.sprintId, id), isNull(tasks.deletedAt)));
+
+    if ((assignedCount?.count ?? 0) > 0) {
+      return c.json(
+        { error: `Cannot delete sprint — ${assignedCount.count} task(s) are still assigned. Move them to backlog first.` },
+        409
+      );
+    }
+
+    const [row] = await db
+      .delete(sprints)
+      .where(and(eq(sprints.id, id), eq(sprints.userId, userId)))
+      .returning();
+
+    if (!row) {
+      return c.json({ error: "not found" }, 404);
+    }
+
+    return c.json({ ok: true });
   });
