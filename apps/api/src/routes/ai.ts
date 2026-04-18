@@ -10,6 +10,7 @@ import { openaiJsonCompletion } from "../ai/openai-json.js";
 import { db } from "../db/client.js";
 import { aiCallLog, tasks } from "../db/schema.js";
 import type { AppEnv } from "../types.js";
+import { buildPlannerSystemPrompt } from "../ai/prompts.js";
 
 const parseDumpBody = z.object({
   raw: z.string().min(1),
@@ -43,10 +44,10 @@ const chatBody = z.object({
     .optional(),
 });
 
-const ALLOWED_CHAT_MODELS = new Set(["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4"]);
+const ALLOWED_CHAT_MODELS = new Set(["chatgpt-5-nano", "gpt-5-nano", "gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4"]);
 
 function resolveChatModel(requested?: string): string {
-  const fallback = process.env.OPENAI_SMART_MODEL ?? "gpt-4o";
+  const fallback = process.env.OPENAI_SMART_MODEL ?? "chatgpt-5-nano";
   if (requested && ALLOWED_CHAT_MODELS.has(requested)) return requested;
   return fallback;
 }
@@ -84,79 +85,12 @@ async function runPlannerToolLoop(
       ? `\n\nSELECTED TASKS: The user is focused on task IDs: ${opts.selected_task_ids.join(", ")}. Prefer operating on these unless they ask for something broader.`
       : "";
 
-  const systemPrompt =
-    `You are DevPlanner RAG Agent — an ADHD-friendly planning assistant embedded in DevPlanner. Today is ${todayIso}.` +
-
-    `\n\n═══ ARCHITECTURE (read carefully) ═══` +
-    `\n- The system uses 3 levels: Sprint → Task → Subtask.` +
-    `\n- TASKS are the parent unit (title, priority, sprintId, dueDate). They do NOT have a scheduledDate.` +
-    `\n- SUBTASKS are the atomic execution units (title, completed, estimatedMinutes).` +
-    `\n- The Now view shows today's focus. Timeline shows task due dates across the calendar.` +
-    `\n- To schedule work for a specific day, CREATE SUBTASKS — do not modify the parent task's dueDate.` +
-    `\n- A task with no subtasks is a standalone unit visible in Now/Timeline only via its dueDate.` +
-
-    `\n\n═══ DATA MODEL — tasks + subtasks (Case 2) ═══` +
-    `\nDevPlanner uses TWO separate tables. Never confuse them.` +
-    `\n\ntasks table key fields:` +
-    `\n  id, userId, sprintId, areaId, title,` +
-    `\n  status (enum: backlog|todo|in_progress|done|cancelled|blocked),` +
-    `\n  priority, energyLevel, workDepth, physicalEnergy,` +
-    `\n  dueDate (YYYY-MM-DD), completedAt, deletedAt (soft-delete — always filter isNull(deletedAt))` +
-    `\n  → A task is done when status = 'done'.` +
-
-    `\n\nsubtasks table key fields:` +
-    `\n  id, taskId (FK → tasks.id), title,` +
-    `\n  completed (BOOLEAN — NOT a status enum), estimatedMinutes, completedAt, createdAt` +
-    `\n  → A subtask is done when completed = true.` +
-    `\n  → Subtasks have NO dueDate, NO scheduledDate, NO status enum.` +
-
-    `\n\nRelationship: tasks.id = subtasks.taskId (one-to-many). No parent_id on tasks.` +
-
-    `\n\nCompletion rules (authoritative):` +
-    `\n  • Task HAS subtasks → count each subtask as one unit; task is done only when ALL subtasks.completed = true.` +
-    `\n  • Task has NO subtasks → the task is one unit; check tasks.status = 'done'.` +
-    `\n  • total_units   = (subtask rows in scope) + (tasks with 0 subtasks in scope)` +
-    `\n  • completed_units = (subtasks with completed=true) + (standalone tasks with status='done')` +
-    `\n  • completion_percentage = round(completed_units / GREATEST(total_units,1) * 100)` +
-
-    `\n\nspreadSubtasksAcrossDays note:` +
-    `\n  Subtasks have NO scheduledDate column. This tool returns a distribution PLAN only —` +
-    `\n  narrate it to the user; it does NOT mutate any date field in the DB.` +
-
-    `\n\n═══ PLANNING HORIZONS ═══` +
-    `\n• Monthly: tasks in the active sprint are this month's goals. Parent tasks with many subtasks are "projects".` +
-    `\n• Weekly: sprint tasks with dueDate in the next 7 days are candidates for this week's focus.` +
-    `\n• Daily/Now: keep to 3–5 items. Prefer a mix of energy levels (shallow + deep_work).` +
-    `\n• Subtasks: smallest doable unit. Parent progress = done subtasks / total subtasks.` +
-
-    `\n\n═══ COMPLETION LOGIC (for progress circles / donut charts) ═══` +
-    `\nSubtasks are the PRIMARY units of work for all completion stats.` +
-    `\n- If a task HAS subtasks: it is complete only when ALL its subtasks are completed.` +
-    `\n  Count each subtask individually as a unit (not the parent).` +
-    `\n- If a task has NO subtasks: the task itself is one unit; use its status.` +
-    `\n- total_units = (all subtasks in scope) + (standalone tasks with no subtasks in scope)` +
-    `\n- completed_units = (completed subtasks in scope) + (done standalone tasks in scope)` +
-    `\n- completion_percentage = round(completed_units / total_units * 100) or 0 if total = 0` +
-    `\n- Use getProgressStats tool to compute this. Always return donut data in this shape:` +
-    `\n  { "completed": <pct>, "remaining": <100-pct> }` +
-
-    `\n\n═══ WORKFLOW RULES ═══` +
-    `\n- Break down a task: call listTasks → createSubtasks with meaningful steps.` +
-    `\n- Spread subtasks over days: use spreadSubtasksAcrossDays (divides evenly across numDays).` +
-    `\n- Reorganize / Split Tasks: If asked to actually split a large list of subtasks into separate Day/Phase tasks, create those standalone tasks, then use moveSubtasks to assign subtasks to them.` +
-    `\n- Bulk delete: listTasks with status filter → deleteTask for each.` +
-    `\n- Always call listSprints before assigning tasks to sprints.` +
-    `\n- Overdue = dueDate before today AND status != done.` +
-    `\n- Use areaKind: work | personal | sidequest to resolve areas automatically.` +
-
-    `\n\n═══ OUTPUT FORMAT ═══` +
-    `\nWhen making structural changes, after the tool calls finish, summarise in 1–2 ADHD-friendly sentences.` +
-    `\nWhen computing stats, include the JSON in your reply so the UI can render circles:` +
-    `\n{ "progress": { "weekly": { "total_units":N, "completed_units":N, "completion_percentage":N, "donut_segments":{"completed":N,"remaining":N} }, "monthly":{...}, "sprint":{...} } }` +
-
-    energyHint +
-    viewHint +
-    selectionHint;
+  const systemPrompt = buildPlannerSystemPrompt({
+    todayIso,
+    energyHint,
+    viewHint,
+    selectionHint,
+  });
 
   // ── RAG: retrieve semantically similar tasks before first LLM call ──
   const ragTasks = await retrieveRagContext(userId, userMessage, 8);
@@ -238,7 +172,7 @@ export const aiRoutes = new Hono<AppEnv>()
     }
     const userId = c.get("userId");
     const { raw } = parsed.data;
-    const model = process.env.OPENAI_FAST_MODEL ?? "gpt-4o-mini";
+    const model = process.env.OPENAI_FAST_MODEL ?? "chatgpt-5-nano";
     try {
       const { raw: text } = await openaiJsonCompletion({
         userId,
@@ -275,7 +209,7 @@ export const aiRoutes = new Hono<AppEnv>()
     }
     const userId = c.get("userId");
     const { title, context } = parsed.data;
-    const model = process.env.OPENAI_SMART_MODEL ?? "gpt-4o-mini";
+    const model = process.env.OPENAI_SMART_MODEL ?? "chatgpt-5-nano";
     try {
       const { raw: text } = await openaiJsonCompletion({
         userId,
@@ -312,7 +246,7 @@ export const aiRoutes = new Hono<AppEnv>()
   .get("/config", (c) => {
     return c.json({
       openaiKeySet: Boolean(process.env.OPENAI_API_KEY?.trim()),
-      defaultChatModel: process.env.OPENAI_SMART_MODEL ?? "gpt-4o-mini",
+      defaultChatModel: process.env.OPENAI_SMART_MODEL ?? "chatgpt-5-nano",
       allowedChatModels: [...ALLOWED_CHAT_MODELS],
     });
   })

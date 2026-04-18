@@ -20,6 +20,7 @@ import { taskRoutes } from "./routes/tasks.js";
 import { backlogRoutes } from "./routes/backlog.js";
 import { subtasksRoutes } from "./routes/subtasks.js";
 import { timeLogRoutes } from "./routes/time-logs.js";
+import { insightsRoutes } from "./routes/insights.js";
 import type { AppEnv } from "./types.js";
 
 validateEnv();
@@ -113,6 +114,7 @@ app.route("/api/time-logs", timeLogRoutes);
 app.route("/api/tags", tagRoutes);
 app.route("/api/subtasks", subtasksRoutes);
 app.route("/api/backlog", backlogRoutes);
+app.route("/api/insights", insightsRoutes);
 
 // ─── Startup ──────────────────────────────────────────────────────
 const port = Number(process.env.PORT) || 3001;

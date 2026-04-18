@@ -13,6 +13,7 @@ import {
   patchTask,
   patchSubtask,
   patchTasksBulkSchedule,
+  postAutoSchedule,
   type TaskRow,
 } from "@/lib/api";
 import { LS_PHYSICAL_ENERGY, type PhysicalEnergyLevel } from "@/lib/planner-prefs";
@@ -98,6 +99,16 @@ export default function NowPage() {
       toast.success("Tasks scheduled for today");
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId, todayLocal] });
     },
+  });
+
+  const autoScheduleMut = useMutation({
+    mutationFn: () => postAutoSchedule(todayLocal),
+    onSuccess: (data) => {
+      if (data.error) throw new Error(data.error);
+      toast.success(`Auto-schedule complete. Organized ${data.scheduled?.length || 0} tasks. Displaced ${data.displaced || 0} tasks.`);
+      void qc.invalidateQueries({ queryKey: ["tasks-today", userId, todayLocal] });
+    },
+    onError: (e: Error) => toast.error(`Auto-schedule failed: ${e.message}`),
   });
 
   const persistEnergy = useCallback((next: PhysicalEnergyLevel | "") => {
@@ -207,6 +218,10 @@ export default function NowPage() {
   const hasScheduledItems = allItems.length > 0;
   const isTimerRunningForActive = isRunning && activeItem && activeLog?.taskId === activeItem.taskId;
 
+  const capacity = q.data?.dailyCapacity ?? 0;
+  const used = q.data?.usedMinutes ?? 0;
+  const hasCapacityData = capacity > 0;
+
   return (
     <div className="flex flex-col gap-8 pb-12">
       {/* ── Header ─────────────────────────────────────────────────── */}
@@ -242,6 +257,38 @@ export default function NowPage() {
           </select>
         </div>
       </div>
+
+      {hasCapacityData && (
+        <div className="flex flex-col gap-2 rounded-xl border border-white/5 bg-surface/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between mb-2">
+          <div className="flex items-center gap-3">
+             <div className="flex flex-col">
+               <span className="text-xs font-semibold uppercase tracking-wider text-muted">Daily Capacity</span>
+               <div className="flex items-center gap-2 mt-1">
+                 <div className="w-32 h-1.5 bg-black/40 rounded-full overflow-hidden">
+                    <div 
+                       className={cn("h-full rounded-full transition-all", (used > capacity) ? "bg-red-500" : "bg-primary")} 
+                       style={{ width: `${Math.min(100, (used / capacity) * 100)}%` }} 
+                    />
+                 </div>
+                 <span className={cn("text-xs font-medium", (used > capacity) ? "text-red-400" : "text-foreground")}>
+                   {used} / {capacity} mins
+                 </span>
+               </div>
+             </div>
+             {(used > capacity) && (
+                <span className="bg-red-500/20 text-red-500 text-[10px] px-2 py-0.5 rounded font-bold ml-2">OVERLOAD</span>
+             )}
+          </div>
+          <button
+            onClick={() => autoScheduleMut.mutate()}
+            disabled={autoScheduleMut.isPending}
+            className="rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
+            title="Automatically schedule and bump overflow tasks"
+          >
+            {autoScheduleMut.isPending ? "Balancing..." : "Auto-Schedule"}
+          </button>
+        </div>
+      )}
 
       {overdueRoots.length >= 3 && !rescueDismissed && (
         <div className="flex flex-col gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-foreground sm:flex-row sm:items-center sm:justify-between">

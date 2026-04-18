@@ -54,6 +54,14 @@ export const focusSourceEnum = pgEnum("focus_source", ["manual", "focus_import"]
 
 export const caldavActionEnum = pgEnum("caldav_action", ["create", "update", "delete"]);
 
+export const schedulingStateEnum = pgEnum("scheduling_state", [
+  "unscheduled",
+  "suggested",
+  "scheduled",
+  "overflow",
+  "needs_rescheduling"
+]);
+
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   email: varchar("email", { length: 320 }).notNull().unique(),
@@ -61,6 +69,10 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   workHoursPerDay: real("work_hours_per_day").notNull().default(4),
   personalHoursPerDay: real("personal_hours_per_day").notNull().default(2),
+  efficiencyFactor: real("efficiency_factor").notNull().default(0.8),
+  bufferFactor: real("buffer_factor").notNull().default(0.2),
+  dailyCapacityMinutes: integer("daily_capacity_minutes").notNull().default(240),
+  cognitiveLoadBaseline: real("cognitive_load_baseline").notNull().default(50.0),
   timezone: varchar("timezone", { length: 64 }).default("UTC"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -143,6 +155,9 @@ export const tasks = pgTable(
     taskType: taskTypeEnum("task_type").notNull().default("main"),
     dueDate: date("due_date"),
     scheduledDate: date("scheduled_date"),
+    schedulingState: schedulingStateEnum("scheduling_state").notNull().default("unscheduled"),
+    rescheduleCount: integer("reschedule_count").notNull().default(0),
+    isAutoScheduled: boolean("is_auto_scheduled").notNull().default(false),
     recurrenceRule: text("recurrence_rule"),
     caldavUid: uuid("caldav_uid").defaultRandom(),
     /** RFC5545 UID from the calendar (imports + stable identity for round-trip). */

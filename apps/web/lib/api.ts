@@ -127,7 +127,7 @@ export async function fetchBacklog(): Promise<TaskRow[]> {
 export async function fetchToday(date?: string) {
   const params: Record<string, string> = {};
   if (date) params.date = date;
-  return fetchJson<{ tasks: TaskRow[]; date: string; doneTodayCount: number }>(
+  return fetchJson<{ tasks: TaskRow[]; date: string; doneTodayCount: number; dailyCapacity: number; usedMinutes: number }>(
     apiUrl("/api/tasks/today", params)
   );
 }
@@ -230,11 +230,26 @@ export async function postSubtasksSpread(taskId: string, subtaskTitles: string[]
   });
 }
 
-export async function patchTasksBulkSchedule(ids: string[], scheduledDate: string) {
+export async function patchTasksBulkSchedule(ids: string[], scheduledDate: string | null) {
   return fetchJson<{ updated: number }>(apiUrl("/api/tasks/bulk"), {
     method: "PATCH",
     body: JSON.stringify({ ids, scheduledDate }),
   });
+}
+
+export async function postAutoSchedule(date: string) {
+  return fetchJson<{ scheduled?: string[]; displaced?: number; error?: string }>(apiUrl("/api/tasks/auto-schedule"), {
+    method: "POST",
+    body: JSON.stringify({ date }),
+  });
+}
+
+export async function fetchInsightsActivity() {
+  return fetchJson<{
+    activityHeatmap: { hour: number; label: string; minutes: number }[];
+    peakHourLabel: string;
+    recommendedDeepWork: number[];
+  }>(apiUrl("/api/insights/activity"));
 }
 
 export async function postBrainDumpLines(

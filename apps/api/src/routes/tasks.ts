@@ -221,11 +221,25 @@ export const taskRoutes = new Hono<AppEnv>()
         subtaskMap[s.taskId].push(s);
       }
     }
+    
+    // Import dynamically to avoid circular dependencies if any
+    const { calculateDailyCapacity } = await import("../services/scheduler.js");
+    const dailyCapacity = await calculateDailyCapacity(db, userId);
+    
+    let usedMinutes = 0;
+    const finalTasks = rows.map((t) => {
+      const subsForTask = subtaskMap[t.id] ?? [];
+      const parentMins = subsForTask.reduce((acc, sub) => acc + (sub.estimatedMinutes || 0), 0) || 30; // fallback per task unit
+      usedMinutes += parentMins; // simplistic accumulation of workload
+      return { ...withTaskApiFields(t), _tags: todayTagMap[t.id] ?? [], _subtasks: subsForTask };
+    });
 
     return c.json({
-      tasks: rows.map((t) => ({ ...withTaskApiFields(t), _tags: todayTagMap[t.id] ?? [], _subtasks: subtaskMap[t.id] ?? [] })),
+      tasks: finalTasks,
       date: dt,
       doneTodayCount: doneTodayRow?.count ?? 0,
+      dailyCapacity,
+      usedMinutes,
     });
   })
 
@@ -358,6 +372,20 @@ export const taskRoutes = new Hono<AppEnv>()
       action: "create",
     }).catch(() => {});
     return c.json({ task: withTaskApiFields(row) });
+  })
+  .post("/auto-schedule", async (c) => {
+    const userId = c.get("userId");
+    const { date } = await c.req.json().catch(() => ({ date: serverTodayYmd() }));
+    try {
+      assertSaneCalendarDate("date", date);
+    } catch {
+      return c.json({ error: "invalid date" }, 400);
+    }
+    
+    // Import dynamically to avoid circular dependencies if any
+    const { runAutoScheduler } = await import("../services/scheduler.js");
+    const result = await runAutoScheduler(db, userId, date);
+    return c.json(result);
   })
   .patch("/bulk", async (c) => {
     const parsed = bulkScheduleBody.safeParse(await c.req.json());

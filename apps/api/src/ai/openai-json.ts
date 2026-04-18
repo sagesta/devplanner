@@ -5,8 +5,9 @@ const maxOut = 1500;
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 1000;
 
-// Cost per 1M tokens (approximate, for logging)
 const COST_PER_1M: Record<string, { input: number; output: number }> = {
+  "gpt-5-nano": { input: 0.15, output: 0.60 },
+  "chatgpt-5-nano": { input: 0.15, output: 0.60 },
   "gpt-4.1-nano": { input: 0.10, output: 0.40 },
   "gpt-4.1-mini": { input: 0.40, output: 1.60 },
   "gpt-4o-mini": { input: 0.15, output: 0.60 },
