@@ -534,20 +534,8 @@ export function AiChatDock() {
                 ) : (
                   loading &&
                   i === messages.length - 1 && (
-                    <span className="inline-flex gap-1 text-muted">
-                      <span className="animate-pulse">●</span>
-                      <span
-                        className="animate-pulse"
-                        style={{ animationDelay: "150ms" }}
-                      >
-                        ●
-                      </span>
-                      <span
-                        className="animate-pulse"
-                        style={{ animationDelay: "300ms" }}
-                      >
-                        ●
-                      </span>
+                    <span className="inline-flex gap-1 text-muted animate-pulse font-medium">
+                      ...loading
                     </span>
                   )
                 )}

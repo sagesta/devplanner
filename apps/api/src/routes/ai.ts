@@ -146,7 +146,16 @@ async function runPlannerToolLoop(
         continue;
       }
 
-      const text = msg.content?.trim() ?? "";
+      let text = msg.content?.trim() ?? "";
+      if (!text && messages.some(m => m.role === "tool")) {
+        messages.push({ role: "user", content: "Briefly explain in 1 conversational sentence what changes you just made to the user's dev planner schedule." });
+        const summary = await client.chat.completions.create({
+          model,
+          messages,
+          max_completion_tokens: 300,
+        });
+        text = summary.choices[0]?.message?.content?.trim() ?? "Task modifications successfully completed.";
+      }
       approxChars += text.length;
       return { text: text || "(No response - completed without text)", approxChars };
     } catch (e) {
