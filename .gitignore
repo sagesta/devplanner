@@ -6,5 +6,4 @@ dist
 .turbo
 *.log
 .gemini/
-.gsd/
-package-lock.json
+.gsd/

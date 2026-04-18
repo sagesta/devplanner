@@ -454,14 +454,14 @@ export function KanbanBoard() {
     [q.data, m]
   );
 
-  const roots = q.data ?? [];
+  const roots = useMemo(() => q.data ?? [], [q.data]);
 
   const areaMap = new Map<string, AreaRow>();
   for (const a of areasQ.data ?? []) {
     areaMap.set(a.id, a);
   }
   const defaultAreaId = areasQ.data?.[0]?.id ?? "";
-  const draggedTask = dragId ? (q.data ?? []).find((t) => t.id === dragId) : null;
+  const draggedTask = dragId ? roots.find((t) => t.id === dragId) : null;
   const overdueRoots = useMemo(
     () => roots.filter((t) => isTaskOverdue(t, todayYmd)),
     [roots, todayYmd]
