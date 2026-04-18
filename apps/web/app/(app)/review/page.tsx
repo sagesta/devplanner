@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckCircle2, Circle } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -58,7 +59,11 @@ export default function ReviewPage() {
   useEffect(() => {
     if (!hydrated) return;
     try {
-      localStorage.setItem(REVIEW_LS, JSON.stringify({ step, notes, finished }));
+      if (finished) {
+        localStorage.removeItem(REVIEW_LS);
+      } else {
+        localStorage.setItem(REVIEW_LS, JSON.stringify({ step, notes }));
+      }
     } catch {
       /* ignore */
     }
@@ -153,9 +158,19 @@ export default function ReviewPage() {
             <h2 className="font-display text-xl text-foreground">Review complete!</h2>
             <p className="mt-2 text-sm text-muted">
               Your next sprint has been created. Head to{" "}
-              <a href="/sprints" className="text-primary hover:underline">Sprints</a>{" "}
+              <Link href="/sprints" className="text-primary hover:underline">Sprints</Link>{" "}
               to add tasks.
             </p>
+            <button
+              onClick={() => {
+                setStep(0);
+                setNotes(["", "", "", "", ""]);
+                setFinished(false);
+              }}
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-sm font-medium text-foreground hover:bg-white/20 transition-colors"
+            >
+              Start New Review
+            </button>
           </div>
         ) : (
           <div className="mt-6 rounded-2xl border border-white/10 bg-surface p-5 animate-fadeIn" key={step}>
