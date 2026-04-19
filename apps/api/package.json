@@ -18,9 +18,10 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
+    "@hono/zod-validator": "^0.7.6",
     "bullmq": "^5.34.5",
-    "drizzle-kit": "^0.30.1",
     "dotenv": "^16.4.7",
+    "drizzle-kit": "^0.30.1",
     "drizzle-orm": "^0.38.3",
     "esbuild": "^0.19.12",
     "googleapis": "^144.0.0",
