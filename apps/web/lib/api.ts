@@ -524,3 +524,16 @@ export async function patchArea(
     body: JSON.stringify(body),
   });
 }
+
+// ─── Reviews ──────────────────────────────────────────────────────
+export async function saveReview(body: {
+  step1?: string;
+  step2?: string;
+  step3?: string;
+}) {
+  return fetchJson<{ success: boolean; file: string }>(apiUrl("/api/reviews"), {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+

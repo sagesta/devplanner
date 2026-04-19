@@ -158,3 +158,10 @@ export function barPixels(
   const width = Math.max(10, right - left);
   return { left, width };
 }
+
+export const RECURRENCE_PRESETS: { label: string; value: string }[] = [
+  { label: "No repeat", value: "" },
+  { label: "Daily", value: "FREQ=DAILY" },
+  { label: "Weekly", value: "FREQ=WEEKLY" },
+  { label: "Weekdays", value: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR" },
+];

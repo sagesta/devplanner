@@ -43,6 +43,8 @@ services:
       dockerfile: docker/Dockerfile.api
     ports:
       - "${API_PORT:-3001}:3001"
+    volumes:
+      - ./data/reviews:/app/reviews
     env_file:
       - .env
     environment:

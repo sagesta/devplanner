@@ -41,6 +41,10 @@ import Link from "next/link";
 import { SkeletonCard } from "@/lib/skeleton";
 import { cn, displayPhysicalEnergy, displayWorkDepth, isTaskOverdue } from "@/lib/utils";
 import { StatusDot, SubtaskBar, TaskCard } from "./task-card";
+import { DraggableCard } from "./kanban/DraggableCard";
+import { DroppableColumn } from "./kanban/DroppableColumn";
+import { InlineAddTask } from "./kanban/InlineAddTask";
+import { toYMD, RECURRENCE_PRESETS } from "@/lib/timeline-utils";
 import { TagChip } from "./TagChip";
 import { TagSelector } from "./TagSelector";
 
@@ -65,248 +69,7 @@ function resolveDropStatus(overId: string | undefined, rootsList: TaskRow[]): st
   return hit ? hit.status : null;
 }
 
-function DraggableCard({ id, children }: { id: string; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id });
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px,${transform.y}px,0)`, zIndex: 50 }
-    : undefined;
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "cursor-grab active:cursor-grabbing",
-        isDragging && "opacity-40 scale-[0.97]"
-      )}
-      {...listeners}
-      {...attributes}
-    >
-      {children}
-    </div>
-  );
-}
 
-function DroppableColumn({
-  id,
-  title,
-  count,
-  children,
-  onAdd,
-  showColumnEmpty,
-}: {
-  id: string;
-  title: string;
-  count: number;
-  children: React.ReactNode;
-  onAdd: () => void;
-  /** stress-test-fix: designed empty column state */
-  showColumnEmpty?: boolean;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-  return (
-    <section
-      ref={setNodeRef}
-      className={cn(
-        "min-h-[260px] rounded-xl border border-white/10 bg-surface p-3 transition-all duration-200",
-        isOver && "ring-2 ring-primary/50 border-primary/30 bg-surface/80"
-      )}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{title}</h2>
-          <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-white/5 px-1 text-[10px] text-muted">
-            {count}
-          </span>
-        </div>
-        <button
-          type="button"
-          className="rounded p-0.5 text-muted hover:bg-white/10 hover:text-foreground transition-colors"
-          onClick={onAdd}
-          title="Add task"
-        >
-          <Plus size={14} />
-        </button>
-      </div>
-      <div className="flex min-h-[200px] flex-col">
-        <div className="flex-1 space-y-2 stagger-list">{children}</div>
-        {showColumnEmpty && (
-          <div className="mt-2 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/12 bg-white/[0.02] px-4 py-10 text-center">
-            <Sparkles size={24} className="mb-3 text-primary/30" />
-            <p className="text-[11px] text-muted">No tasks here yet</p>
-            <button
-              type="button"
-              className="mt-3 text-xs font-medium text-primary hover:underline hover:text-primary-hover"
-              onClick={onAdd}
-            >
-              + Add task
-            </button>
-            <p className="mt-2 text-[10px] text-muted/50">Or drop a card from another column</p>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-const RECURRENCE_PRESETS: { label: string; value: string }[] = [
-  { label: "No repeat", value: "" },
-  { label: "Daily", value: "FREQ=DAILY" },
-  { label: "Weekly", value: "FREQ=WEEKLY" },
-  { label: "Weekdays", value: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR" },
-];
-
-function toPgTime(v: string): string | null {
-  if (!v) return null;
-  return v.length === 5 ? `${v}:00` : v;
-}
-
-function InlineAddTask({
-  userId,
-  areaId,
-  sprintId,
-  status,
-  onDone,
-}: {
-  userId: string;
-  areaId: string;
-  sprintId: string;
-  status: string;
-  onDone: () => void;
-}) {
-  const [title, setTitle] = useState("");
-  const [more, setMore] = useState(false);
-  const [scheduledDate, setScheduledDate] = useState("");
-  const [startT, setStartT] = useState("");
-  const [endT, setEndT] = useState("");
-  const [recurrence, setRecurrence] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-  const qc = useQueryClient();
-
-  const m = useMutation({
-    mutationFn: () =>
-      createTask({
-        areaId,
-        sprintId,
-        title: title.trim(),
-        status,
-        ...(scheduledDate ? { scheduledDate } : {}),
-        scheduledStartTime: toPgTime(startT),
-        scheduledEndTime: toPgTime(endT),
-        recurrenceRule: recurrence || null,
-      }),
-    onSuccess: () => {
-      setTitle("");
-      setScheduledDate("");
-      setStartT("");
-      setEndT("");
-      setRecurrence("");
-      void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
-      void qc.invalidateQueries({ queryKey: ["tasks"] });
-      void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
-      inputRef.current?.focus();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  return (
-    <div className="inline-add-container animate-slideIn space-y-2 rounded-md border border-white/10 bg-background/40 p-2">
-      <div className="flex gap-1.5">
-        <input
-          ref={inputRef}
-          autoFocus
-          className="flex-1 rounded-md border border-white/10 bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted/50"
-          placeholder="Task title…"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && title.trim()) m.mutate();
-            if (e.key === "Escape") onDone();
-          }}
-          onBlur={(e) => {
-             // Let close button or other inner actions fire first before blindly closing/mutating
-             if (e.relatedTarget && e.relatedTarget.closest('.inline-add-container')) return;
-             if (title.trim() && !m.isPending) m.mutate();
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => onDone()}
-          className="rounded p-1 text-muted hover:text-foreground"
-        >
-          <X size={14} />
-        </button>
-      </div>
-      <button
-        type="button"
-        className="flex w-full items-center justify-center gap-1 text-[10px] text-muted hover:text-foreground"
-        onClick={() =>
-          setMore((v) => {
-            const next = !v;
-            if (next) setScheduledDate((d) => d || localISODate());
-            return next;
-          })
-        }
-      >
-        {more ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-        Date &amp; time (optional)
-      </button>
-      {more && (
-        <div className="grid gap-2 text-[10px]">
-          <label className="text-muted">
-            Day
-            <input
-              type="date"
-              className="mt-0.5 w-full rounded border border-white/10 bg-background px-1.5 py-1 text-foreground"
-              defaultValue={scheduledDate}
-              onChange={(e) => setScheduledDate(e.target.value)}
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-1">
-            <label className="text-muted">
-              Start
-              <input
-                type="time"
-                className="mt-0.5 w-full rounded border border-white/10 bg-background px-1.5 py-1 text-foreground"
-                value={startT}
-                onChange={(e) => setStartT(e.target.value)}
-              />
-            </label>
-            <label className="text-muted">
-              End
-              <input
-                type="time"
-                className="mt-0.5 w-full rounded border border-white/10 bg-background px-1.5 py-1 text-foreground"
-                value={endT}
-                onChange={(e) => setEndT(e.target.value)}
-              />
-            </label>
-          </div>
-          <label className="text-muted">
-            Recurrence
-            <select
-              className="mt-0.5 w-full rounded border border-white/10 bg-background px-1.5 py-1 text-foreground"
-              value={recurrence}
-              onChange={(e) => setRecurrence(e.target.value)}
-            >
-              {RECURRENCE_PRESETS.map((p) => (
-                <option key={p.label} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function localISODate(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 export function KanbanBoard() {
   const { status } = useSession();
@@ -318,7 +81,7 @@ export function KanbanBoard() {
   const [rescueDismissed, setRescueDismissed] = useState(false);
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const { tags: allTags } = useTags();
-  const todayYmd = useMemo(() => localISODate(), []);
+  const todayYmd = useMemo(() => toYMD(new Date()), []);
 
   const areasQ = useQuery({
     queryKey: ["areas", userId],
@@ -520,7 +283,7 @@ export function KanbanBoard() {
                  name="startDate" 
                  className="w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none" 
                  required
-                 defaultValue={localISODate()}
+                 defaultValue={todayYmd}
                />
              </div>
              <div className="flex-1">
@@ -530,7 +293,7 @@ export function KanbanBoard() {
                  name="endDate" 
                  className="w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none" 
                  required
-                 defaultValue={localISODate(new Date(Date.now() + 14 * 86400000))}
+                 defaultValue={toYMD(new Date(Date.now() + 14 * 86400000))}
                />
              </div>
           </div>

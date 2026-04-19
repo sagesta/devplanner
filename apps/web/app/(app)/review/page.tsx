@@ -8,7 +8,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { TimeWeekPanel } from "@/components/TimeWeekPanel";
 import { startOfWeekMonday, addDaysYMD } from "@/lib/timeline-utils";
-import { createSprint } from "@/lib/api";
+import { createSprint, saveReview } from "@/lib/api";
 import { useAppUserId } from "@/hooks/use-app-user-id";
 
 const REVIEW_LS = "devplanner.weeklyReview.v1";
@@ -81,6 +81,16 @@ export default function ReviewPage() {
       nextFri.setDate(nextMon.getDate() + 4);
       const goal = notes[3]?.trim() || notes[2]?.trim() || null;
       const weekLabel = nextMon.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+      // Persist the review notes to the backend filesystem
+      await saveReview({
+        step1: notes[0],
+        step2: notes[1],
+        step3: notes[2],
+      }).catch(err => {
+        console.error("Failed to save review markdown file context", err);
+      });
+
       return createSprint({
         name: `Week of ${weekLabel}`,
         startDate: toYmd(nextMon),
