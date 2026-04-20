@@ -308,7 +308,11 @@ export function AiChatDock() {
     }
 
     setMsg("");
-    setMessages((prev) => [...prev, { role: "user", content: displayMsg }]);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: displayMsg },
+      { role: "assistant", content: "" }
+    ]);
     setLoading(true);
     scrollToBottom();
 
@@ -356,7 +360,6 @@ export function AiChatDock() {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let accumulated = "";
-        setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
         while (true) {
           const { done, value } = await reader.read();
@@ -391,20 +394,28 @@ export function AiChatDock() {
         }
       } else {
         const j = (await res.json()) as { reply?: string };
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: j.reply ?? "(No response)" },
-        ]);
+        setMessages((prev) => {
+          const copy = [...prev];
+          copy[copy.length - 1] = {
+            role: "assistant",
+            content: j.reply ?? "(No response)",
+          };
+          return copy;
+        });
       }
 
       // Clear selected tasks after a successful send
       setSelectedTasks([]);
     } catch (e) {
       toast.error(String(e));
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: `Error: ${String(e)}` },
-      ]);
+      setMessages((prev) => {
+        const copy = [...prev];
+        copy[copy.length - 1] = {
+          role: "assistant",
+          content: `Error: ${String(e)}`,
+        };
+        return copy;
+      });
     } finally {
       setLoading(false);
       scrollToBottom();

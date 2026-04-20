@@ -62,7 +62,8 @@ async function runPlannerToolLoop(
     current_view?: string;
     selected_task_ids?: string[];
     history?: { role: "user" | "assistant"; content: string }[];
-  }
+  },
+  onChunk?: (chunk: string) => Promise<void>
 ): Promise<{ text: string; approxChars: number }> {
   const todayIso = new Date().toISOString().split("T")[0]!;
 
@@ -93,8 +94,13 @@ async function runPlannerToolLoop(
   });
 
   // ── RAG: retrieve semantically similar tasks before first LLM call ──
-  const ragTasks = await retrieveRagContext(userId, userMessage, 8);
-  const ragBlock = formatRagContext(ragTasks);
+  const isSimpleQuery = userMessage.trim().length <= 15 && userMessage.split(/\\s+/).length <= 3 && !/\\b(task|bug|sprint|board|timeline|review|plan)\\b/i.test(userMessage);
+
+  let ragBlock = "";
+  if (!isSimpleQuery) {
+    const ragTasks = await retrieveRagContext(userId, userMessage, 8);
+    ragBlock = formatRagContext(ragTasks);
+  }
 
   const fullPrompt = systemPrompt + ragBlock;
 
@@ -114,20 +120,47 @@ async function runPlannerToolLoop(
 
   for (let round = 0; round < 8; round++) {
     try {
-      const resp = await client.chat.completions.create({
+      const streamResp = await client.chat.completions.create({
         model,
         messages,
         tools: PLANNER_CHAT_TOOLS,
         tool_choice: "auto",
         max_completion_tokens: 2000,
+        stream: true,
       });
-      const msg = resp.choices[0]?.message;
-      if (!msg) break;
 
-      if (msg.tool_calls?.length) {
-        messages.push(msg);
-        for (const tc of msg.tool_calls) {
-          if (tc.type !== "function") continue;
+      let content = "";
+      const toolCallsMap = new Map<number, { id: string, type: "function", function: { name: string, arguments: string } }>();
+
+      for await (const chunk of streamResp) {
+        const delta = chunk.choices[0]?.delta;
+        if (!delta) continue;
+
+        if (delta.content) {
+          content += delta.content;
+          if (onChunk) await onChunk(delta.content);
+        }
+
+        if (delta.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const index = tc.index;
+            if (!toolCallsMap.has(index)) {
+              toolCallsMap.set(index, { id: tc.id!, type: "function", function: { name: tc.function?.name ?? "", arguments: "" } });
+            }
+            if (tc.function?.arguments) {
+              toolCallsMap.get(index)!.function.arguments += tc.function.arguments;
+            }
+          }
+        }
+      }
+
+      if (toolCallsMap.size > 0) {
+        const tool_calls = Array.from(toolCallsMap.values());
+        const asstMsg: OpenAI.Chat.Completions.ChatCompletionMessageParam = { role: "assistant", tool_calls };
+        if (content) asstMsg.content = content;
+        messages.push(asstMsg);
+
+        for (const tc of tool_calls) {
           let args: unknown = {};
           try {
             args = JSON.parse(tc.function.arguments || "{}");
@@ -146,19 +179,26 @@ async function runPlannerToolLoop(
         continue;
       }
 
-      let text = msg.content?.trim() ?? "";
-      if (!text && messages.some(m => m.role === "tool")) {
+      if (!content.trim() && messages.some(m => m.role === "tool")) {
         messages.push({ role: "user", content: "Briefly explain in 1 conversational sentence what changes you just made to the user's dev planner schedule." });
-        const summary = await client.chat.completions.create({
+        const summaryStream = await client.chat.completions.create({
           model,
           messages,
           max_completion_tokens: 300,
+          stream: true,
         });
-        text = summary.choices[0]?.message?.content?.trim() ?? "Task modifications successfully completed.";
+        for await (const sChunk of summaryStream) {
+          const sDelta = sChunk.choices[0]?.delta?.content ?? "";
+          if (sDelta) {
+            content += sDelta;
+            if (onChunk) await onChunk(sDelta);
+          }
+        }
       }
-      approxChars += text.length;
-      return { text: text || "(No response - completed without text)", approxChars };
+      approxChars += content.length;
+      return { text: content || "(No response - completed without text)", approxChars };
     } catch (e) {
+      if (onChunk) await onChunk(`\n\n[Inner API Error in Tool Loop: ${String(e)}]`);
       return { text: `[Inner API Error in Tool Loop: ${String(e)}]`, approxChars };
     }
   }
@@ -332,16 +372,14 @@ export const aiRoutes = new Hono<AppEnv>()
         }
 
         if (useTools) {
-          const { text, approxChars } = await runPlannerToolLoop(client, model, userId, body.message, {
+          const { approxChars } = await runPlannerToolLoop(client, model, userId, body.message, {
             currentPhysicalEnergy: body.currentPhysicalEnergy,
             current_view: body.current_view,
             selected_task_ids: body.selected_task_ids,
             history: body.history,
+          }, async (chunk) => {
+            await stream.write(chunk);
           });
-          const chunkSize = 24;
-          for (let i = 0; i < text.length; i += chunkSize) {
-            await stream.write(text.slice(i, i + chunkSize));
-          }
           const latencyMs = Date.now() - started;
           await logAiCall({
             userId,
