@@ -206,6 +206,15 @@ export function AiChatDock() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputAreaRef = useRef<HTMLDivElement>(null);
 
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }, 50);
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const m = localStorage.getItem(LS_CHAT_MODEL);
@@ -223,7 +232,7 @@ export function AiChatDock() {
     } catch {
       // silent
     }
-  }, []);
+  }, [scrollToBottom]);
 
   // Save chat history to session storage when it changes
   useEffect(() => {
@@ -259,15 +268,6 @@ export function AiChatDock() {
     const pick = model || def;
     return allowed.includes(pick) ? pick : def;
   }, [model, config]);
-
-  const scrollToBottom = useCallback(() => {
-    setTimeout(() => {
-      scrollRef.current?.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }, 50);
-  }, []);
 
   function persistModel(next: string) {
     setModel(next);
