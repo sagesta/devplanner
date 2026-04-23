@@ -6,9 +6,9 @@ import { getGoogleClientId, getGoogleClientSecret, getGoogleRedirectUri, googleC
 
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 
-import type { OAuth2Client } from 'google-auth-library';
+import type { Auth } from 'googleapis';
 
-export function createOAuth2Client(): OAuth2Client {
+export function createOAuth2Client(): Auth.OAuth2Client {
   return new google.auth.OAuth2(getGoogleClientId(), getGoogleClientSecret(), getGoogleRedirectUri());
 }
 

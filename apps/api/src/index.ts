@@ -2,10 +2,11 @@ import "./lib/loadRootEnv.js";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
 import { pool } from "./db/client.js";
 import { runMigrations } from "./db/migrate.js";
 import { validateEnv } from "./lib/validateEnv.js";
+import { logger } from "./lib/logger.js";
+import { registry, httpRequestsTotal, httpRequestDurationMs } from "./lib/metrics.js";
 import { aiRateLimit } from "./middleware/aiRateLimit.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 import { aiRoutes } from "./routes/ai.js";
@@ -22,6 +23,7 @@ import { subtasksRoutes } from "./routes/subtasks.js";
 import { timeLogRoutes } from "./routes/time-logs.js";
 import { insightsRoutes } from "./routes/insights.js";
 import { reviewRoutes } from "./routes/reviews.js";
+import { createRedisConnection } from "./queues/connection.js";
 import type { AppEnv } from "./types.js";
 
 validateEnv();
@@ -29,7 +31,19 @@ validateEnv();
 const app = new Hono<AppEnv>();
 
 // ─── Middleware ────────────────────────────────────────────────────
-app.use("*", logger());
+
+// Pino request logger (replaces Hono built-in logger())
+app.use("*", async (c, next) => {
+  const start = Date.now();
+  await next();
+  const durationMs = Date.now() - start;
+  logger.info({
+    method: c.req.method,
+    path: c.req.path,
+    statusCode: c.res.status,
+    durationMs,
+  }, "request");
+});
 
 app.use(
   "*",
@@ -49,17 +63,26 @@ app.use(
 app.use("*", requireAuth);
 app.use("*", aiRateLimit);
 
-// Request timing
+// Request timing + Prometheus metrics
 app.use("*", async (c, next) => {
   const start = Date.now();
   await next();
   const ms = Date.now() - start;
   c.header("X-Response-Time", `${ms}ms`);
+
+  // Normalise path to avoid high-cardinality label explosions (e.g. UUIDs)
+  const rawPath = c.req.routePath ?? c.req.path;
+  httpRequestsTotal.inc({
+    method: c.req.method,
+    path: rawPath,
+    status: String(c.res.status),
+  });
+  httpRequestDurationMs.observe({ method: c.req.method, path: rawPath }, ms);
 });
 
 // Global error handler — catch unhandled exceptions → 500 JSON
 app.onError((err, c) => {
-  console.error("[API Error]", err);
+  logger.error({ err, stack: err.stack, path: c.req.path }, "[API Error]");
   return c.json(
     { error: err.message ?? "Internal server error", stack: process.env.NODE_ENV === "development" ? err.stack : undefined },
     500
@@ -80,7 +103,52 @@ app.get("/", (c) =>
   })
 );
 
-app.get("/health", (c) => c.json({ ok: true, uptime: process.uptime() }));
+app.get("/health", async (c) => {
+  const uptime = process.uptime();
+  const mem = process.memoryUsage();
+
+  // DB check
+  let dbStatus: "ok" | "error" = "ok";
+  let dbError: string | undefined;
+  try {
+    await pool.query("SELECT 1");
+  } catch (e) {
+    dbStatus = "error";
+    dbError = String(e);
+  }
+
+  // Redis check
+  let redisStatus: "ok" | "error" = "ok";
+  let redisError: string | undefined;
+  let redisClient: ReturnType<typeof createRedisConnection> | null = null;
+  try {
+    redisClient = createRedisConnection();
+    await redisClient.ping();
+  } catch (e) {
+    redisStatus = "error";
+    redisError = String(e);
+  } finally {
+    redisClient?.disconnect();
+  }
+
+  const overallStatus = dbStatus === "ok" && redisStatus === "ok" ? "ok" : "degraded";
+
+  return c.json(
+    {
+      status: overallStatus,
+      uptime,
+      version: process.env.npm_package_version ?? "0.1.0",
+      db: { status: dbStatus, ...(dbError ? { error: dbError } : {}) },
+      redis: { status: redisStatus, ...(redisError ? { error: redisError } : {}) },
+      memory: {
+        heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+        heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024),
+        rssMb: Math.round(mem.rss / 1024 / 1024),
+      },
+    },
+    overallStatus === "ok" ? 200 : 503
+  );
+});
 
 app.get("/api/health", (c) => c.json({ ok: true, uptime: process.uptime() }));
 
@@ -100,6 +168,14 @@ app.get("/health/vector", async (c) => {
   } catch (e) {
     return c.json({ ok: false, error: String(e) }, 503);
   }
+});
+
+// ─── Metrics (public — no auth) ───────────────────────────────────
+app.get("/metrics", async (c) => {
+  const metrics = await registry.metrics();
+  return c.text(metrics, 200, {
+    "Content-Type": registry.contentType,
+  });
 });
 
 // ─── Routes ───────────────────────────────────────────────────────
@@ -126,5 +202,5 @@ const hostname = process.env.HOST?.trim() || "0.0.0.0";
 // Safe to run on every boot — all statements use IF NOT EXISTS.
 await runMigrations(pool);
 
-console.log(`DevPlanner API listening on http://${hostname}:${port}`);
+logger.info({ port, hostname }, `DevPlanner API listening on http://${hostname}:${port}`);
 serve({ fetch: app.fetch, port, hostname });

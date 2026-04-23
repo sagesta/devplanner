@@ -6,6 +6,7 @@ function isPublicPath(path: string, method: string): boolean {
   if (method === "OPTIONS") return true;
   if (path === "/" || path === "/health" || path === "/health/db" || path === "/health/vector") return true;
   if (path === "/api/health") return true;
+  if (path === "/metrics") return true;
   return false;
 }
 

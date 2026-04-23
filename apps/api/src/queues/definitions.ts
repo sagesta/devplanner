@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import { createRedisConnection } from "./connection.js";
+import { bullmqJobsTotal } from "../lib/metrics.js";
 
 let caldavSyncQueue: Queue | null = null;
 let caldavPullQueue: Queue | null = null;
@@ -69,6 +70,7 @@ export async function enqueueCaldavSync(payload: CaldavSyncJob) {
     const queue = getCaldavQueue();
     if (!queue) return; // Redis not available — silently skip
     await queue.add("sync", payload, { removeOnComplete: 100, removeOnFail: 50 });
+    bullmqJobsTotal.inc({ queue: "caldav-sync", status: "enqueued" });
   } catch (e) {
     console.warn("[caldav queue] unavailable:", e);
   }
@@ -79,6 +81,7 @@ export async function enqueueCaldavPull(payload: { userId: string }) {
     const queue = getCaldavPullQueue();
     if (!queue) return;
     await queue.add("pull", payload, { removeOnComplete: 50, removeOnFail: 25 });
+    bullmqJobsTotal.inc({ queue: "caldav-pull", status: "enqueued" });
   } catch (e) {
     console.warn("[caldav pull queue] unavailable:", e);
   }
@@ -97,6 +100,7 @@ export async function enqueueGoogleCalendarSync(payload: GoogleCalendarSyncJob) 
     const queue = getGoogleCalendarSyncQueue();
     if (!queue) return;
     await queue.add("sync", payload, { removeOnComplete: 100, removeOnFail: 50 });
+    bullmqJobsTotal.inc({ queue: "google-calendar-sync", status: "enqueued" });
   } catch (e) {
     console.warn("[google-calendar-sync queue] unavailable:", e);
   }
@@ -107,6 +111,7 @@ export async function enqueueGoogleCalendarPull(payload: { userId: string }) {
     const queue = getGoogleCalendarPullQueue();
     if (!queue) return;
     await queue.add("pull", payload, { removeOnComplete: 50, removeOnFail: 25 });
+    bullmqJobsTotal.inc({ queue: "google-calendar-pull", status: "enqueued" });
   } catch (e) {
     console.warn("[google-calendar-pull queue] unavailable:", e);
   }

@@ -5,6 +5,7 @@ import { db } from "../db/client.js";
 import { areas, tags, taskTags, tasks, subtasks } from "../db/schema.js";
 import { generateAndStoreEmbedding, buildEmbeddingText, deleteStaleEmbedding } from "../ai/embeddings.js";
 import { enqueueTaskCalendarSync } from "../queues/definitions.js";
+import { taskCreatedTotal } from "../lib/metrics.js";
 import type { AppEnv } from "../types.js";
 
 const uuidParam = z.string().uuid();
@@ -312,6 +313,7 @@ export const taskRoutes = new Hono<AppEnv>()
         }))
       );
     }
+    taskCreatedTotal.inc(inserted.length);
     return c.json(
       { tasks: inserted.map((t) => withTaskApiFields(t)), count: inserted.length },
       201
@@ -502,6 +504,7 @@ export const taskRoutes = new Hono<AppEnv>()
       row.id,
       buildEmbeddingText(row.title, row.description)
     ).catch(() => {});
+    taskCreatedTotal.inc();
 
     return c.json({
       task: withTaskApiFields(row),
