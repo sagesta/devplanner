@@ -129,7 +129,47 @@ services:
       devplanner-db:
         condition: service_healthy
 
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    volumes:
+      - /var/log:/var/log
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail-config.yml:/etc/promtail/promtail-config.yml
+    restart: unless-stopped
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    ports:
+      - "8080:8080"
+    environment:
+      COLLECTIONS: "crowdsecurity/linux crowdsecurity/nginx crowdsecurity/ssh-bf"
+    volumes:
+      - crowdsec-data:/etc/crowdsec
+      - crowdsec-db:/var/lib/crowdsec/data
+    restart: unless-stopped
+
 volumes:
   devplanner_db_data:
   devplanner_redis_data:
   radicale_data:
+  loki-data:
+  prometheus-data:
+  crowdsec-data:
+  crowdsec-db:
