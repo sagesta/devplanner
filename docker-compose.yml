@@ -159,10 +159,12 @@ services:
     ports:
       - "8080:8080"
     environment:
-      COLLECTIONS: "crowdsecurity/linux crowdsecurity/nginx crowdsecurity/ssh-bf"
+      COLLECTIONS: "crowdsecurity/linux crowdsecurity/nginx crowdsecurity/sshd"
     volumes:
       - crowdsec-data:/etc/crowdsec
       - crowdsec-db:/var/lib/crowdsec/data
+      - /var/log/auth.log:/var/log/auth.log:ro
+      - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
     restart: unless-stopped
 
 volumes:
