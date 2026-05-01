@@ -62,6 +62,12 @@ function serverTodayYmd(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function addDaysYmd(ymd: string, days: number): string {
+  const d = new Date(`${ymd}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 const taskActive = isNull(tasks.deletedAt);
 
 const brainDumpBody = z.object({
@@ -384,10 +390,14 @@ export const taskRoutes = new Hono<AppEnv>()
       return c.json({ error: "invalid date" }, 400);
     }
     
-    // Import dynamically to avoid circular dependencies if any
-    const { runAutoScheduler } = await import("../services/scheduler.js");
-    const result = await runAutoScheduler(db, userId, date);
-    return c.json(result);
+    const horizonEnd = addDaysYmd(date, 6);
+    const { buildSchedulePreview } = await import("../services/scheduler.js");
+    const result = await buildSchedulePreview(db, userId, { fromDate: date, horizonEnd });
+    return c.json({
+      ...result,
+      mode: "preview",
+      message: "Review and approve these schedule changes before they are applied.",
+    });
   })
   .patch("/bulk", async (c) => {
     const parsed = bulkScheduleBody.safeParse(await c.req.json());

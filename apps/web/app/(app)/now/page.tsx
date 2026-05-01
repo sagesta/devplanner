@@ -14,6 +14,8 @@ import {
   patchSubtask,
   patchTasksBulkSchedule,
   postAutoSchedule,
+  postScheduleApply,
+  type ScheduleProposal,
   type TaskRow,
 } from "@/lib/api";
 import { LS_PHYSICAL_ENERGY, type PhysicalEnergyLevel } from "@/lib/planner-prefs";
@@ -53,6 +55,8 @@ export default function NowPage() {
   const qc = useQueryClient();
   const [energyFilter, setEnergyFilter] = useState<PhysicalEnergyLevel | "">("");
   const [rescueDismissed, setRescueDismissed] = useState(false);
+  const [scheduleProposals, setScheduleProposals] = useState<ScheduleProposal[]>([]);
+  const [selectedProposalIds, setSelectedProposalIds] = useState<string[]>([]);
   const todayLocal = useMemo(() => localISODate(), []);
 
   const { isRunning, elapsed, activeLog, startTimer, stopActiveTimer, isStarting, isStopping } =
@@ -105,10 +109,25 @@ export default function NowPage() {
     mutationFn: () => postAutoSchedule(todayLocal),
     onSuccess: (data) => {
       if (data.error) throw new Error(data.error);
-      toast.success(`Auto-schedule complete. Organized ${data.scheduled?.length || 0} tasks. Displaced ${data.displaced || 0} tasks.`);
-      void qc.invalidateQueries({ queryKey: ["tasks-today", userId, todayLocal] });
+      const proposals = data.proposals ?? [];
+      setScheduleProposals(proposals);
+      setSelectedProposalIds(proposals.map((p) => p.id));
+      if (proposals.length === 0) toast.success("No rollover changes needed.");
     },
     onError: (e: Error) => toast.error(`Auto-schedule failed: ${e.message}`),
+  });
+
+  const applyScheduleMut = useMutation({
+    mutationFn: (proposals: ScheduleProposal[]) => postScheduleApply(proposals),
+    onSuccess: (data) => {
+      toast.success(`Applied ${data.applied} schedule change(s).`);
+      setScheduleProposals([]);
+      setSelectedProposalIds([]);
+      void qc.invalidateQueries({ queryKey: ["tasks-today", userId, todayLocal] });
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["calendar-progress"] });
+    },
+    onError: (e: Error) => toast.error(`Could not apply schedule: ${e.message}`),
   });
 
   const persistEnergy = useCallback((next: PhysicalEnergyLevel | "") => {
@@ -221,6 +240,7 @@ export default function NowPage() {
   const capacity = q.data?.dailyCapacity ?? 0;
   const used = q.data?.usedMinutes ?? 0;
   const hasCapacityData = capacity > 0;
+  const selectedProposals = scheduleProposals.filter((p) => selectedProposalIds.includes(p.id));
 
   return (
     <div className="flex flex-col gap-8 pb-12">
@@ -285,9 +305,70 @@ export default function NowPage() {
             className="rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
             title="Automatically schedule and bump overflow tasks"
           >
-            {autoScheduleMut.isPending ? "Balancing..." : "Auto-Schedule"}
+            {autoScheduleMut.isPending ? "Reviewing..." : "Preview rollover"}
           </button>
         </div>
+      )}
+
+      {scheduleProposals.length > 0 && (
+        <section className="rounded-xl border border-primary/25 bg-primary/5 p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Review schedule changes</h2>
+              <p className="mt-1 text-xs text-muted">
+                DevPlanner found unfinished work to roll forward. Nothing changes until you approve it.
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-muted hover:bg-white/5"
+                onClick={() => {
+                  setScheduleProposals([]);
+                  setSelectedProposalIds([]);
+                }}
+              >
+                Dismiss
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
+                disabled={selectedProposals.length === 0 || applyScheduleMut.isPending}
+                onClick={() => applyScheduleMut.mutate(selectedProposals)}
+              >
+                {applyScheduleMut.isPending ? "Applying..." : `Apply ${selectedProposals.length}`}
+              </button>
+            </div>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {scheduleProposals.map((proposal) => {
+              const checked = selectedProposalIds.includes(proposal.id);
+              return (
+                <li key={proposal.id} className="rounded-lg border border-white/10 bg-surface px-3 py-2">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      className="mt-1 rounded border-white/20"
+                      checked={checked}
+                      onChange={() =>
+                        setSelectedProposalIds((prev) =>
+                          checked ? prev.filter((id) => id !== proposal.id) : [...prev, proposal.id]
+                        )
+                      }
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{proposal.title}</p>
+                      <p className="mt-0.5 text-xs text-muted">
+                        {proposal.fromDate} to {proposal.toDate} - {proposal.estimatedMinutes}m
+                      </p>
+                      <p className="mt-1 text-xs text-muted/80">{proposal.reason}</p>
+                    </div>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
       {overdueRoots.length >= 3 && !rescueDismissed && (

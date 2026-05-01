@@ -109,7 +109,7 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
     function: {
       name: "createTask",
       description:
-        "Create a new task. Can optionally schedule it via an implicit subtask if scheduledDate is provided.",
+        "Create a new task. Chat uses read-only tools, so this executor is reserved for confirmed server actions.",
       parameters: {
         type: "object",
         properties: {
@@ -281,22 +281,6 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
           newParentTaskId: { type: "string" }
         },
         required: ["subtaskIds", "newParentTaskId"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "scheduleTask",
-      description: "Set the scheduledDate on a task that has no subtasks (by creating an implicit identical subtask).",
-      parameters: {
-        type: "object",
-        properties: {
-          taskId: { type: "string" },
-          scheduledDate: { type: "string", description: "YYYY-MM-DD" },
-          estimatedMinutes: { type: "integer" }
-        },
-        required: ["taskId", "scheduledDate"]
       }
     }
   },
@@ -696,10 +680,13 @@ export async function executePlannerTool(
       const subtaskId = typeof obj.subtaskId === "string" ? obj.subtaskId : "";
       if (!subtaskId) return { error: "subtaskId required" };
 
-      const existing = await db.query.subtasks.findFirst({
-        where: eq(subtasks.id, subtaskId)
-      });
-      if (!existing) return { error: "subtask not found" };
+      const [existing] = await db
+        .select({ id: subtasks.id, taskId: subtasks.taskId })
+        .from(subtasks)
+        .innerJoin(tasks, eq(tasks.id, subtasks.taskId))
+        .where(and(eq(subtasks.id, subtaskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)))
+        .limit(1);
+      if (!existing) return { error: "subtask not found for user" };
 
       const updates: Record<string, unknown> = {};
       if (typeof obj.title === "string") updates.title = obj.title.trim().slice(0, 500);
@@ -717,8 +704,13 @@ export async function executePlannerTool(
       const subtaskId = typeof obj.subtaskId === "string" ? obj.subtaskId : "";
       if (!subtaskId) return { error: "subtaskId required" };
       
-      const existing = await db.query.subtasks.findFirst({ where: eq(subtasks.id, subtaskId) });
-      if (!existing) return { error: "subtask not found" };
+      const [existing] = await db
+        .select({ id: subtasks.id, taskId: subtasks.taskId })
+        .from(subtasks)
+        .innerJoin(tasks, eq(tasks.id, subtasks.taskId))
+        .where(and(eq(subtasks.id, subtaskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)))
+        .limit(1);
+      if (!existing) return { error: "subtask not found for user" };
 
       await db.delete(subtasks).where(eq(subtasks.id, subtaskId));
       await rollupParentTaskStatus(db, existing.taskId);
@@ -735,9 +727,11 @@ export async function executePlannerTool(
       });
       if (!existing) return { error: "new parent task not found" };
 
-      const toMove = await db.query.subtasks.findMany({
-         where: inArray(subtasks.id, sIds)
-      });
+      const toMove = await db
+        .select({ id: subtasks.id, taskId: subtasks.taskId })
+        .from(subtasks)
+        .innerJoin(tasks, eq(tasks.id, subtasks.taskId))
+        .where(and(eq(tasks.userId, userId), isNull(tasks.deletedAt), inArray(subtasks.id, sIds)));
       if (!toMove.length) return { error: "no valid subtasks found to move" };
 
       const oldParentIds = [...new Set(toMove.map(s => s.taskId))];

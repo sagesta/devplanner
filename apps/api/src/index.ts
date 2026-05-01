@@ -23,6 +23,7 @@ import { subtasksRoutes } from "./routes/subtasks.js";
 import { timeLogRoutes } from "./routes/time-logs.js";
 import { insightsRoutes } from "./routes/insights.js";
 import { reviewRoutes } from "./routes/reviews.js";
+import { scheduleRoutes } from "./routes/schedule.js";
 import { createRedisConnection } from "./queues/connection.js";
 import type { AppEnv } from "./types.js";
 
@@ -193,6 +194,7 @@ app.route("/api/subtasks", subtasksRoutes);
 app.route("/api/backlog", backlogRoutes);
 app.route("/api/insights", insightsRoutes);
 app.route("/api/reviews", reviewRoutes);
+app.route("/api/schedule", scheduleRoutes);
 
 // ─── Startup ──────────────────────────────────────────────────────
 const port = Number(process.env.PORT) || 3001;

@@ -45,6 +45,13 @@ const chatBody = z.object({
 });
 
 const ALLOWED_CHAT_MODELS = new Set(["gpt-5-nano"]);
+const READ_ONLY_TOOL_NAMES = new Set([
+  "listTasks",
+  "getSubtasks",
+  "listSprints",
+  "getProgressStats",
+  "spreadSubtasksAcrossDays",
+]);
 
 function resolveChatModel(requested?: string): string {
   const fallback = process.env.OPENAI_SMART_MODEL ?? "gpt-5-nano";
@@ -123,7 +130,7 @@ async function runPlannerToolLoop(
       const streamResp = await client.chat.completions.create({
         model,
         messages,
-        tools: PLANNER_CHAT_TOOLS,
+        tools: PLANNER_CHAT_TOOLS.filter((tool) => READ_ONLY_TOOL_NAMES.has(tool.function.name)),
         tool_choice: "auto",
         max_completion_tokens: 2000,
         stream: true,

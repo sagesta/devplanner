@@ -47,7 +47,7 @@ const SUGGESTED_PROMPTS = [
   "Plan my week",
   "What's overdue?",
   "Show my weekly progress",
-  "Delete the tasks marked as done",
+  "Suggest what to roll forward",
 ];
 
 // ─── Task Selector Panel ────────────────────────────────────────────────────
@@ -499,8 +499,8 @@ export function AiChatDock() {
             {messages.length === 0 && (
               <div className="space-y-3 py-2">
                 <p className="text-center text-xs text-muted leading-relaxed">
-                  Ask what to work on, change your schedule, or use task tools
-                  to edit your board.{" "}
+                    Ask what to work on, inspect your progress, or draft safe
+                  schedule changes.{" "}
                   <strong className="text-foreground/70">@</strong> to pin tasks
                   for context.
                 </p>
@@ -581,7 +581,7 @@ export function AiChatDock() {
                   checked={toolsEnabled}
                   onChange={(e) => persistTools(e.target.checked)}
                 />
-                Task tools
+                Read tools
               </label>
             </div>
 

@@ -30,13 +30,13 @@ import { useAppUserId } from "@/hooks/use-app-user-id";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  ["/board", "Board", KanbanSquare],
-  ["/now", "Now", Zap],
+  ["/now", "Today", Zap],
+  ["/backlog", "Capture", Inbox],
+  ["/board", "Plan", KanbanSquare],
   ["/timeline", "Timeline", ChartGantt],
   ["/table", "Table", LayoutList],
-  ["/backlog", "Backlog", Inbox],
   ["/sprints", "Sprints", CalendarCheck],
-  ["/review", "Review", BarChart3],
+  ["/insights", "Review", BarChart3],
   ["/settings", "Settings", Settings],
 ] as const;
 
@@ -91,8 +91,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <p className="font-display text-lg text-foreground text-center">D</p>
             ) : (
               <>
-                <p className="font-display text-xl text-foreground tracking-tight">DevPlanner</p>
-                <p className="mt-0.5 text-[10px] text-muted">ADHD-friendly planner</p>
+                <p className="text-lg font-semibold text-foreground">DevPlanner</p>
+                <p className="mt-0.5 text-[11px] text-muted">Today. Capture. Plan. Review.</p>
               </>
             )}
           </div>

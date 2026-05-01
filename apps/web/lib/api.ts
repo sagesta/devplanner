@@ -111,6 +111,42 @@ export type AiLogRow = {
   createdAt: string;
 };
 
+export type CalendarProgressDay = {
+  date: string;
+  plannedUnits: number;
+  completedUnits: number;
+  plannedMinutes: number;
+  completedMinutes: number;
+  overdueUnits: number;
+  percent: number;
+  status: "empty" | "complete" | "missed" | "overload" | "planned";
+};
+
+export type ScheduleProposal = {
+  id: string;
+  targetType: "task" | "subtask";
+  targetId: string;
+  title: string;
+  fromDate: string;
+  toDate: string;
+  estimatedMinutes: number;
+  priority: string;
+  workDepth: string | null;
+  physicalEnergy: string | null;
+  reason: string;
+  risk: "low" | "medium" | "high";
+};
+
+export type SchedulePreviewResponse = {
+  proposals: ScheduleProposal[];
+  learning: {
+    dailyCapacity: number;
+    peakHour: number | null;
+    deepWorkHours: number[];
+    observedCompletionCount: number;
+  };
+};
+
 // ─── Tasks ────────────────────────────────────────────────────────
 export async function fetchTasks(sprintId?: string): Promise<TaskRow[]> {
   const params: Record<string, string> = {};
@@ -238,7 +274,7 @@ export async function patchTasksBulkSchedule(ids: string[], scheduledDate: strin
 }
 
 export async function postAutoSchedule(date: string) {
-  return fetchJson<{ scheduled?: string[]; displaced?: number; error?: string }>(apiUrl("/api/tasks/auto-schedule"), {
+  return fetchJson<SchedulePreviewResponse & { mode?: string; message?: string; error?: string }>(apiUrl("/api/tasks/auto-schedule"), {
     method: "POST",
     body: JSON.stringify({ date }),
   });
@@ -250,6 +286,26 @@ export async function fetchInsightsActivity() {
     peakHourLabel: string;
     recommendedDeepWork: number[];
   }>(apiUrl("/api/insights/activity"));
+}
+
+export async function fetchCalendarProgress(start: string, end: string) {
+  return fetchJson<{ start: string; end: string; dailyCapacity: number; days: CalendarProgressDay[] }>(
+    apiUrl("/api/insights/calendar-progress", { start, end })
+  );
+}
+
+export async function postSchedulePreview(fromDate: string, horizonEnd: string) {
+  return fetchJson<SchedulePreviewResponse>(apiUrl("/api/schedule/preview"), {
+    method: "POST",
+    body: JSON.stringify({ fromDate, horizonEnd }),
+  });
+}
+
+export async function postScheduleApply(proposals: ScheduleProposal[]) {
+  return fetchJson<{ applied: number; skipped: number }>(apiUrl("/api/schedule/apply"), {
+    method: "POST",
+    body: JSON.stringify({ proposals }),
+  });
 }
 
 export async function postBrainDumpLines(
