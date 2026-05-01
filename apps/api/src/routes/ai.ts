@@ -59,6 +59,59 @@ function resolveChatModel(requested?: string): string {
   return fallback;
 }
 
+function looksLikePlanImportRequest(message: string): boolean {
+  return /\b(create|import|add)\b/i.test(message) &&
+    /\b(tasks?|subtasks?|sprint|deadline|stage|project)\b/i.test(message) &&
+    message.length > 500;
+}
+
+function hasPrioritySignal(message: string): boolean {
+  return /\b(priority|urgent|highest|high|normal|low|p0|p1|p2|p3)\b/i.test(message);
+}
+
+function hasEnergySignal(message: string): boolean {
+  return /\b(energy|deep[_ -]?work|shallow|admin|quick[_ -]?win|low energy|medium energy|high energy|focus|cognitive)\b/i.test(message);
+}
+
+function buildPlanMetadataHint(message: string): string {
+  if (!looksLikePlanImportRequest(message)) return "";
+
+  const missingPriority = !hasPrioritySignal(message);
+  const missingEnergy = !hasEnergySignal(message);
+  if (!missingPriority && !missingEnergy) return "";
+
+  const missing = [
+    missingPriority ? "priority" : null,
+    missingEnergy ? "energy/work-depth" : null,
+  ].filter(Boolean).join(" and ");
+
+  return `\n\nPLAN IMPORT METADATA HANDLING:
+- This looks like a structured plan import, and it is missing explicit ${missing}.
+- Do not fail, go silent, or return "(No response)" because metadata is missing.
+- If the missing metadata is not essential, proceed with visible assumptions and say they can be changed before approval.
+- Default missing priority to "normal", except phrases like "deadline", "highest", "critical", "production", or "urgent" should be treated as "urgent" or "high".
+- Infer missing energy/work type from wording: deployment, migrations, infrastructure, provisioning, workflow, server, database, and security are deep_work; documentation, handoff, governance, review, and runbooks are admin; small setup/checklist tasks are shallow; short contained fixes are quick_win.
+- Ask one concise follow-up only if the missing metadata would materially change the schedule or risk level.`;
+}
+
+function buildNoContentFallback(message: string): string {
+  if (looksLikePlanImportRequest(message)) {
+    const missing: string[] = [];
+    if (!hasPrioritySignal(message)) missing.push("priority");
+    if (!hasEnergySignal(message)) missing.push("energy/work-depth");
+    return [
+      "I could not safely create those tasks directly from chat yet, so I did not change your planner.",
+      "",
+      missing.length
+        ? `The plan is missing ${missing.join(" and ")}, so I would handle that with defaults in the draft: normal priority unless the plan says urgent/highest/production, and inferred energy from each task type.`
+        : "The plan has enough metadata to draft a task tree.",
+      "",
+      "I can still help with this plan as a reviewable import: paste it into Capture/Brain dump, or ask me to turn it into a task tree first. The app should create the sprint, tasks, subtasks, dates, estimates, priority, and energy only after you approve the draft.",
+    ].join("\n");
+  }
+  return "I could not produce a useful response for that request. Try rephrasing it, or paste the plan into Capture so it can be reviewed before anything is created.";
+}
+
 async function runPlannerToolLoop(
   client: OpenAI,
   model: string,
@@ -109,7 +162,7 @@ async function runPlannerToolLoop(
     ragBlock = formatRagContext(ragTasks);
   }
 
-  const fullPrompt = systemPrompt + ragBlock;
+  const fullPrompt = systemPrompt + buildPlanMetadataHint(userMessage) + ragBlock;
 
   const priorMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
     (opts?.history ?? []).map((m) => ({
@@ -187,7 +240,7 @@ async function runPlannerToolLoop(
       }
 
       if (!content.trim() && messages.some(m => m.role === "tool")) {
-        messages.push({ role: "user", content: "Briefly explain in 1 conversational sentence what changes you just made to the user's dev planner schedule." });
+        messages.push({ role: "user", content: "Briefly summarize what you found in 1-2 conversational sentences. Do not claim any changes were made." });
         const summaryStream = await client.chat.completions.create({
           model,
           messages,
@@ -203,7 +256,7 @@ async function runPlannerToolLoop(
         }
       }
       approxChars += content.length;
-      return { text: content || "(No response - completed without text)", approxChars };
+      return { text: content || buildNoContentFallback(userMessage), approxChars };
     } catch (e) {
       if (onChunk) await onChunk(`\n\n[Inner API Error in Tool Loop: ${String(e)}]`);
       return { text: `[Inner API Error in Tool Loop: ${String(e)}]`, approxChars };
@@ -239,7 +292,7 @@ export const aiRoutes = new Hono<AppEnv>()
         jobType: "parse_dump",
         model,
         system:
-          'Return JSON: {"items":[{"title":string,"energy":"deep_work"|"shallow"|"admin"|"quick_win","priority":"urgent"|"high"|"normal"|"low","estimated_minutes":number}]}. One item per line of input. Do not invent calendar dates; omit any date field unless explicitly present in input.',
+          'Return JSON: {"items":[{"title":string,"energy":"deep_work"|"shallow"|"admin"|"quick_win","priority":"urgent"|"high"|"normal"|"low","estimated_minutes":number}]}. One item per line of input. Do not invent calendar dates; omit any date field unless explicitly present in input. If priority is missing, use "normal" unless the text says urgent/highest/critical/production, then use "urgent" or "high". If energy is missing, infer it: deployment/migration/infrastructure/server/database/security = "deep_work"; documentation/governance/review/runbook/handoff = "admin"; small setup/checklist = "shallow"; short contained fix = "quick_win". Never fail solely because priority or energy is absent.',
         user: raw.slice(0, 12_000),
       });
       const data = JSON.parse(text) as { items?: unknown };
@@ -379,14 +432,19 @@ export const aiRoutes = new Hono<AppEnv>()
         }
 
         if (useTools) {
-          const { approxChars } = await runPlannerToolLoop(client, model, userId, body.message, {
+          let streamedChars = 0;
+          const { text, approxChars } = await runPlannerToolLoop(client, model, userId, body.message, {
             currentPhysicalEnergy: body.currentPhysicalEnergy,
             current_view: body.current_view,
             selected_task_ids: body.selected_task_ids,
             history: body.history,
           }, async (chunk) => {
+            streamedChars += chunk.length;
             await stream.write(chunk);
           });
+          if (streamedChars === 0) {
+            await stream.write(text);
+          }
           const latencyMs = Date.now() - started;
           await logAiCall({
             userId,
@@ -418,9 +476,11 @@ export const aiRoutes = new Hono<AppEnv>()
                 `You are DevPlanner RAG Agent — ADHD-friendly planning assistant. Today is ${todayLine}.` +
                 " A task is overdue if its dueDate is before today and status is not done." +
                 " Subtasks are primary units; a parent task is done only when all subtasks are done." +
+                " If a plan is missing priority or energy, either ask one concise follow-up if it materially affects scheduling, or proceed with clear defaults: normal priority and inferred energy from task wording." +
                 " Be concise and reply in under 6 sentences." +
                 energyLine +
-                viewLine,
+                viewLine +
+                buildPlanMetadataHint(body.message),
             },
             { role: "user", content: body.message.slice(0, 8000) },
           ],
@@ -432,6 +492,11 @@ export const aiRoutes = new Hono<AppEnv>()
             await stream.write(chunk);
             totalChars += chunk.length;
           }
+        }
+        if (totalChars === 0) {
+          const fallback = buildNoContentFallback(body.message);
+          await stream.write(fallback);
+          totalChars = fallback.length;
         }
         const latencyMs = Date.now() - started;
         await logAiCall({

@@ -16,6 +16,7 @@ Important Directives:
 - Schedule proactively according to Priority (P0 = Urgent, P1 = High).
 - If the user is overwhelmed, recommend deep work in their peak activity windows or push lower priority backlog.
 - NEVER invent tasks without user interaction, stick strictly to what they requested.
+- Missing metadata should not break planning. If a plan lacks priority or energy, either ask one concise follow-up when it materially changes the schedule, or proceed with explicit assumptions: normal priority by default and inferred energy from task wording.
 
 Contextual Hints:
 ${opts.energyHint}
