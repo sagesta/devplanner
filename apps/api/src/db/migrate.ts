@@ -13,6 +13,7 @@ import type pg from "pg";
  *   0002_tasks_deleted_at.sql
  *   0003_time_tracking_tags.sql
  *   0004_add_tasks_scheduled_date.sql
+ *   0005_add_scheduling_and_capacity_columns.sql
  *   + re-adds subtasks.scheduled_date / scheduled_time / estimated_minutes
  *     which 0001_add_subtasks_table.sql mistakenly dropped.
  */
@@ -131,6 +132,33 @@ export async function runMigrations(pool: pg.Pool): Promise<void> {
 
     await client.query(`
       CREATE INDEX IF NOT EXISTS subtasks_task_idx ON subtasks (task_id);
+    `);
+
+    // ── scheduling_state enum ─────────────────────────────────────
+    await client.query(`
+      DO $$ BEGIN
+        CREATE TYPE "public"."scheduling_state" AS ENUM (
+          'unscheduled', 'suggested', 'scheduled', 'overflow', 'needs_rescheduling'
+        );
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `);
+
+    // ── tasks: scheduling columns ─────────────────────────────────
+    await client.query(`
+      ALTER TABLE "tasks"
+        ADD COLUMN IF NOT EXISTS "scheduling_state"  "scheduling_state" NOT NULL DEFAULT 'unscheduled',
+        ADD COLUMN IF NOT EXISTS "reschedule_count"  INTEGER NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS "is_auto_scheduled" BOOLEAN NOT NULL DEFAULT false;
+    `);
+
+    // ── users: capacity & efficiency columns ──────────────────────
+    await client.query(`
+      ALTER TABLE "users"
+        ADD COLUMN IF NOT EXISTS "efficiency_factor"      REAL NOT NULL DEFAULT 0.8,
+        ADD COLUMN IF NOT EXISTS "buffer_factor"          REAL NOT NULL DEFAULT 0.2,
+        ADD COLUMN IF NOT EXISTS "daily_capacity_minutes" INTEGER NOT NULL DEFAULT 240,
+        ADD COLUMN IF NOT EXISTS "cognitive_load_baseline" REAL NOT NULL DEFAULT 50.0;
     `);
 
     await client.query("COMMIT");
