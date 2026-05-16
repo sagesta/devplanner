@@ -324,6 +324,24 @@ export async function postBrainDumpLines(
   });
 }
 
+// ─── AI brain-dump parser ─────────────────────────────────────────
+export type ParsedDumpItem = {
+  title: string;
+  energy: "deep_work" | "shallow" | "admin" | "quick_win";
+  priority: "urgent" | "high" | "normal" | "low";
+  estimated_minutes: number;
+};
+
+export async function parseDump(raw: string) {
+  return fetchJson<{ draft: ParsedDumpItem[]; model: string; warning?: string }>(
+    apiUrl("/api/ai/parse-dump"),
+    {
+      method: "POST",
+      body: JSON.stringify({ raw }),
+    }
+  );
+}
+
 export async function postBulkStatus(
   taskIds: string[],
   status: "backlog" | "todo" | "in_progress" | "done" | "cancelled" | "blocked"
