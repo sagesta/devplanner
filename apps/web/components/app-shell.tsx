@@ -36,7 +36,7 @@ const NAV = [
   ["/timeline", "Timeline", ChartGantt],
   ["/table", "Table", LayoutList],
   ["/sprints", "Sprints", CalendarCheck],
-  ["/insights", "Review", BarChart3],
+  ["/insights", "Insights", BarChart3],
   ["/settings", "Settings", Settings],
 ] as const;
 
@@ -57,6 +57,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("devplanner-theme", theme);
   }, [theme]);
+
+  // Per-page <title> for browser tabs / history — "Today — DevPlanner" etc.
+  useEffect(() => {
+    const match = NAV.find(([href]) => pathname === href || pathname.startsWith(`${href}/`));
+    const label = match?.[1];
+    document.title = label ? `${label} — DevPlanner` : "DevPlanner";
+  }, [pathname]);
 
   // stress-test-fix: Alt+T notifications tray
   useEffect(() => {
@@ -179,7 +186,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     setBrainOpen(false);
                     setNotificationsOpen(true);
                   }}
-                  title="Notifications (Alt+T)"
+                  aria-label="Notifications"
+                  aria-keyshortcuts="Alt+T"
+                  title="Notifications — press Alt+T"
                 >
                   <Bell size={12} />
                   Alerts

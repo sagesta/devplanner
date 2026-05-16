@@ -6,7 +6,7 @@ import { CalendarCheck, Plus, ArrowLeft, Pencil, Trash2, Check, X } from "lucide
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { createSprint, deleteSprint, fetchSprints, patchSprint, fetchTasks, patchTask, type SprintRow } from "@/lib/api";
+import { createSprint, createTask, deleteSprint, fetchAreas, fetchSprints, patchSprint, fetchTasks, patchTask, type SprintRow } from "@/lib/api";
 import { Skeleton } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +28,7 @@ export default function SprintsPage() {
   const [goal, setGoal] = useState("");
   const [startErr, setStartErr] = useState(false);
   const [endErr, setEndErr] = useState(false);
+  const [rangeErr, setRangeErr] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -160,17 +161,22 @@ export default function SprintsPage() {
               <input
                 ref={endDateRef}
                 type="date"
+                min={startDate || undefined}
                 className={cn(
                   "mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm",
-                  endErr ? "border-red-500/70" : "border-white/10"
+                  endErr || rangeErr ? "border-red-500/70" : "border-white/10"
                 )}
                 value={endDate}
                 onChange={(e) => {
                   setEndDate(e.target.value);
                   setEndErr(false);
+                  setRangeErr(false);
                 }}
               />
               {endErr && <p className="mt-1 text-xs text-red-400">This field is required.</p>}
+              {!endErr && rangeErr && (
+                <p className="mt-1 text-xs text-red-400">End date must be on or after start date.</p>
+              )}
             </div>
           </div>
           <div className="mt-4 flex justify-end gap-2">
@@ -190,11 +196,17 @@ export default function SprintsPage() {
                 const missEnd = !endDate;
                 setStartErr(missStart);
                 setEndErr(missEnd);
+                setRangeErr(false);
                 if (missStart) {
                   startDateRef.current?.focus();
                   return;
                 }
                 if (missEnd) {
+                  endDateRef.current?.focus();
+                  return;
+                }
+                if (endDate < startDate) {
+                  setRangeErr(true);
                   endDateRef.current?.focus();
                   return;
                 }
@@ -390,11 +402,31 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack:
     queryKey: ["tasks", userId],
     queryFn: () => fetchTasks(),
   });
+  const areasQ = useQuery({
+    queryKey: ["areas", userId],
+    queryFn: () => fetchAreas(),
+  });
+  const [newTitle, setNewTitle] = useState("");
 
   const patchMut = useMutation({
     mutationFn: ({ taskId, sprintId }: { taskId: string; sprintId: string | null }) =>
       patchTask(taskId, { sprintId }),
     onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["sprints", userId] });
+      void qc.invalidateQueries({ queryKey: ["backlog", userId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const createMut = useMutation({
+    mutationFn: (title: string) => {
+      const areaId = areasQ.data?.[0]?.id;
+      if (!areaId) throw new Error("Create an Area in Settings first.");
+      return createTask({ areaId, title, sprintId: sprint.id, status: "todo" });
+    },
+    onSuccess: () => {
+      setNewTitle("");
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
       void qc.invalidateQueries({ queryKey: ["sprints", userId] });
       void qc.invalidateQueries({ queryKey: ["backlog", userId] });
@@ -452,6 +484,34 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack:
             <h2 className="text-xs font-semibold uppercase tracking-wide text-primary">Sprint Tasks</h2>
             <span className="text-[10px] text-muted">{sprintTasks.length}</span>
           </div>
+          <form
+            className="px-3 pt-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const trimmed = newTitle.trim();
+              if (!trimmed) return;
+              createMut.mutate(trimmed);
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="Add task to this sprint…"
+                className="flex-1 rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-primary focus:outline-none"
+                disabled={createMut.isPending}
+              />
+              <button
+                type="submit"
+                disabled={createMut.isPending || !newTitle.trim()}
+                className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40 transition-colors"
+              >
+                <Plus size={14} />
+                {createMut.isPending ? "Adding…" : "Add"}
+              </button>
+            </div>
+          </form>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {sprintTasks.map(t => (
               <div key={t.id} className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-white/5 bg-background text-sm card-hover">

@@ -275,8 +275,8 @@ export default function SettingsPage() {
           <section className="rounded-xl border border-white/10 bg-surface p-5">
             <h2 className="text-sm font-semibold text-foreground">General</h2>
             <p className="mt-2 text-sm text-muted leading-relaxed">
-              Daily budgets (<strong>4h work / 2h personal</strong>) are enforced in AI prompts when
-              OPENAI_API_KEY is set. User profile fields live on the <code className="rounded bg-background px-1 text-xs">users</code> row (seeded dev user).
+              Your daily capacity defaults to <strong>4h work / 2h personal</strong>. The AI
+              assistant uses these limits when suggesting a schedule.
             </p>
             <p className="mt-3 text-sm text-muted leading-relaxed">
               <strong className="text-foreground">Theme:</strong> use the Sun / Moon control in the sidebar (bottom) to switch light and dark mode.
@@ -286,17 +286,7 @@ export default function SettingsPage() {
                 Signed in as{" "}
                 <span className="text-foreground">{session?.user?.email ?? "—"}</span>
               </p>
-              {userId && (
-                <p>
-                  Account ID: <code className="text-foreground">{userId}</code>
-                </p>
-              )}
             </div>
-            <p className="mt-4 text-xs text-muted leading-relaxed border-t border-white/10 pt-4">
-              <strong className="text-foreground">API 401</strong> on pages like Now/Board usually means the browser is not sending the session cookie to your API host. If the UI and API use different subdomains (e.g.{" "}
-              <code className="rounded bg-background px-1">planner.*</code> and <code className="rounded bg-background px-1">api.*</code>), set{" "}
-              <code className="rounded bg-background px-1">NEXTAUTH_COOKIE_DOMAIN=.yourdomain.com</code> in server <code className="rounded bg-background px-1">.env</code>, rebuild/restart the <strong>web</strong> container, then sign out and sign in again. See README → &quot;401 Unauthorized&quot;.
-            </p>
           </section>
         )}
 

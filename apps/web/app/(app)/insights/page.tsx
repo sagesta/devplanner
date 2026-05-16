@@ -254,7 +254,7 @@ export default function InsightsPage() {
     <div className="mx-auto flex max-w-6xl flex-col gap-6 pb-12">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Review</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Insights</h1>
           <p className="mt-1 text-sm text-muted">Progress rings, learning signals, and schedule cleanup.</p>
         </div>
         <button

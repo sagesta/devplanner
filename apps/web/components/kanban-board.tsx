@@ -80,6 +80,7 @@ export function KanbanBoard() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [rescueDismissed, setRescueDismissed] = useState(false);
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
+  const [sprintFormStart, setSprintFormStart] = useState<string>("");
   const { tags: allTags } = useTags();
   const todayYmd = useMemo(() => toYMD(new Date()), []);
 
@@ -265,6 +266,10 @@ export function KanbanBoard() {
                toast.error("Please fill in all sprint fields.");
                return;
             }
+            if (endDate < startDate) {
+               toast.error("End date must be on or after start date.");
+               return;
+            }
             createSprintM.mutate({ name, startDate, endDate, status: "active" });
           }}
         >
@@ -278,20 +283,22 @@ export function KanbanBoard() {
           <div className="flex gap-3 w-full">
              <div className="flex-1">
                <label className="block text-left text-[10px] uppercase font-semibold text-muted mb-1 px-1">Start date</label>
-               <input 
-                 type="date" 
-                 name="startDate" 
-                 className="w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none" 
+               <input
+                 type="date"
+                 name="startDate"
+                 className="w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
                  required
                  defaultValue={todayYmd}
+                 onChange={(e) => setSprintFormStart(e.target.value)}
                />
              </div>
              <div className="flex-1">
                <label className="block text-left text-[10px] uppercase font-semibold text-muted mb-1 px-1">End date</label>
-               <input 
-                 type="date" 
-                 name="endDate" 
-                 className="w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none" 
+               <input
+                 type="date"
+                 name="endDate"
+                 min={sprintFormStart || todayYmd}
+                 className="w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
                  required
                  defaultValue={toYMD(new Date(Date.now() + 14 * 86400000))}
                />
