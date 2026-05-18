@@ -161,6 +161,19 @@ export async function runMigrations(pool: pg.Pool): Promise<void> {
         ADD COLUMN IF NOT EXISTS "cognitive_load_baseline" REAL NOT NULL DEFAULT 50.0;
     `);
 
+    // ── backfill: tasks in a sprint should not be "backlog" ───────
+    // The Plan board only shows todo/in_progress/done, so any task that's
+    // been moved into a sprint but kept "backlog" status disappears from
+    // the board. This backfills the legacy stuck rows; new writes are
+    // protected by the auto-promotion logic in routes/tasks.ts PATCH.
+    await client.query(`
+      UPDATE "tasks"
+      SET "status" = 'todo'
+      WHERE "status" = 'backlog'
+        AND "sprint_id" IS NOT NULL
+        AND "deleted_at" IS NULL;
+    `);
+
     await client.query("COMMIT");
     console.log("[migrate] Schema up-to-date ✓");
   } catch (err) {

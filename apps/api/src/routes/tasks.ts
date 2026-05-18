@@ -558,6 +558,26 @@ export const taskRoutes = new Hono<AppEnv>()
       }
     }
     const userId = c.get("userId");
+
+    // Auto-promote backlog → todo when a task is moved into a sprint, so it
+    // appears on the Plan board (which only renders todo/in_progress/done).
+    // Only fires when the caller didn't explicitly set a status — otherwise
+    // an explicit status wins.
+    if (
+      v.sprintId !== undefined &&
+      v.sprintId !== null &&
+      v.status === undefined
+    ) {
+      const [existing] = await db
+        .select({ status: tasks.status })
+        .from(tasks)
+        .where(and(eq(tasks.id, id), eq(tasks.userId, userId), taskActive))
+        .limit(1);
+      if (existing?.status === "backlog") {
+        updates.status = "todo";
+      }
+    }
+
     const [row] = await db
       .update(tasks)
       .set(updates)
