@@ -342,6 +342,36 @@ export async function parseDump(raw: string) {
   );
 }
 
+/**
+ * Send a recorded audio blob to Whisper for transcription.
+ * Returns the recognized text. We deliberately don't reuse fetchJson because
+ * the body is multipart/form-data, not JSON.
+ */
+export async function transcribeAudio(audio: Blob, opts?: { language?: string }) {
+  const form = new FormData();
+  // Whisper sniffs format from the filename extension — give it a hint.
+  const ext = audio.type.includes("ogg")
+    ? "ogg"
+    : audio.type.includes("mp4")
+      ? "m4a"
+      : audio.type.includes("wav")
+        ? "wav"
+        : "webm";
+  form.append("audio", audio, `recording.${ext}`);
+  if (opts?.language) form.append("language", opts.language);
+  const res = await fetch(apiUrl("/api/ai/transcribe"), {
+    method: "POST",
+    credentials: "include",
+    body: form,
+    cache: "no-store" as RequestCache,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "Unknown error");
+    throw new Error(`Transcribe ${res.status}: ${text}`);
+  }
+  return res.json() as Promise<{ text: string; model: string }>;
+}
+
 export async function postBulkStatus(
   taskIds: string[],
   status: "backlog" | "todo" | "in_progress" | "done" | "cancelled" | "blocked"

@@ -363,6 +363,70 @@ export const aiRoutes = new Hono<AppEnv>()
       allowedChatModels: [...ALLOWED_CHAT_MODELS],
     });
   })
+  .post("/transcribe", async (c) => {
+    const key = process.env.OPENAI_API_KEY?.trim();
+    if (!key) {
+      return c.json({ error: "OPENAI_API_KEY not set" }, 503);
+    }
+    let form: FormData;
+    try {
+      form = await c.req.formData();
+    } catch {
+      return c.json({ error: "expected multipart/form-data with an 'audio' file" }, 400);
+    }
+    const audio = form.get("audio");
+    if (!(audio instanceof File)) {
+      return c.json({ error: "missing 'audio' file field" }, 400);
+    }
+    // Hard cap so a stuck mic / malicious upload can't bill us forever.
+    // 25MB matches OpenAI's own Whisper limit.
+    const MAX_BYTES = 25 * 1024 * 1024;
+    if (audio.size > MAX_BYTES) {
+      return c.json({ error: `audio too large (${audio.size} bytes, max ${MAX_BYTES})` }, 413);
+    }
+    if (audio.size === 0) {
+      return c.json({ error: "empty audio file" }, 400);
+    }
+    const userId = c.get("userId");
+    const model = process.env.OPENAI_TRANSCRIBE_MODEL ?? "whisper-1";
+    const language = (form.get("language") as string | null) ?? undefined;
+    const client = new OpenAI({ apiKey: key });
+    const started = Date.now();
+    try {
+      const resp = await client.audio.transcriptions.create({
+        file: audio,
+        model,
+        ...(language ? { language } : {}),
+        // Plain text response — easiest to consume from the client.
+        response_format: "text",
+        stream: false,
+      });
+      // With response_format: "text", the SDK returns a plain string. Older
+      // versions returned { text: string }, so accept both.
+      const text =
+        typeof resp === "string"
+          ? resp
+          : ((resp as { text?: string } | null)?.text ?? "");
+      const latencyMs = Date.now() - started;
+      // Whisper bills per-second of audio rather than tokens, so leave token
+      // counts null and let the duration sit in latencyMs for now.
+      await logAiCall({
+        userId,
+        jobType: "transcribe",
+        model,
+        provider: "openai",
+        inputTokens: null,
+        outputTokens: null,
+        costUsdEstimate: null,
+        latencyMs,
+      });
+      return c.json({ text: text.trim(), model });
+    } catch (e) {
+      const status = (e as { status?: number })?.status;
+      const message = e instanceof Error ? e.message : String(e);
+      return c.json({ error: `Transcription failed: ${message}` }, status === 429 ? 429 : 502);
+    }
+  })
   .post("/backfill-embeddings", async (c) => {
     const userId = c.get("userId");
     const key = process.env.OPENAI_API_KEY?.trim();

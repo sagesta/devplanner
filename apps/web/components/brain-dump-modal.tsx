@@ -1,7 +1,18 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, ChevronUp, Lightbulb, Sparkles, Trash2, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  Lightbulb,
+  Loader2,
+  Mic,
+  Sparkles,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -9,6 +20,7 @@ import {
   fetchAreas,
   parseDump,
   postBrainDumpLines,
+  transcribeAudio,
   type ParsedDumpItem,
 } from "@/lib/api";
 import { useAppUserId } from "@/hooks/use-app-user-id";
@@ -63,6 +75,115 @@ export function BrainDumpModal({
   const [view, setView] = useState<"raw" | "preview">("raw");
   const [parsedItems, setParsedItems] = useState<ParsedDumpItem[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // ─── Speech-to-text (Whisper) ───────────────────────────────────
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [recordingSec, setRecordingSec] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const canRecord =
+    typeof window !== "undefined" &&
+    typeof window.MediaRecorder !== "undefined" &&
+    !!navigator.mediaDevices?.getUserMedia;
+
+  async function startRecording() {
+    if (!canRecord) {
+      toast.error("Voice capture isn't supported in this browser.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      // Pick the best supported MIME. Chromium → webm/opus, Safari → mp4.
+      const candidates = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+        "audio/ogg;codecs=opus",
+      ];
+      const mimeType =
+        candidates.find((c) => MediaRecorder.isTypeSupported(c)) ?? "";
+      const recorder = new MediaRecorder(
+        stream,
+        mimeType ? { mimeType } : undefined
+      );
+      recorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) audioChunksRef.current.push(ev.data);
+      };
+      recorder.onstop = async () => {
+        // Always release the mic, even if transcription fails.
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || mimeType || "audio/webm",
+        });
+        audioChunksRef.current = [];
+        if (blob.size === 0) {
+          toast.error("No audio captured — try again and speak after the mic light turns on.");
+          return;
+        }
+        setIsTranscribing(true);
+        try {
+          const { text: transcript } = await transcribeAudio(blob);
+          const clean = transcript.trim();
+          if (!clean) {
+            toast.error("Whisper returned an empty transcript.");
+            return;
+          }
+          // Append on a new line if there's already content, otherwise replace.
+          setText((prev) => (prev.trim() ? `${prev.replace(/\s+$/, "")}\n${clean}` : clean));
+          toast.success("Transcribed — review the text, then save or AI-organize.");
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : String(e));
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      setRecordingSec(0);
+      recordingTimerRef.current = setInterval(
+        () => setRecordingSec((s) => s + 1),
+        1000
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(
+        msg.toLowerCase().includes("permission")
+          ? "Microphone permission denied. Allow it in your browser, then try again."
+          : `Couldn't start recording: ${msg}`
+      );
+    }
+  }
+
+  function stopRecording() {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+    }
+    mediaRecorderRef.current = null;
+    setIsRecording(false);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }
+
+  // Stop recording if the modal closes mid-capture or unmounts.
+  useEffect(() => {
+    if (!open && isRecording) stopRecording();
+  }, [open, isRecording]);
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    };
+  }, []);
 
   const RECURRENCE_PRESETS: { label: string; value: string }[] = [
     { label: "No repeat", value: "" },
@@ -308,9 +429,47 @@ export function BrainDumpModal({
                 )}
               </select>
             )}
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-[11px] text-muted">
+                Type or dictate your list — one thought per line.
+              </span>
+              {canRecord && (
+                <button
+                  type="button"
+                  onClick={() => (isRecording ? stopRecording() : startRecording())}
+                  disabled={isTranscribing}
+                  className={
+                    isRecording
+                      ? "inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-500/15 px-2.5 py-1 text-[11px] font-medium text-red-300 hover:bg-red-500/25 transition-colors"
+                      : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-background px-2.5 py-1 text-[11px] text-muted hover:text-foreground hover:bg-white/5 transition-colors disabled:opacity-40"
+                  }
+                  title={isRecording ? "Stop recording" : "Record voice memo"}
+                  aria-label={isRecording ? "Stop recording" : "Record voice memo"}
+                  aria-pressed={isRecording}
+                >
+                  {isTranscribing ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      Transcribing…
+                    </>
+                  ) : isRecording ? (
+                    <>
+                      <Square size={11} className="fill-red-300 text-red-300 animate-pulse" />
+                      Stop · {Math.floor(recordingSec / 60)}:
+                      {String(recordingSec % 60).padStart(2, "0")}
+                    </>
+                  ) : (
+                    <>
+                      <Mic size={12} />
+                      Record
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
             <textarea
               ref={textareaRef}
-              className="mt-3 min-h-[200px] w-full rounded-lg border border-white/10 bg-background p-3 text-sm text-foreground placeholder:text-muted/50 resize-none"
+              className="mt-2 min-h-[200px] w-full rounded-lg border border-white/10 bg-background p-3 text-sm text-foreground placeholder:text-muted/50 resize-none"
               placeholder="- Fix login bug&#10;- Call mum&#10;- Write blog post"
               value={text}
               onChange={(e) => setText(e.target.value)}
