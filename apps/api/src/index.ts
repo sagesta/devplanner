@@ -22,6 +22,7 @@ import { backlogRoutes } from "./routes/backlog.js";
 import { subtasksRoutes } from "./routes/subtasks.js";
 import { timeLogRoutes } from "./routes/time-logs.js";
 import { insightsRoutes } from "./routes/insights.js";
+import { priorityRoutes } from "./routes/priorities.js";
 import { reviewRoutes } from "./routes/reviews.js";
 import { scheduleRoutes } from "./routes/schedule.js";
 import { createRedisConnection } from "./queues/connection.js";
@@ -195,6 +196,7 @@ app.route("/api/backlog", backlogRoutes);
 app.route("/api/insights", insightsRoutes);
 app.route("/api/reviews", reviewRoutes);
 app.route("/api/schedule", scheduleRoutes);
+app.route("/api/priorities", priorityRoutes);
 
 // ─── Startup ──────────────────────────────────────────────────────
 const port = Number(process.env.PORT) || 3001;

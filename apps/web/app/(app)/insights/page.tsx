@@ -13,6 +13,7 @@ import {
   type CalendarProgressDay,
   type ScheduleProposal,
 } from "@/lib/api";
+import { PriorityAnchorsCard } from "@/components/priority-anchors-card";
 import { SkeletonListItem } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -255,7 +256,7 @@ export default function InsightsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Insights</h1>
-          <p className="mt-1 text-sm text-muted">Progress rings, learning signals, and schedule cleanup.</p>
+          <p className="mt-1 text-sm text-muted">North star anchors, progress rings, and schedule cleanup.</p>
         </div>
         <button
           type="button"
@@ -267,6 +268,8 @@ export default function InsightsPage() {
           {previewMut.isPending ? "Preparing..." : "Preview rollover"}
         </button>
       </div>
+
+      <PriorityAnchorsCard variant="full" />
 
       <section className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-white/10 bg-surface p-4">

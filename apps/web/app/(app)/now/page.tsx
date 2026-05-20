@@ -21,6 +21,7 @@ import {
 import { LS_PHYSICAL_ENERGY, type PhysicalEnergyLevel } from "@/lib/planner-prefs";
 import { SkeletonListItem } from "@/lib/skeleton";
 import { cn, displayPhysicalEnergy, isTaskOverdue } from "@/lib/utils";
+import { PriorityAnchorsCard } from "@/components/priority-anchors-card";
 import { TagChip } from "@/components/TagChip";
 import { TimerButton } from "@/components/TimerButton";
 import { useActiveTimer, formatElapsed } from "@/hooks/use-active-timer";
@@ -244,6 +245,8 @@ export default function NowPage() {
 
   return (
     <div className="flex flex-col gap-8 pb-12">
+      {/* ── Priority anchors ──────────────────────────────────────── */}
+      <PriorityAnchorsCard variant="week" />
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>

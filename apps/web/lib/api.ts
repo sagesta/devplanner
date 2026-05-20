@@ -325,11 +325,14 @@ export async function postBrainDumpLines(
 }
 
 // ─── AI brain-dump parser ─────────────────────────────────────────
+export type DumpBucket = "today" | "this_week" | "backlog" | "noise";
 export type ParsedDumpItem = {
   title: string;
   energy: "deep_work" | "shallow" | "admin" | "quick_win";
   priority: "urgent" | "high" | "normal" | "low";
   estimated_minutes: number;
+  /** Triage hint from the model: where this item should live. */
+  bucket: DumpBucket;
 };
 
 export async function parseDump(raw: string) {
@@ -340,6 +343,58 @@ export async function parseDump(raw: string) {
       body: JSON.stringify({ raw }),
     }
   );
+}
+
+// ─── Priority anchors ─────────────────────────────────────────────
+export type PriorityCategory = "work" | "personal" | "growth";
+export type PriorityPeriod = "week" | "month";
+
+export type PriorityRow = {
+  id: string;
+  userId: string;
+  periodType: PriorityPeriod;
+  periodStart: string; // YYYY-MM-DD
+  category: PriorityCategory;
+  statement: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PrioritiesResponse = {
+  period: { week: string; month: string };
+  week_anchors: PriorityRow[];
+  month_anchors: PriorityRow[];
+};
+
+export async function fetchPriorities() {
+  return fetchJson<PrioritiesResponse>(apiUrl("/api/priorities"));
+}
+
+export async function savePriorities(
+  anchors: Array<{
+    periodType: PriorityPeriod;
+    periodStart: string;
+    category: PriorityCategory;
+    statement: string;
+  }>
+) {
+  return fetchJson<{ ok: true; upserted: number; deleted: number }>(
+    apiUrl("/api/priorities"),
+    {
+      method: "PUT",
+      body: JSON.stringify({ anchors }),
+    }
+  );
+}
+
+export async function suggestPriorities(periodType: PriorityPeriod, periodStart: string) {
+  return fetchJson<{
+    drafts: Array<{ category: PriorityCategory; statement: string }>;
+    model: string;
+  }>(apiUrl("/api/priorities/suggest"), {
+    method: "POST",
+    body: JSON.stringify({ periodType, periodStart }),
+  });
 }
 
 /**

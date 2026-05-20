@@ -7,6 +7,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
 import { createSprint, createTask, deleteSprint, fetchAreas, fetchSprints, patchSprint, fetchTasks, patchTask, type SprintRow } from "@/lib/api";
+import { PriorityAnchorsCard } from "@/components/priority-anchors-card";
 import { Skeleton } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -100,6 +101,7 @@ export default function SprintsPage() {
 
   return (
     <div>
+      <PriorityAnchorsCard variant="week" className="mb-6" />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl text-foreground">Sprints</h1>

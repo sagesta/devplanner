@@ -174,6 +174,40 @@ export async function runMigrations(pool: pg.Pool): Promise<void> {
         AND "deleted_at" IS NULL;
     `);
 
+    // ── priorities table (weekly/monthly "compass" anchors) ───────
+    await client.query(`
+      DO $$ BEGIN
+        CREATE TYPE "public"."priority_period" AS ENUM ('week', 'month');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `);
+    await client.query(`
+      DO $$ BEGIN
+        CREATE TYPE "public"."priority_category" AS ENUM ('work', 'personal', 'growth');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS priorities (
+        id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        period_type  priority_period NOT NULL,
+        period_start DATE NOT NULL,
+        category     priority_category NOT NULL,
+        statement    TEXT NOT NULL,
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS priorities_unique_slot
+        ON priorities (user_id, period_type, period_start, category);
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS priorities_user_period_idx
+        ON priorities (user_id, period_type, period_start);
+    `);
+
     await client.query("COMMIT");
     console.log("[migrate] Schema up-to-date ✓");
   } catch (err) {

@@ -54,6 +54,9 @@ export const focusSourceEnum = pgEnum("focus_source", ["manual", "focus_import"]
 
 export const caldavActionEnum = pgEnum("caldav_action", ["create", "update", "delete"]);
 
+export const priorityPeriodEnum = pgEnum("priority_period", ["week", "month"]);
+export const priorityCategoryEnum = pgEnum("priority_category", ["work", "personal", "growth"]);
+
 export const schedulingStateEnum = pgEnum("scheduling_state", [
   "unscheduled",
   "suggested",
@@ -277,6 +280,31 @@ export const googleCalendarLinks = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   }
+);
+
+/** Weekly / monthly "compass statements" — anchors that all tasks should ladder up to. */
+export const priorities = pgTable(
+  "priorities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** "week" or "month". */
+    periodType: priorityPeriodEnum("period_type").notNull(),
+    /** Monday of the week, or 1st of the month — stored as DATE for cheap range queries. */
+    periodStart: date("period_start").notNull(),
+    /** Fixed slot: Work / Personal / Growth. */
+    category: priorityCategoryEnum("category").notNull(),
+    /** The compass sentence itself. Free-form, not a task title. */
+    statement: text("statement").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("priorities_unique_slot").on(t.userId, t.periodType, t.periodStart, t.category),
+    index("priorities_user_period_idx").on(t.userId, t.periodType, t.periodStart),
+  ]
 );
 
 export const caldavSyncLog = pgTable(

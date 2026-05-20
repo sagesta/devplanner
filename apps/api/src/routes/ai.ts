@@ -292,7 +292,7 @@ export const aiRoutes = new Hono<AppEnv>()
         jobType: "parse_dump",
         model,
         system:
-          'Return JSON: {"items":[{"title":string,"energy":"deep_work"|"shallow"|"admin"|"quick_win","priority":"urgent"|"high"|"normal"|"low","estimated_minutes":number}]}. One item per line of input. Do not invent calendar dates; omit any date field unless explicitly present in input. If priority is missing, use "normal" unless the text says urgent/highest/critical/production, then use "urgent" or "high". If energy is missing, infer it: deployment/migration/infrastructure/server/database/security = "deep_work"; documentation/governance/review/runbook/handoff = "admin"; small setup/checklist = "shallow"; short contained fix = "quick_win". Never fail solely because priority or energy is absent.',
+          'Return JSON: {"items":[{"title":string,"energy":"deep_work"|"shallow"|"admin"|"quick_win","priority":"urgent"|"high"|"normal"|"low","estimated_minutes":number,"bucket":"today"|"this_week"|"backlog"|"noise"}]}. One item per line of input. Do not invent calendar dates; omit any date field unless explicitly present in input. If priority is missing, use "normal" unless the text says urgent/highest/critical/production, then use "urgent" or "high". If energy is missing, infer it: deployment/migration/infrastructure/server/database/security = "deep_work"; documentation/governance/review/runbook/handoff = "admin"; small setup/checklist = "shallow"; short contained fix = "quick_win". Always assign a bucket: "today" only for items the user wrote with explicit today/now urgency or that take <30 min and are urgent; "this_week" for items with a clear short-term deadline or follow-up obligation; "backlog" by default for everything else; "noise" only for items that are vague venting, duplicates, or already-handled chores. Never fail solely because priority, energy, or bucket is absent.',
         user: raw.slice(0, 12_000),
       });
       const data = JSON.parse(text) as { items?: unknown };
@@ -309,6 +309,7 @@ export const aiRoutes = new Hono<AppEnv>()
           energy: "shallow",
           priority: "normal",
           estimated_minutes: 30,
+          bucket: "backlog",
         })),
         model: "heuristic",
         warning: String(e),

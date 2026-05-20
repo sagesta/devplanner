@@ -21,6 +21,7 @@ import {
   parseDump,
   postBrainDumpLines,
   transcribeAudio,
+  type DumpBucket,
   type ParsedDumpItem,
 } from "@/lib/api";
 import { useAppUserId } from "@/hooks/use-app-user-id";
@@ -30,6 +31,28 @@ type Priority = ParsedDumpItem["priority"];
 
 const ENERGY_CYCLE: Energy[] = ["deep_work", "shallow", "admin", "quick_win"];
 const PRIORITY_CYCLE: Priority[] = ["urgent", "high", "normal", "low"];
+const BUCKET_CYCLE: DumpBucket[] = ["today", "this_week", "backlog", "noise"];
+
+const BUCKET_LABEL: Record<DumpBucket, string> = {
+  today: "Do today",
+  this_week: "This week",
+  backlog: "Backlog",
+  noise: "Noise",
+};
+
+const BUCKET_DESCRIPTION: Record<DumpBucket, string> = {
+  today: "Schedules for today and lands in the Plan board's Todo column.",
+  this_week: "Schedules for the end of this week.",
+  backlog: "Goes into the backlog with no schedule.",
+  noise: "Skipped — won't be saved.",
+};
+
+const BUCKET_STYLE: Record<DumpBucket, string> = {
+  today: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  this_week: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  backlog: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
+  noise: "bg-red-500/10 text-red-300/80 border-red-500/30",
+};
 
 const ENERGY_LABEL: Record<Energy, string> = {
   deep_work: "Deep",
@@ -288,35 +311,79 @@ export function BrainDumpModal({
       } else {
         toast.success(`AI organized ${data.draft.length} task(s) — review and confirm`);
       }
-      setParsedItems(data.draft);
+      // Some models occasionally omit the bucket field; default to "backlog"
+      // so the user can always pick a destination explicitly.
+      const normalised = data.draft.map((item) => ({
+        ...item,
+        bucket: (BUCKET_CYCLE as readonly string[]).includes(item.bucket as string)
+          ? item.bucket
+          : ("backlog" as DumpBucket),
+      }));
+      setParsedItems(normalised);
       setView("preview");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /** Bucket → defaults the API expects. "noise" items are skipped entirely. */
+  function bucketDefaults(bucket: DumpBucket): {
+    status: "backlog" | "todo";
+    scheduledDate: string | null;
+  } | null {
+    if (bucket === "noise") return null;
+    const today = new Date();
+    const toYmd = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (bucket === "today") {
+      return { status: "todo", scheduledDate: toYmd(today) };
+    }
+    if (bucket === "this_week") {
+      // End of this calendar week (Sunday). If today is already Sunday, target today.
+      const day = today.getDay(); // 0..6 (Sun=0)
+      const daysToSunday = day === 0 ? 0 : 7 - day;
+      const sunday = new Date(today);
+      sunday.setDate(today.getDate() + daysToSunday);
+      return { status: "todo", scheduledDate: toYmd(sunday) };
+    }
+    // backlog
+    return { status: "backlog", scheduledDate: null };
+  }
+
   const createOrganizedMut = useMutation({
     mutationFn: async () => {
-      const schedule = validatedSchedule();
+      // The schedule block on the modal still wins when the user explicitly
+      // sets it — it represents a deliberate override of the AI's bucket call.
+      const explicitSchedule = validatedSchedule();
+      const acceptable = parsedItems.filter((it) => it.bucket !== "noise");
+      if (!acceptable.length) {
+        throw new Error("All items are tagged 'noise' — change at least one bucket to save.");
+      }
       const results = await Promise.all(
-        parsedItems.map((item) =>
-          createTask({
+        acceptable.map((item) => {
+          const defaults = bucketDefaults(item.bucket)!; // never null after filter
+          const status = explicitSchedule?.scheduledDate ? "todo" : defaults.status;
+          const scheduledDate =
+            explicitSchedule?.scheduledDate ?? defaults.scheduledDate;
+          return createTask({
             areaId,
             title: item.title.slice(0, 500),
-            status: "backlog",
+            status,
             priority: item.priority,
             energyLevel: item.energy,
             estimatedMinutes: item.estimated_minutes,
-            recurrenceRule: schedule?.recurrenceRule ?? null,
-            scheduledDate: schedule?.scheduledDate ?? null,
-            scheduledStartTime: schedule?.scheduledStartTime ?? null,
-            scheduledEndTime: schedule?.scheduledEndTime ?? null,
-          })
-        )
+            recurrenceRule: explicitSchedule?.recurrenceRule ?? null,
+            scheduledDate,
+            scheduledStartTime: explicitSchedule?.scheduledStartTime ?? null,
+            scheduledEndTime: explicitSchedule?.scheduledEndTime ?? null,
+          });
+        })
       );
-      return results.length;
+      const skipped = parsedItems.length - acceptable.length;
+      return { created: results.length, skipped };
     },
-    onSuccess: (count) => {
-      toast.success(`Created ${count} organized task(s)`);
+    onSuccess: ({ created, skipped }) => {
+      const skipMsg = skipped > 0 ? ` (skipped ${skipped} noise)` : "";
+      toast.success(`Created ${created} organized task(s)${skipMsg}`);
       invalidateTaskQueries();
       resetAndClose();
     },
@@ -608,6 +675,16 @@ export function BrainDumpModal({
                       </button>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                      <button
+                        type="button"
+                        className={`rounded-full border px-2 py-0.5 font-medium transition-colors ${BUCKET_STYLE[item.bucket]}`}
+                        onClick={() =>
+                          updateItem(idx, { bucket: cycle(BUCKET_CYCLE, item.bucket) })
+                        }
+                        title={BUCKET_DESCRIPTION[item.bucket]}
+                      >
+                        {BUCKET_LABEL[item.bucket]}
+                      </button>
                       <button
                         type="button"
                         className={`rounded-full border px-2 py-0.5 transition-colors ${ENERGY_STYLE[item.energy]}`}
