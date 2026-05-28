@@ -96,11 +96,29 @@ export function KanbanBoard() {
     enabled: Boolean(userId),
   });
 
-  const activeSprint = useMemo(() => {
-    if (!sprintsQ.data?.sprints) return null;
-    // Removed strict date limits so any 'active' sprint displays its tasks
-    return sprintsQ.data.sprints.find(s => s.status === 'active');
+  const activeSprints = useMemo(() => {
+    if (!sprintsQ.data?.sprints) return [];
+    return sprintsQ.data.sprints.filter(s => s.status === 'active');
   }, [sprintsQ.data?.sprints]);
+
+  const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
+
+  const activeSprint = useMemo(() => {
+    if (activeSprints.length === 0) return null;
+    if (selectedSprintId) {
+      const found = activeSprints.find(s => s.id === selectedSprintId);
+      if (found) return found;
+    }
+    return activeSprints[0];
+  }, [activeSprints, selectedSprintId]);
+
+  useEffect(() => {
+    if (activeSprints.length > 0 && (!selectedSprintId || !activeSprints.find(s => s.id === selectedSprintId))) {
+      setSelectedSprintId(activeSprints[0].id);
+    } else if (activeSprints.length === 0 && selectedSprintId) {
+      setSelectedSprintId(null);
+    }
+  }, [activeSprints, selectedSprintId]);
 
   const q = useQuery({
     queryKey: ["sprintTasks", activeSprint?.id],
@@ -348,6 +366,30 @@ export function KanbanBoard() {
           </div>
         </div>
       )}
+      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-white/10 bg-surface/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Active sprint board</p>
+          <h1 className="mt-1 truncate font-display text-xl text-foreground">{activeSprint.name}</h1>
+          <p className="mt-0.5 text-xs text-muted">{activeSprint.startDate} to {activeSprint.endDate}</p>
+        </div>
+        {activeSprints.length > 1 && (
+          <label className="flex shrink-0 flex-col gap-1 text-[10px] font-medium uppercase tracking-wide text-muted">
+            Sprint
+            <select
+              className="min-w-[220px] rounded-lg border border-white/10 bg-background px-3 py-2 text-sm normal-case text-foreground"
+              value={activeSprint.id}
+              onChange={(e) => setSelectedSprintId(e.target.value)}
+            >
+              {activeSprints.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+
       {/* Tag Filter Toolbar */}
       <div className="mb-4 flex items-center justify-end">
         <div className="relative group/filter">

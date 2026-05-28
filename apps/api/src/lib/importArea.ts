@@ -1,11 +1,12 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { areas } from "../db/schema.js";
+import { ensureDefaultAreas } from "./defaultAreas.js";
 
 /**
  * Area for calendar imports (Google + CalDAV). Uses CALDAV_IMPORT_AREA_ID when set and valid,
- * else the user's first area by sort order. If the user has no areas (common after Google-only
- * sign-up without `npm run seed`), creates the same default "Work" / "Personal" pair as seed.
+ * else the user's first area by sort order. If the user has missing default areas (common after
+ * Google-only sign-up without `npm run seed`), creates the same defaults as seed.
  */
 export async function resolveOrCreateImportAreaId(userId: string): Promise<string | null> {
   return db.transaction(async (tx) => {
@@ -26,21 +27,11 @@ export async function resolveOrCreateImportAreaId(userId: string): Promise<strin
     });
     if (first) return first.id;
 
-    const [w] = await tx
-      .insert(areas)
-      .values({
-        userId,
-        name: "Work",
-        color: "#01696f",
-        sortOrder: 0,
-      })
-      .returning({ id: areas.id });
-    await tx.insert(areas).values({
-      userId,
-      name: "Personal",
-      color: "#6b7280",
-      sortOrder: 1,
+    await ensureDefaultAreas(tx, userId);
+    const createdFirst = await tx.query.areas.findFirst({
+      where: eq(areas.userId, userId),
+      orderBy: (a, { asc }) => [asc(a.sortOrder), asc(a.name)],
     });
-    return w.id;
+    return createdFirst?.id ?? null;
   });
 }

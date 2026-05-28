@@ -47,6 +47,7 @@ async function resolveAreaForUser(
   const aliases: Record<string, string[]> = {
     work: ["work"],
     personal: ["personal"],
+    growth: ["growth"],
     sidequest: ["sidequest", "side quest"],
   };
 
@@ -117,7 +118,7 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
           areaId: { type: "string", description: "UUID" },
           areaKind: {
             type: "string",
-            enum: ["work", "personal", "sidequest"],
+            enum: ["work", "personal", "growth", "sidequest"],
           },
           status: { type: "string", enum: [...STATUS_ENUM] },
           priority: { type: "string", enum: ["urgent", "high", "normal", "low"] },

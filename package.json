@@ -23,6 +23,7 @@
     "docker:migrate": "docker compose --profile tools run --rm migrate"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "concurrently": "^9.2.1"
   }
 }

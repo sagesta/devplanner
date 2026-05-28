@@ -13,6 +13,18 @@ async function fetchJson<T>(url: string | URL, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "Unknown error");
+    let parsedError: string | null = null;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed.error === "string") {
+        parsedError = parsed.error;
+      }
+    } catch {
+      // Response was not JSON; keep the raw text fallback below.
+    }
+    if (parsedError) {
+      throw new Error(parsedError);
+    }
     throw new Error(`API ${res.status}: ${text}`);
   }
   return res.json() as Promise<T>;

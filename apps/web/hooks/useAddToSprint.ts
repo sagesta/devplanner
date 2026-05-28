@@ -13,7 +13,7 @@ export function useAddToSprint() {
         status: "todo",
       });
     },
-    onSuccess: (data, { sprintId }) => {
+    onSuccess: () => {
       toast.success("Added to sprint");
       // Invalidate the active sprint board so it immediately fetches the new task
       void qc.invalidateQueries({ queryKey: ["sprintTasks"] });

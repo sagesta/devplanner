@@ -69,7 +69,7 @@ export default function SprintsPage() {
         startDate,
         endDate,
         goal: goal.trim() || null,
-        status: (q.data?.sprints && q.data.sprints.some(s => s.status === "active")) ? "planned" : "active",
+        status: "active",
       }),
     onSuccess: () => {
       toast.success("Sprint created");

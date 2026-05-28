@@ -5,6 +5,7 @@ import "./lib/loadRootEnv.js";
 import { eq } from "drizzle-orm";
 import { db, pool } from "./db/client.js";
 import { areas, users } from "./db/schema.js";
+import { DEFAULT_AREAS } from "./lib/defaultAreas.js";
 
 const email = process.env.SEED_USER_EMAIL ?? "dev@localhost";
 
@@ -28,18 +29,7 @@ async function main() {
 
   const areaRows = await db.select().from(areas).where(eq(areas.userId, userId)).limit(1);
   if (!areaRows.length) {
-    await db.insert(areas).values({
-      userId,
-      name: "Work",
-      color: "#01696f",
-      sortOrder: 0,
-    });
-    await db.insert(areas).values({
-      userId,
-      name: "Personal",
-      color: "#6b7280",
-      sortOrder: 1,
-    });
+    await db.insert(areas).values(DEFAULT_AREAS.map((area) => ({ userId, ...area })));
     console.log("Created default areas");
   } else {
     console.log("Areas already present");

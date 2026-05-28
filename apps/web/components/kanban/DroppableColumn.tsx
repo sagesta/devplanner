@@ -23,7 +23,7 @@ export function DroppableColumn({
     <section
       ref={setNodeRef}
       className={cn(
-        "min-h-[260px] rounded-xl border border-white/10 bg-surface p-3 transition-all duration-200",
+        "min-h-[260px] rounded-xl border border-white/10 bg-surface/40 backdrop-blur-md p-3 transition-all duration-200",
         isOver && "ring-2 ring-primary/50 border-primary/30 bg-surface/80"
       )}
     >
@@ -46,8 +46,8 @@ export function DroppableColumn({
       <div className="flex min-h-[200px] flex-col">
         <div className="flex-1 space-y-2 stagger-list">{children}</div>
         {showColumnEmpty && (
-          <div className="mt-2 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/12 bg-white/[0.02] px-4 py-10 text-center">
-            <Sparkles size={24} className="mb-3 text-primary/30" />
+          <div className="mt-2 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/12 bg-white/[0.02] px-4 py-10 text-center transition-colors hover:bg-white/[0.04] hover:border-white/20 group">
+            <Sparkles size={24} className="mb-3 text-primary/30 group-hover:text-primary/50 group-hover:scale-110 transition-all duration-300" />
             <p className="text-[11px] text-muted">No tasks here yet</p>
             <button
               type="button"

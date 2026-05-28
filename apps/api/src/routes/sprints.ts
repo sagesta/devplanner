@@ -84,6 +84,10 @@ export const sprintRoutes = new Hono<AppEnv>()
     if (!owner.length) {
       return c.json({ error: "user not found" }, 404);
     }
+    const name = v.name.trim();
+    if (!name) {
+      return c.json({ error: "name is required" }, 422);
+    }
     if (v.endDate < v.startDate) {
       return c.json({ error: "endDate must be on or after startDate" }, 422);
     }
@@ -91,7 +95,7 @@ export const sprintRoutes = new Hono<AppEnv>()
       .insert(sprints)
       .values({
         userId,
-        name: v.name.trim(),
+        name,
         startDate: v.startDate,
         endDate: v.endDate,
         goal: v.goal ?? null,
@@ -119,15 +123,29 @@ export const sprintRoutes = new Hono<AppEnv>()
     if (Object.keys(updates).length === 0) {
       return c.json({ error: "no fields to update" }, 422);
     }
+    if (updates.name !== undefined && !updates.name) {
+      return c.json({ error: "name is required" }, 422);
+    }
+
     const userId = c.get("userId");
+    const current = await db.query.sprints.findFirst({
+      where: and(eq(sprints.id, id), eq(sprints.userId, userId)),
+    });
+    if (!current) {
+      return c.json({ error: "not found" }, 404);
+    }
+
+    const nextStart = updates.startDate ?? current.startDate;
+    const nextEnd = updates.endDate ?? current.endDate;
+    if (nextEnd < nextStart) {
+      return c.json({ error: "endDate must be on or after startDate" }, 422);
+    }
+
     const [row] = await db
       .update(sprints)
       .set(updates)
       .where(and(eq(sprints.id, id), eq(sprints.userId, userId)))
       .returning();
-    if (!row) {
-      return c.json({ error: "not found" }, 404);
-    }
     return c.json({ sprint: row });
   })
   .delete("/:id", async (c) => {

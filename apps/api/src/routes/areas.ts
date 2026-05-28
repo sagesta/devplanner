@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/client.js";
 import { areas, users } from "../db/schema.js";
+import { ensureDefaultAreas } from "../lib/defaultAreas.js";
 import type { AppEnv } from "../types.js";
 
 const createBody = z.object({
@@ -23,6 +24,7 @@ const patchBody = z.object({
 export const areaRoutes = new Hono<AppEnv>()
   .get("/", async (c) => {
     const userId = c.get("userId");
+    await ensureDefaultAreas(db, userId);
     const rows = await db
       .select()
       .from(areas)

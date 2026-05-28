@@ -38,7 +38,7 @@ const RECURRENCE_PRESETS: { label: string; value: string }[] = [
   { label: "Monthly", value: "FREQ=MONTHLY" },
 ];
 
-type AreaFilter = "all" | "work" | "personal";
+type AreaFilter = "all" | "work" | "personal" | "growth";
 
 function localISODate(d = new Date()) {
   const y = d.getFullYear();
@@ -140,7 +140,8 @@ export default function BacklogPage() {
     if (areaFilter === "all") return true;
     const n = (area?.name ?? "").toLowerCase();
     if (areaFilter === "work") return n.includes("work");
-    return n.includes("personal");
+    if (areaFilter === "personal") return n.includes("personal");
+    return n.includes("growth");
   }
 
   const filteredGroups = Array.from(grouped.entries()).filter(([areaId]) =>
@@ -154,7 +155,7 @@ export default function BacklogPage() {
         Tasks without a sprint — {q.data?.length ?? 0} total.
       </p>
       <div className="mt-3 flex flex-wrap gap-1.5">
-        {(["all", "work", "personal"] as const).map((key) => (
+        {(["all", "work", "personal", "growth"] as const).map((key) => (
           <button
             key={key}
             type="button"
@@ -166,7 +167,7 @@ export default function BacklogPage() {
                 : "bg-white/5 text-muted hover:bg-white/10 hover:text-foreground"
             )}
           >
-            {key === "all" ? "All areas" : key === "work" ? "Work" : "Personal"}
+            {key === "all" ? "All areas" : key === "work" ? "Work" : key === "personal" ? "Personal" : "Growth"}
           </button>
         ))}
       </div>

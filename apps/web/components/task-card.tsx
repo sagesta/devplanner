@@ -46,6 +46,13 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: "bg-zinc-700/20 text-zinc-500",
 };
 
+const PRIORITY_HOVER_GLOW: Record<string, string> = {
+  urgent: "hover:shadow-red-500/15",
+  high: "hover:shadow-orange-500/15",
+  normal: "hover:shadow-primary/10",
+  low: "hover:shadow-zinc-500/10",
+};
+
 /** Solid bar fills for timeline / Gantt-style views (pairs with PRIORITY_COLORS badges). */
 export const PRIORITY_BAR_CLASS: Record<string, string> = {
   urgent: "bg-red-500/85",
@@ -177,8 +184,9 @@ export const TaskCard = memo(function TaskCard({
   return (
     <div
       className={cn(
-        "group relative rounded-md border border-white/5 bg-background/90 shadow-sm transition-all duration-200",
-        "hover:border-white/15 hover:shadow-md hover:-translate-y-0.5 hover:shadow-black/20",
+        "group relative rounded-md border border-white/5 bg-background/90 shadow-sm transition-all duration-300 ease-out",
+        "hover:border-white/15 hover:shadow-lg hover:-translate-y-1",
+        PRIORITY_HOVER_GLOW[priority] ?? PRIORITY_HOVER_GLOW.normal,
         compact ? "px-2 py-1.5" : "px-3 py-2.5",
         overdue && "border-red-500/35 ring-1 ring-red-500/15",
         className
@@ -226,7 +234,7 @@ export const TaskCard = memo(function TaskCard({
         </div>
         <div className="min-w-0 flex-1">
           <p className={cn(
-            "text-foreground leading-snug",
+            "text-foreground leading-snug line-clamp-2",
             compact ? "text-xs" : "text-sm",
             status === "done" && "line-through opacity-60"
           )}>
