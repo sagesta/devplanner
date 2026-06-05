@@ -14,8 +14,8 @@ import { useAppUserId } from "@/hooks/use-app-user-id";
 const REVIEW_LS = "devplanner.weeklyReview.v1";
 
 const STEPS = [
-  { title: "Last week — review completions", hint: "What did you complete? Any wins worth celebrating?" },
-  { title: "Carried over — why not done?", hint: "Which tasks rolled over? What blocked you?" },
+  { title: "Wins", hint: "What shipped, closed, sold, or moved forward?" },
+  { title: "Carryover", hint: "What did not finish, and what blocked it?" },
   { title: "Top 3 intentions (next week)", hint: "What are the 3 most important things to do next week?" },
   { title: "Draft sprint (notes)", hint: "High-level plan: what goes into the sprint, what stays in backlog?" },
   { title: "Approve & close", hint: "Review your notes above and finalize the week." },
@@ -102,7 +102,7 @@ export default function ReviewPage() {
     onSuccess: () => {
       setFinished(true);
       void qc.invalidateQueries({ queryKey: ["sprints"] });
-      toast.success("Review saved — next sprint created! 🚀");
+      toast.success("Review saved. Next sprint created.");
     },
     onError: (e: Error) => toast.error(`Failed to create sprint: ${e.message}`),
   });
@@ -114,7 +114,7 @@ export default function ReviewPage() {
           <div>
             <h1 className="font-display text-2xl text-foreground">Weekly review</h1>
             <p className="mt-1 text-sm text-muted">
-              Guided ritual — reflect on last week, plan the next.
+              Count wins, clear carryover, set the next sprint.
             </p>
           </div>
           <button

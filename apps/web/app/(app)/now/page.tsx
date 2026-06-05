@@ -3,7 +3,25 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import confetti from "canvas-confetti";
-import { Clock, Sparkles, CheckCircle2, Circle, CalendarPlus } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Banknote,
+  CalendarPlus,
+  CheckCircle2,
+  Circle,
+  Clock,
+  FileText,
+  Inbox,
+  ListChecks,
+  PackageCheck,
+  Play,
+  Square,
+  Target,
+  Trophy,
+  type LucideIcon,
+} from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
@@ -20,10 +38,8 @@ import {
 } from "@/lib/api";
 import { LS_PHYSICAL_ENERGY, type PhysicalEnergyLevel } from "@/lib/planner-prefs";
 import { SkeletonListItem } from "@/lib/skeleton";
-import { cn, displayPhysicalEnergy, isTaskOverdue } from "@/lib/utils";
+import { cn, isTaskOverdue } from "@/lib/utils";
 import { PriorityAnchorsCard } from "@/components/priority-anchors-card";
-import { TagChip } from "@/components/TagChip";
-import { TimerButton } from "@/components/TimerButton";
 import { useActiveTimer, formatElapsed } from "@/hooks/use-active-timer";
 
 function localISODate(d = new Date()) {
@@ -35,8 +51,56 @@ function localISODate(d = new Date()) {
 
 const PRIORITY_ORDER: Record<string, number> = { urgent: 3, high: 2, normal: 1, low: 0 };
 
+const MONEY_KEYWORDS = [
+  "money",
+  "revenue",
+  "sales",
+  "sell",
+  "client",
+  "invoice",
+  "proposal",
+  "pitch",
+  "sponsor",
+  "sponsorship",
+  "offer",
+  "pricing",
+  "paid",
+  "contract",
+  "lead",
+  "deal",
+];
+
+const CONTENT_KEYWORDS = [
+  "content",
+  "idea",
+  "draft",
+  "edit",
+  "publish",
+  "published",
+  "schedule",
+  "scheduled",
+  "post",
+  "article",
+  "newsletter",
+  "video",
+  "youtube",
+  "thread",
+  "essay",
+  "script",
+];
+
+type PipelineStageKey = "idea" | "draft" | "edit" | "scheduled" | "published";
+
+const PIPELINE_STAGES: Array<{ key: PipelineStageKey; label: string; accent: string }> = [
+  { key: "idea", label: "Idea", accent: "bg-sky-400" },
+  { key: "draft", label: "Draft", accent: "bg-violet-400" },
+  { key: "edit", label: "Edit", accent: "bg-amber-400" },
+  { key: "scheduled", label: "Scheduled", accent: "bg-teal-400" },
+  { key: "published", label: "Published", accent: "bg-emerald-400" },
+];
+
 type NowItem = {
-  id: string; // subtask ID or task ID (if fallback task)
+  id: string;
   type: "subtask" | "task";
   taskId: string;
   title: string;
@@ -44,11 +108,101 @@ type NowItem = {
   completed: boolean;
   priorityValue: number;
   priorityLabel: string;
-  tags: any[];
   scheduledTime: string | null;
   estimatedMinutes: number | null;
   physicalEnergy: string;
 };
+
+function taskText(task: TaskRow): string {
+  const tags = (task._tags ?? []).map((tag) => tag.name).join(" ");
+  return [task.title, task.description ?? "", task.status, tags].join(" ").toLowerCase();
+}
+
+function matchesAnyKeyword(task: TaskRow, keywords: string[]): boolean {
+  const haystack = taskText(task);
+  return keywords.some((keyword) => haystack.includes(keyword));
+}
+
+function isOpenTask(task: TaskRow): boolean {
+  return task.status !== "done" && task.status !== "cancelled";
+}
+
+function isContentTask(task: TaskRow): boolean {
+  return matchesAnyKeyword(task, CONTENT_KEYWORDS);
+}
+
+function isMoneyTask(task: TaskRow): boolean {
+  return matchesAnyKeyword(task, MONEY_KEYWORDS);
+}
+
+function contentStage(task: TaskRow): PipelineStageKey {
+  const text = taskText(task);
+  if (task.status === "done" || text.includes("published") || text.includes("shipped")) {
+    return "published";
+  }
+  if (text.includes("scheduled") || task.scheduledDate || task.dueDate) return "scheduled";
+  if (task.status === "in_progress" || text.includes("edit") || text.includes("review")) {
+    return "edit";
+  }
+  if (task.status === "todo" || text.includes("draft") || text.includes("script")) return "draft";
+  return "idea";
+}
+
+function compareTasksForExecution(a: TaskRow, b: TaskRow): number {
+  const priorityDelta = (PRIORITY_ORDER[b.priority] ?? 1) - (PRIORITY_ORDER[a.priority] ?? 1);
+  if (priorityDelta !== 0) return priorityDelta;
+  const aDate = a.dueDate ?? a.scheduledDate ?? "9999-12-31";
+  const bDate = b.dueDate ?? b.scheduledDate ?? "9999-12-31";
+  return aDate.localeCompare(bDate);
+}
+
+function priorityClass(priority: string): string {
+  if (priority === "urgent") return "border-red-500/20 bg-red-500/10 text-red-300";
+  if (priority === "high") return "border-orange-500/20 bg-orange-500/10 text-orange-300";
+  if (priority === "low") return "border-white/10 bg-white/5 text-muted";
+  return "border-white/10 bg-white/5 text-foreground";
+}
+
+function taskDateLabel(task: TaskRow): string {
+  const due = task.dueDate?.slice(0, 10);
+  const scheduled = task.scheduledDate?.slice(0, 10);
+  if (due) return `Due ${due}`;
+  if (scheduled) return `Scheduled ${scheduled}`;
+  return "No date";
+}
+
+function itemSize(item: NowItem): "big" | "medium" | "small" {
+  if ((item.estimatedMinutes ?? 0) >= 90 || item.priorityLabel === "urgent") return "big";
+  if ((item.estimatedMinutes ?? 0) >= 30 || item.priorityLabel === "high") return "medium";
+  return "small";
+}
+
+function QuestionTile({
+  label,
+  value,
+  meta,
+  Icon,
+  tone = "text-primary",
+}: {
+  label: string;
+  value: string;
+  meta: string;
+  Icon: LucideIcon;
+  tone?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-surface px-4 py-3">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+        <Icon size={14} className={tone} />
+        {label}
+      </div>
+      <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-foreground">
+        {value}
+      </p>
+      <p className="mt-2 truncate text-xs text-muted">{meta}</p>
+    </div>
+  );
+}
 
 export default function NowPage() {
   const { status } = useSession();
@@ -103,6 +257,7 @@ export default function NowPage() {
     onSuccess: () => {
       toast.success("Tasks scheduled for today");
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId, todayLocal] });
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
     },
   });
 
@@ -138,14 +293,13 @@ export default function NowPage() {
     else localStorage.removeItem(LS_PHYSICAL_ENERGY);
   }, []);
 
-  // 1. Compile the unified list of NowItems
   const allItems = useMemo(() => {
     const items: NowItem[] = [];
     const raw = q.data?.tasks ?? [];
 
     for (const t of raw) {
       if (energyFilter && t.physicalEnergy !== energyFilter && t.physicalEnergy) continue;
-      
+
       const subs = t._subtasks ?? [];
       const todaySubs = subs.filter((s) => s.scheduledDate === todayLocal);
 
@@ -160,15 +314,12 @@ export default function NowPage() {
             completed: s.completed,
             priorityValue: PRIORITY_ORDER[t.priority] ?? 1,
             priorityLabel: t.priority,
-            tags: t._tags ?? [],
             scheduledTime: s.scheduledTime,
             estimatedMinutes: s.estimatedMinutes,
-            physicalEnergy: t.physicalEnergy ?? "medium"
+            physicalEnergy: t.physicalEnergy ?? "medium",
           });
         }
-      } else {
-        // Fallback for legacy tasks that are due today but have no subtasks
-        if (t.status === "done") continue;
+      } else if (t.status !== "done") {
         items.push({
           id: t.id,
           type: "task",
@@ -177,15 +328,13 @@ export default function NowPage() {
           completed: false,
           priorityValue: PRIORITY_ORDER[t.priority] ?? 1,
           priorityLabel: t.priority,
-          tags: t._tags ?? [],
           scheduledTime: null,
           estimatedMinutes: null,
-          physicalEnergy: t.physicalEnergy ?? "medium"
+          physicalEnergy: t.physicalEnergy ?? "medium",
         });
       }
     }
 
-    // Sort by priority (high to low), then by time (if set), then alphabetically.
     items.sort((a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
       if (a.priorityValue !== b.priorityValue) return b.priorityValue - a.priorityValue;
@@ -200,30 +349,72 @@ export default function NowPage() {
     return items;
   }, [q.data?.tasks, energyFilter, todayLocal]);
 
-  // 2. Extract Active Item and Up Next Item
   const activeItem = useMemo(() => {
-    // If a timer is running, the running item is active
     if (activeLog) {
       const running = allItems.find((i) => i.taskId === activeLog.taskId && !i.completed);
       if (running) return running;
     }
-    // Otherwise, first incomplete item
     return allItems.find((i) => !i.completed) ?? null;
   }, [allItems, activeLog]);
 
+  const todayFocusItems = useMemo(() => {
+    return allItems.filter((i) => !i.completed).slice(0, 7);
+  }, [allItems]);
+
   const upNextItems = useMemo(() => {
-    return allItems.filter((i) => !i.completed && i.id !== activeItem?.id);
-  }, [allItems, activeItem]);
+    return todayFocusItems.filter((i) => i.id !== activeItem?.id);
+  }, [todayFocusItems, activeItem]);
+
+  const allRootTasks = useMemo(() => tasksForRescue.data ?? q.data?.tasks ?? [], [
+    tasksForRescue.data,
+    q.data?.tasks,
+  ]);
 
   const overdueRoots = useMemo(() => {
-    const bgTasks = tasksForRescue.data ?? [];
-    return bgTasks.filter((t) => isTaskOverdue(t, todayLocal));
-  }, [tasksForRescue.data, todayLocal]);
+    return allRootTasks.filter((t) => isTaskOverdue(t, todayLocal));
+  }, [allRootTasks, todayLocal]);
 
   const unscheduledRoots = useMemo(() => {
-    const bgTasks = tasksForRescue.data ?? [];
-    return bgTasks.filter((t) => t.status !== "done" && !isTaskOverdue(t, todayLocal));
-  }, [tasksForRescue.data, todayLocal]);
+    return allRootTasks
+      .filter((t) => isOpenTask(t) && !isTaskOverdue(t, todayLocal))
+      .sort(compareTasksForExecution);
+  }, [allRootTasks, todayLocal]);
+
+  const contentTasks = useMemo(() => {
+    return allRootTasks.filter(isContentTask).sort(compareTasksForExecution);
+  }, [allRootTasks]);
+
+  const moneyTasks = useMemo(() => {
+    return allRootTasks.filter((task) => isOpenTask(task) && isMoneyTask(task)).sort(compareTasksForExecution);
+  }, [allRootTasks]);
+
+  const pipeline = useMemo(() => {
+    return PIPELINE_STAGES.map((stage) => ({
+      ...stage,
+      tasks: contentTasks.filter((task) => contentStage(task) === stage.key),
+    }));
+  }, [contentTasks]);
+
+  const nextShipTask = useMemo(() => {
+    const openContent = contentTasks.filter(isOpenTask);
+    return (
+      openContent.find((task) => contentStage(task) === "scheduled") ??
+      openContent.find((task) => contentStage(task) === "edit") ??
+      openContent.find((task) => contentStage(task) === "draft") ??
+      openContent[0] ??
+      null
+    );
+  }, [contentTasks]);
+
+  const taskMix = useMemo(() => {
+    return todayFocusItems.reduce(
+      (acc, item) => {
+        acc[itemSize(item)] += 1;
+        return acc;
+      },
+      { big: 0, medium: 0, small: 0 }
+    );
+  }, [todayFocusItems]);
 
   if (status === "loading") {
     return (
@@ -237,20 +428,21 @@ export default function NowPage() {
 
   const hasScheduledItems = allItems.length > 0;
   const isTimerRunningForActive = isRunning && activeItem && activeLog?.taskId === activeItem.taskId;
-
   const capacity = q.data?.dailyCapacity ?? 0;
   const used = q.data?.usedMinutes ?? 0;
   const hasCapacityData = capacity > 0;
+  const capacityPercent = hasCapacityData ? Math.min(100, Math.round((used / capacity) * 100)) : 0;
   const selectedProposals = scheduleProposals.filter((p) => selectedProposalIds.includes(p.id));
+  const winsToday = q.data?.doneTodayCount ?? allItems.filter((item) => item.completed).length;
+  const publishedContentCount = contentTasks.filter((task) => contentStage(task) === "published").length;
+  const topMoneyTask = moneyTasks[0] ?? null;
 
   return (
-    <div className="flex flex-col gap-8 pb-12">
-      {/* ── Priority anchors ──────────────────────────────────────── */}
-      <PriorityAnchorsCard variant="week" />
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="mx-auto flex max-w-[1440px] flex-col gap-5 pb-10">
+      <header className="flex flex-col gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="font-display text-2xl text-foreground">Now</h1>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Execution today</p>
+          <h1 className="mt-1 text-2xl font-semibold text-foreground">Today</h1>
           <p className="mt-1 text-sm text-muted">
             <time dateTime={todayLocal}>
               {new Date(todayLocal + "T12:00:00").toLocaleDateString(undefined, {
@@ -262,65 +454,87 @@ export default function NowPage() {
             </time>
           </p>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-medium uppercase tracking-wide text-muted">
-            Match my energy
-          </label>
-          <select
-            className="rounded-lg border border-white/10 bg-surface px-2 py-1.5 text-xs text-foreground"
-            value={energyFilter}
-            onChange={(e) =>
-              persistEnergy(e.target.value === "" ? "" : (e.target.value as PhysicalEnergyLevel))
-            }
-          >
-            <option value="">All tasks</option>
-            <option value="low">Low energy</option>
-            <option value="medium">Medium energy</option>
-            <option value="high">High energy</option>
-          </select>
-        </div>
-      </div>
 
-      {hasCapacityData && (
-        <div className="flex flex-col gap-2 rounded-xl border border-white/5 bg-surface/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between mb-2">
-          <div className="flex items-center gap-3">
-             <div className="flex flex-col">
-               <span className="text-xs font-semibold uppercase tracking-wider text-muted">Daily Capacity</span>
-               <div className="flex items-center gap-2 mt-1">
-                 <div className="w-32 h-1.5 bg-black/40 rounded-full overflow-hidden">
-                    <div 
-                       className={cn("h-full rounded-full transition-all", (used > capacity) ? "bg-red-500" : "bg-primary")} 
-                       style={{ width: `${Math.min(100, (used / capacity) * 100)}%` }} 
-                    />
-                 </div>
-                 <span className={cn("text-xs font-medium", (used > capacity) ? "text-red-400" : "text-foreground")}>
-                   {used} / {capacity} mins
-                 </span>
-               </div>
-             </div>
-             {(used > capacity) && (
-                <span className="bg-red-500/20 text-red-500 text-[10px] px-2 py-0.5 rounded font-bold ml-2">OVERLOAD</span>
-             )}
-          </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          {hasCapacityData && (
+            <div className="min-w-[210px] rounded-lg border border-white/10 bg-surface px-3 py-2">
+              <div className="flex items-center justify-between gap-3 text-[11px] text-muted">
+                <span className="font-semibold uppercase tracking-wide">Capacity</span>
+                <span className={cn("font-medium", used > capacity ? "text-red-300" : "text-foreground")}>
+                  {used}/{capacity}m
+                </span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/40">
+                <div
+                  className={cn("h-full rounded-full", used > capacity ? "bg-red-500" : "bg-primary")}
+                  style={{ width: `${capacityPercent}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          <label className="min-w-[160px] text-[11px] font-semibold uppercase tracking-wide text-muted">
+            Energy
+            <select
+              className="mt-1 w-full rounded-lg border border-white/10 bg-surface px-2 py-2 text-xs font-normal text-foreground"
+              value={energyFilter}
+              onChange={(e) =>
+                persistEnergy(e.target.value === "" ? "" : (e.target.value as PhysicalEnergyLevel))
+              }
+            >
+              <option value="">All tasks</option>
+              <option value="low">Low energy</option>
+              <option value="medium">Medium energy</option>
+              <option value="high">High energy</option>
+            </select>
+          </label>
+
           <button
             onClick={() => autoScheduleMut.mutate()}
             disabled={autoScheduleMut.isPending}
-            className="rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
-            title="Automatically schedule and bump overflow tasks"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-white/10 disabled:opacity-50"
+            title="Preview unfinished work that should roll forward"
           >
-            {autoScheduleMut.isPending ? "Reviewing..." : "Preview rollover"}
+            <ArrowRight size={14} />
+            {autoScheduleMut.isPending ? "Reviewing" : "Preview rollover"}
           </button>
         </div>
-      )}
+      </header>
+
+      <section className="grid gap-3 lg:grid-cols-3">
+        <QuestionTile
+          Icon={Target}
+          label="What am I doing today?"
+          value={activeItem?.title ?? todayFocusItems[0]?.title ?? "Nothing locked yet"}
+          meta={activeItem?.parentTitle ?? `${todayFocusItems.length} task(s) selected`}
+        />
+        <QuestionTile
+          Icon={PackageCheck}
+          label="What am I shipping next?"
+          value={nextShipTask?.title ?? upNextItems[0]?.title ?? "No minimum ship visible"}
+          meta={nextShipTask ? `${contentStage(nextShipTask)} - ${taskDateLabel(nextShipTask)}` : "Pull one from Inbox"}
+          tone="text-emerald-300"
+        />
+        <QuestionTile
+          Icon={Banknote}
+          label="What makes money this week?"
+          value={topMoneyTask?.title ?? "No money move visible"}
+          meta={topMoneyTask ? `${topMoneyTask.priority} - ${taskDateLabel(topMoneyTask)}` : "Tag or title one revenue task"}
+          tone="text-amber-300"
+        />
+      </section>
 
       {scheduleProposals.length > 0 && (
-        <section className="rounded-xl border border-primary/25 bg-primary/5 p-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">Review schedule changes</h2>
-              <p className="mt-1 text-xs text-muted">
-                DevPlanner found unfinished work to roll forward. Nothing changes until you approve it.
-              </p>
+        <section className="rounded-lg border border-primary/25 bg-primary/5 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex gap-3">
+              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-primary" />
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Review schedule changes</h2>
+                <p className="mt-1 text-xs text-muted">
+                  Unfinished work can roll forward. Nothing changes until you approve it.
+                </p>
+              </div>
             </div>
             <div className="flex shrink-0 gap-2">
               <button
@@ -339,7 +553,7 @@ export default function NowPage() {
                 disabled={selectedProposals.length === 0 || applyScheduleMut.isPending}
                 onClick={() => applyScheduleMut.mutate(selectedProposals)}
               >
-                {applyScheduleMut.isPending ? "Applying..." : `Apply ${selectedProposals.length}`}
+                {applyScheduleMut.isPending ? "Applying" : `Apply ${selectedProposals.length}`}
               </button>
             </div>
           </div>
@@ -375,8 +589,8 @@ export default function NowPage() {
       )}
 
       {overdueRoots.length >= 3 && !rescueDismissed && (
-        <div className="flex flex-col gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-foreground sm:flex-row sm:items-center sm:justify-between">
-          <span>You have {overdueRoots.length} overdue tasks. Reschedule all to today?</span>
+        <div className="flex flex-col gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>{overdueRoots.length} overdue tasks. Move them into today?</span>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => rescueMut.mutate(overdueRoots.map((t) => t.id))}
@@ -395,189 +609,342 @@ export default function NowPage() {
         </div>
       )}
 
-      {q.isLoading && (
-        <div className="space-y-3">
-          <SkeletonListItem />
-          <SkeletonListItem />
-        </div>
-      )}
-
-      {/* ── Active Timer Slot ──────────────────────────────────────── */}
-      {!q.isLoading && activeItem && (
-        <section className="flex flex-col items-center justify-center min-h-[44vh] gap-5 rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/5 to-surface/60 p-8 shadow-sm transition-all duration-300">
-          <div className="text-center w-full max-w-2xl">
-            {activeItem.parentTitle && (
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted/70 mb-2 border-b border-white/5 pb-2 inline-block">
-                {activeItem.parentTitle}
-              </p>
-            )}
-            <h2 className="text-2xl font-semibold text-foreground">
-              {activeItem.title}
-            </h2>
-            <div className="mt-3 flex items-center justify-center gap-2 text-xs text-muted">
-              {activeItem.scheduledTime && (
-                <span className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded">
-                  <Clock size={12} /> {activeItem.scheduledTime.slice(0, 5)}
-                </span>
-              )}
-              {activeItem.estimatedMinutes && (
-                <span className="bg-white/5 px-2 py-1 rounded">{activeItem.estimatedMinutes}m est</span>
-              )}
-              <span className={cn("px-2 py-1 rounded uppercase font-semibold text-[10px]", 
-                activeItem.priorityLabel === 'urgent' ? 'bg-red-500/20 text-red-400' :
-                activeItem.priorityLabel === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                'bg-white/5 text-muted')}>
-                {activeItem.priorityLabel}
-              </span>
-            </div>
-          </div>
-
-          <div className="relative flex items-center justify-center py-4 px-12 mt-2">
-            {isTimerRunningForActive && (
-              <div
-                className="absolute inset-0 rounded-full animate-spin pointer-events-none"
-                style={{
-                  background: "conic-gradient(from 0deg, var(--primary) at 50% 50%, transparent)",
-                  opacity: 0.12,
-                  animationDuration: "4s",
-                }}
-              />
-            )}
-            <div
-              className={cn(
-                "text-6xl font-mono font-semibold tracking-wider z-10 relative transition-colors duration-200",
-                isTimerRunningForActive ? "text-primary" : "text-foreground/60"
-              )}
-            >
-              {isTimerRunningForActive ? formatElapsed(elapsed) : "00:00:00"}
-            </div>
-          </div>
-
-          <div className="flex gap-3 w-full max-w-md mt-4">
-             {isTimerRunningForActive ? (
-                <button
-                  onClick={() => stopActiveTimer()}
-                  disabled={isStopping}
-                  className="flex-1 rounded-xl py-3.5 text-sm font-semibold bg-danger hover:bg-red-600 text-white transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
-                >
-                  <span className="text-lg leading-none mt-[-2px]">■</span> Pause
-                </button>
-              ) : (
-                <button
-                  onClick={() => startTimer(activeItem.taskId)}
-                  disabled={isStarting || isRunning}
-                  title={isRunning ? "Stop the current active timer first" : "Start timer"}
-                  className="flex-1 rounded-xl py-3.5 text-sm font-semibold bg-primary hover:bg-primary-hover text-white transition-colors disabled:opacity-50 flex justify-center items-center gap-2 shadow-lg shadow-primary/20"
-                >
-                  <span className="text-lg leading-none mt-[-1px]">▶</span> Start
-                </button>
-              )}
-              
-              <button
-                onClick={() => doneMut.mutate({ id: activeItem.id, type: activeItem.type })}
-                disabled={doneMut.isPending}
-                className="flex-1 rounded-xl border border-success/30 bg-success/10 hover:bg-success/20 py-3.5 text-sm font-semibold text-success transition-all flex justify-center items-center gap-2"
-              >
-                <CheckCircle2 size={18} /> Done
-              </button>
-          </div>
-        </section>
-      )}
-
-      {/* ── Empty State ────────────────────────────────────────────── */}
-      {!q.isLoading && !hasScheduledItems && (
-        <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-surface/50 py-20 text-center">
-          <Sparkles size={36} className="text-primary/40 mb-4" />
-          <p className="text-foreground font-semibold text-lg">Nothing scheduled for today.</p>
-          <p className="text-muted/80 text-sm mt-2 max-w-sm">
-            Open the backlog, pick a task, and add some subtasks scheduled for today.
-          </p>
-        </div>
-      )}
-
-      {/* ── Up Next ────────────────────────────────────────────────── */}
-      {!q.isLoading && upNextItems.length > 0 && (
-        <section className="space-y-4">
-          <h3 className="text-sm font-semibold text-foreground border-b border-border pb-2 px-1">
-            Up carefully next
-          </h3>
-          <ul className="space-y-2">
-            {upNextItems.map(item => (
-               <li
-                key={item.id}
-                className="group flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-white/10 bg-surface/60 px-4 py-3 hover:border-primary/30 transition-all"
-               >
-                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => doneMut.mutate({ id: item.id, type: item.type })}
-                      className="shrink-0 transition-transform hover:scale-110"
-                    >
-                      <Circle size={20} className="text-muted hover:text-success" />
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm text-foreground flex items-center gap-2">
-                        <span className="truncate">{item.title}</span>
-                      </div>
-                      <div className="flex text-[10px] text-muted/80 mt-0.5 gap-2 truncate">
-                        {item.parentTitle && <span>{item.parentTitle}</span>}
-                        {item.scheduledTime && (
-                          <span className="text-primary/70 flex items-center gap-1">
-                            · <Clock size={10} /> {item.scheduledTime.slice(0, 5)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                 </div>
-                 <div className="flex items-center gap-2 shrink-0">
-                    <span className={cn("px-2 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider", 
-                      item.priorityLabel === 'urgent' ? 'bg-red-500/10 text-red-400' :
-                      item.priorityLabel === 'high' ? 'bg-orange-500/10 text-orange-400' :
-                      'bg-white/5 text-muted')}>
-                      {item.priorityLabel}
-                    </span>
-                 </div>
-               </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* ── Unscheduled tasks fallback ─────────────────────────────── */}
-      {!q.isLoading && !hasScheduledItems && !tasksForRescue.isLoading && unscheduledRoots.length > 0 && (
-        <section className="mt-8">
-          <h3 className="text-sm font-semibold text-foreground mb-3 px-1 border-b border-border pb-2">
-            Unscheduled tasks you could work on
-          </h3>
-          <ul className="space-y-2">
-            {unscheduledRoots.slice(0, 8).map((t) => (
-              <li
-                key={t.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-surface px-4 py-3 hover:border-white/15 transition-all"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-foreground text-sm font-medium">{t.title}</div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted">
-                    <span className="capitalize">{t.priority}</span>
-                  </div>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
+        <div className="space-y-5">
+          <section className="rounded-lg border border-white/10 bg-surface">
+            <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  <Clock size={14} className="text-primary" />
+                  Work block
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
+                <h2 className="mt-1 text-base font-semibold text-foreground">
+                  {activeItem?.title ?? "No active block"}
+                </h2>
+                {activeItem?.parentTitle && (
+                  <p className="mt-1 text-xs text-muted">{activeItem.parentTitle}</p>
+                )}
+              </div>
+              <div className="text-left sm:text-right">
+                <p
+                  className={cn(
+                    "font-mono text-2xl font-semibold tabular-nums",
+                    isTimerRunningForActive ? "text-primary" : "text-foreground/70"
+                  )}
+                >
+                  {isTimerRunningForActive ? formatElapsed(elapsed) : "00:00:00"}
+                </p>
+                <p className="text-xs text-muted">
+                  {activeItem?.scheduledTime ? activeItem.scheduledTime.slice(0, 5) : "Start when ready"}
+                </p>
+              </div>
+            </div>
+
+            {activeItem ? (
+              <div className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-center">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+                  {activeItem.estimatedMinutes && (
+                    <span className="rounded border border-white/10 bg-white/5 px-2 py-1">
+                      {activeItem.estimatedMinutes}m estimate
+                    </span>
+                  )}
+                  <span className={cn("rounded border px-2 py-1 capitalize", priorityClass(activeItem.priorityLabel))}>
+                    {activeItem.priorityLabel}
+                  </span>
+                  <span className="rounded border border-white/10 bg-white/5 px-2 py-1 capitalize">
+                    {activeItem.physicalEnergy} energy
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  {isTimerRunningForActive ? (
+                    <button
+                      onClick={() => stopActiveTimer()}
+                      disabled={isStopping}
+                      className="inline-flex min-w-[120px] items-center justify-center gap-2 rounded-lg bg-danger px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+                    >
+                      <Square size={16} className="fill-current" />
+                      Stop
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => startTimer(activeItem.taskId)}
+                      disabled={isStarting || isRunning}
+                      title={isRunning ? "Stop the current active timer first" : "Start timer"}
+                      className="inline-flex min-w-[120px] items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+                    >
+                      <Play size={16} className="fill-current" />
+                      Start
+                    </button>
+                  )}
                   <button
-                    type="button"
-                    disabled={rescueMut.isPending}
-                    className="flex items-center gap-1.5 rounded-md bg-white/10 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-50"
-                    onClick={() => rescueMut.mutate([t.id])}
+                    onClick={() => doneMut.mutate({ id: activeItem.id, type: activeItem.type })}
+                    disabled={doneMut.isPending}
+                    className="inline-flex min-w-[120px] items-center justify-center gap-2 rounded-lg border border-success/30 bg-success/10 px-4 py-2.5 text-sm font-semibold text-success transition-colors hover:bg-success/20 disabled:opacity-50"
                   >
-                    <CalendarPlus size={12} />
-                    Schedule for today
+                    <CheckCircle2 size={16} />
+                    Done
                   </button>
                 </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+              </div>
+            ) : (
+              <div className="p-4 text-sm text-muted">
+                Pick a task from Today Tasks or schedule one from Inbox.
+              </div>
+            )}
+          </section>
 
+          <section className="rounded-lg border border-white/10 bg-surface">
+            <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  <ListChecks size={14} className="text-primary" />
+                  Today tasks
+                </div>
+                <p className="mt-1 text-sm text-foreground">
+                  {todayFocusItems.length}/7 selected
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5 text-[11px] text-muted">
+                <span className="rounded border border-white/10 bg-white/5 px-2 py-1">1 big: {taskMix.big}</span>
+                <span className="rounded border border-white/10 bg-white/5 px-2 py-1">3 medium: {taskMix.medium}</span>
+                <span className="rounded border border-white/10 bg-white/5 px-2 py-1">5 small: {taskMix.small}</span>
+              </div>
+            </div>
+
+            {q.isLoading ? (
+              <div className="space-y-2 p-4">
+                <SkeletonListItem />
+                <SkeletonListItem />
+              </div>
+            ) : todayFocusItems.length > 0 ? (
+              <ul className="divide-y divide-white/5">
+                {todayFocusItems.map((item) => {
+                  const active = item.id === activeItem?.id;
+                  return (
+                    <li
+                      key={item.id}
+                      className={cn(
+                        "grid gap-3 px-4 py-3 transition-colors sm:grid-cols-[auto_1fr_auto] sm:items-center",
+                        active ? "bg-primary/5" : "hover:bg-white/[0.03]"
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => doneMut.mutate({ id: item.id, type: item.type })}
+                        className="hidden text-muted transition-colors hover:text-success sm:block"
+                        aria-label={`Complete ${item.title}`}
+                      >
+                        <Circle size={18} />
+                      </button>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {active && (
+                            <span className="rounded border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                              Now
+                            </span>
+                          )}
+                          <p className="min-w-0 truncate text-sm font-medium text-foreground">{item.title}</p>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+                          {item.parentTitle && <span className="truncate">{item.parentTitle}</span>}
+                          {item.scheduledTime && <span>{item.scheduledTime.slice(0, 5)}</span>}
+                          {item.estimatedMinutes && <span>{item.estimatedMinutes}m</span>}
+                        </div>
+                      </div>
+                      <span
+                        className={cn(
+                          "w-fit rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
+                          priorityClass(item.priorityLabel)
+                        )}
+                      >
+                        {item.priorityLabel}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="p-4">
+                <div className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center">
+                  <Inbox size={28} className="mx-auto mb-3 text-primary/50" />
+                  <p className="font-semibold text-foreground">Nothing scheduled for today.</p>
+                  <p className="mt-1 text-sm text-muted">Move 3-7 tasks here before you start.</p>
+                </div>
+              </div>
+            )}
+
+            {!q.isLoading && !hasScheduledItems && !tasksForRescue.isLoading && unscheduledRoots.length > 0 && (
+              <div className="border-t border-white/10 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Pull from Inbox
+                  </p>
+                  <Link href="/backlog" className="text-xs font-medium text-primary hover:underline">
+                    Open Inbox
+                  </Link>
+                </div>
+                <ul className="space-y-2">
+                  {unscheduledRoots.slice(0, 5).map((task) => (
+                    <li
+                      key={task.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-background/40 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">{task.title}</p>
+                        <p className="mt-0.5 text-xs capitalize text-muted">{task.priority}</p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={rescueMut.isPending}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-white/10 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-primary/20 hover:text-primary disabled:opacity-50"
+                        onClick={() => rescueMut.mutate([task.id])}
+                      >
+                        <CalendarPlus size={12} />
+                        Today
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-lg border border-white/10 bg-surface">
+            <div className="flex flex-col gap-2 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  <FileText size={14} className="text-primary" />
+                  Content pipeline
+                </div>
+                <p className="mt-1 text-sm text-foreground">{contentTasks.length} content task(s)</p>
+              </div>
+              <div className="hidden items-center gap-1 text-muted sm:flex">
+                {PIPELINE_STAGES.map((stage, index) => (
+                  <div key={stage.key} className="flex items-center gap-1">
+                    <span className="text-[11px]">{stage.label}</span>
+                    {index < PIPELINE_STAGES.length - 1 && <ArrowRight size={12} />}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {contentTasks.length > 0 ? (
+              <div className="grid gap-2 p-3 md:grid-cols-5">
+                {pipeline.map((stage) => (
+                  <div key={stage.key} className="rounded-lg border border-white/10 bg-background/35 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className={cn("h-2 w-2 rounded-full", stage.accent)} />
+                        <h3 className="text-xs font-semibold text-foreground">{stage.label}</h3>
+                      </div>
+                      <span className="text-[11px] text-muted">{stage.tasks.length}</span>
+                    </div>
+                    <ul className="mt-3 space-y-2">
+                      {stage.tasks.slice(0, 2).map((task) => (
+                        <li key={task.id} className="text-xs leading-snug text-muted">
+                          <span className="line-clamp-2 text-foreground">{task.title}</span>
+                          <span className="mt-1 block capitalize">{task.priority}</span>
+                        </li>
+                      ))}
+                      {stage.tasks.length === 0 && (
+                        <li className="text-xs text-muted/60">Empty</li>
+                      )}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4">
+                <div className="rounded-lg border border-dashed border-white/10 px-4 py-6 text-sm text-muted">
+                  No content tasks detected. Add content, draft, edit, scheduled, or published to a task title or tag.
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+
+        <aside className="space-y-5">
+          <section className="rounded-lg border border-white/10 bg-surface">
+            <div className="border-b border-white/10 px-4 py-3">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                <Banknote size={14} className="text-amber-300" />
+                Money moves
+              </div>
+              <p className="mt-1 text-sm text-foreground">{moneyTasks.length} revenue task(s)</p>
+            </div>
+            {moneyTasks.length > 0 ? (
+              <ul className="divide-y divide-white/5">
+                {moneyTasks.slice(0, 5).map((task) => (
+                  <li key={task.id} className="px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="line-clamp-2 text-sm font-medium text-foreground">{task.title}</p>
+                        <p className="mt-1 text-xs text-muted">{taskDateLabel(task)}</p>
+                      </div>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
+                          priorityClass(task.priority)
+                        )}
+                      >
+                        {task.priority}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="p-4 text-sm text-muted">
+                <p>No revenue task is visible.</p>
+                <Link
+                  href="/backlog"
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-foreground hover:bg-white/15"
+                >
+                  <Inbox size={14} />
+                  Add money task
+                </Link>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-lg border border-white/10 bg-surface">
+            <div className="border-b border-white/10 px-4 py-3">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                <Trophy size={14} className="text-emerald-300" />
+                Weekly review + wins
+              </div>
+              <p className="mt-1 text-sm text-foreground">Proof of progress</p>
+            </div>
+            <div className="grid grid-cols-2 divide-x divide-white/10 border-b border-white/10">
+              <div className="px-4 py-3">
+                <p className="text-2xl font-semibold text-foreground">{winsToday}</p>
+                <p className="text-xs text-muted">done today</p>
+              </div>
+              <div className="px-4 py-3">
+                <p className="text-2xl font-semibold text-foreground">{publishedContentCount}</p>
+                <p className="text-xs text-muted">published</p>
+              </div>
+            </div>
+            <div className="p-4">
+              <Link
+                href="/review"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+              >
+                Close the week
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+          </section>
+
+          <section>
+            <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+              <Target size={14} className="text-primary" />
+              Win condition
+            </div>
+            <PriorityAnchorsCard variant="week" />
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }

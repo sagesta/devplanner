@@ -10,6 +10,7 @@ import {
   LayoutList,
   Lightbulb,
   Settings,
+  Target,
   Zap,
   CheckCircle2,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import { fetchTasks } from "@/lib/api";
 const NAV_ITEMS = [
   { href: "/board", label: "Board", icon: KanbanSquare },
   { href: "/now", label: "Now", icon: Zap },
+  { href: "/goals", label: "Goals", icon: Target },
   { href: "/timeline", label: "Timeline", icon: ChartGantt },
   { href: "/table", label: "Table", icon: LayoutList },
   { href: "/backlog", label: "Backlog", icon: Inbox },

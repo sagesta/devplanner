@@ -13,7 +13,9 @@ import {
   PanelLeftOpen,
   Settings,
   Sun,
+  Target,
   Moon,
+  Trophy,
   Zap,
 } from "lucide-react";
 import Link from "next/link";
@@ -31,11 +33,13 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   ["/now", "Today", Zap],
-  ["/backlog", "Capture", Inbox],
-  ["/board", "Plan", KanbanSquare],
+  ["/goals", "Goals", Target],
+  ["/backlog", "Inbox", Inbox],
+  ["/board", "Board", KanbanSquare],
+  ["/sprints", "Sprints", CalendarCheck],
+  ["/review", "Review", Trophy],
   ["/timeline", "Timeline", ChartGantt],
   ["/table", "Table", LayoutList],
-  ["/sprints", "Sprints", CalendarCheck],
   ["/insights", "Insights", BarChart3],
   ["/settings", "Settings", Settings],
 ] as const;
@@ -99,7 +103,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ) : (
               <>
                 <p className="text-lg font-semibold text-foreground">DevPlanner</p>
-                <p className="mt-0.5 text-[11px] text-muted">Today. Capture. Plan. Review.</p>
+                <p className="mt-0.5 text-[11px] text-muted">Execute. Ship. Sell.</p>
               </>
             )}
           </div>
