@@ -178,7 +178,7 @@ export function PriorityAnchorsCard({
                   {PERIOD_LABEL[period]}
                 </h3>
                 <span className="text-[10px] text-muted/70">
-                  {periodStart}
+                  {new Date(periodStart + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                 </span>
                 {filledCount === 0 && !isEditing && (
                   <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300">

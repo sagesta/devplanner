@@ -36,11 +36,11 @@ import {
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { key: "general", label: "General", icon: SettingsIcon },
-  { key: "areas", label: "Areas", icon: Layers },
-  { key: "calendar", label: "Calendar", icon: Calendar },
-  { key: "focus", label: "Focus", icon: Zap },
-  { key: "ai", label: "AI", icon: Cpu },
+  { key: "general", label: "General", icon: SettingsIcon, hint: "Account info and app defaults" },
+  { key: "areas", label: "Areas", icon: Layers, hint: "Life areas and weekly time budgets" },
+  { key: "calendar", label: "Calendar", icon: Calendar, hint: "Sync tasks with Google Calendar or CalDAV" },
+  { key: "focus", label: "Focus", icon: Zap, hint: "Pomodoro timers and distraction settings" },
+  { key: "ai", label: "AI", icon: Cpu, hint: "Chat model, cost tracking, and assistant behavior" },
 ] as const;
 
 export default function SettingsPage() {
@@ -263,6 +263,7 @@ export default function SettingsPage() {
                 : "border-transparent text-muted hover:text-foreground"
             )}
             onClick={() => setTab(key)}
+            title={TABS.find(t => t.key === key)?.hint}
           >
             <Icon size={13} />
             {label}
@@ -270,12 +271,24 @@ export default function SettingsPage() {
         ))}
       </div>
 
+      {/* Tab hint */}
+      <p className="mt-3 text-xs text-muted">
+        {TABS.find(t => t.key === tab)?.hint}
+      </p>
+
       <div className="mt-5 animate-fadeIn" key={tab}>
         {tab === "general" && (
           <section className="rounded-xl border border-white/10 bg-surface p-5">
             <h2 className="text-sm font-semibold text-foreground">General</h2>
             <p className="mt-2 text-sm text-muted leading-relaxed">
-              Your daily capacity defaults to <strong>4h work / 2h personal</strong>. The AI
+              Your daily capacity is derived from the weekly hour targets you set in{" "}
+              <button
+                type="button"
+                className="text-primary hover:underline font-medium"
+                onClick={() => setTab("areas")}
+              >
+                Settings → Areas
+              </button>. The AI
               assistant uses these limits when suggesting a schedule.
             </p>
             <p className="mt-3 text-sm text-muted leading-relaxed">

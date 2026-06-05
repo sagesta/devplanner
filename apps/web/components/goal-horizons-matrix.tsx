@@ -210,14 +210,11 @@ export function GoalHorizonsMatrix({
             </h2>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
               <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">
-                {filledCount}/9 cells filled
-              </span>
-              <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">
-                {progressPercent}% mapped
+                {filledCount} of 9 goals set
               </span>
               {lastSavedAt && (
                 <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">
-                  Autosaved {lastSavedAt}
+                  Autosaved today at {lastSavedAt}
                 </span>
               )}
             </div>
@@ -245,7 +242,7 @@ export function GoalHorizonsMatrix({
                 title="Fill the matrix with editable starter examples"
               >
                 <Sparkles size={14} />
-                Starter
+                Load template
               </button>
               <button
                 type="button"
@@ -269,7 +266,7 @@ export function GoalHorizonsMatrix({
                 type="button"
                 onClick={resetGoals}
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-muted transition-colors hover:bg-white/5 hover:text-foreground"
-                title="Clear every goal"
+                title="Caution: clears every goal in the matrix"
               >
                 <RefreshCw size={14} />
                 Reset

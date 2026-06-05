@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { CalendarCheck, Plus, ArrowLeft, Pencil, Trash2, Check, X } from "lucide-react";
+import { CalendarCheck, Plus, ArrowLeft, Pencil, Trash2, Check, X, Target } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
@@ -101,7 +101,14 @@ export default function SprintsPage() {
 
   return (
     <div>
-      <PriorityAnchorsCard variant="week" className="mb-6" />
+      <div className="mb-6">
+        <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+          <Target size={14} className="text-primary" />
+          Weekly focus
+        </div>
+        <p className="mb-2 text-xs text-muted">Your north-star anchor — linked to your active sprint.</p>
+        <PriorityAnchorsCard variant="week" />
+      </div>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl text-foreground">Sprints</h1>
@@ -284,9 +291,13 @@ export default function SprintsPage() {
                       <h3 className="text-sm font-medium text-foreground">{s.name}</h3>
                       <span className={cn(
                         "rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider",
-                        STATUS_COLORS[s.status] ?? STATUS_COLORS.planned
+                        s.status === "active" && s.endDate && s.endDate < new Date().toISOString().slice(0, 10)
+                          ? "bg-red-500/20 text-red-300"
+                          : STATUS_COLORS[s.status] ?? STATUS_COLORS.planned
                       )}>
-                        {s.status}
+                        {s.status === "active" && s.endDate && s.endDate < new Date().toISOString().slice(0, 10)
+                          ? "expired"
+                          : s.status}
                       </span>
                     </>
                   )}
@@ -331,7 +342,7 @@ export default function SprintsPage() {
                   className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-foreground hover:bg-white/5 disabled:opacity-40 transition-colors"
                   onClick={() => patchMut.mutate({ id: s.id, body: { status: "planned" } })}
                 >
-                  Unset active
+                  Deactivate
                 </button>
               )}
               {s.status !== "completed" && (

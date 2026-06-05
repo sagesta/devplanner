@@ -150,9 +150,9 @@ export default function BacklogPage() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl text-foreground">Backlog</h1>
+      <h1 className="font-display text-2xl text-foreground">Inbox</h1>
       <p className="mt-1 text-sm text-muted">
-        Tasks without a sprint — {q.data?.length ?? 0} total.
+        Unassigned tasks — {q.data?.length ?? 0} total.
       </p>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {(["all", "work", "personal", "growth"] as const).map((key) => (

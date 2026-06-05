@@ -183,12 +183,16 @@ function QuestionTile({
   meta,
   Icon,
   tone = "text-primary",
+  action,
+  metaHref,
 }: {
   label: string;
   value: string;
   meta: string;
   Icon: LucideIcon;
   tone?: string;
+  action?: React.ReactNode;
+  metaHref?: string;
 }) {
   return (
     <div className="rounded-lg border border-white/10 bg-surface px-4 py-3">
@@ -199,7 +203,14 @@ function QuestionTile({
       <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-foreground">
         {value}
       </p>
-      <p className="mt-2 truncate text-xs text-muted">{meta}</p>
+      {metaHref ? (
+        <Link href={metaHref} className="mt-2 block truncate text-xs text-primary hover:underline">
+          {meta}
+        </Link>
+      ) : (
+        <p className="mt-2 truncate text-xs text-muted">{meta}</p>
+      )}
+      {action && <div className="mt-2">{action}</div>}
     </div>
   );
 }
@@ -460,8 +471,8 @@ export default function NowPage() {
             <div className="min-w-[210px] rounded-lg border border-white/10 bg-surface px-3 py-2">
               <div className="flex items-center justify-between gap-3 text-[11px] text-muted">
                 <span className="font-semibold uppercase tracking-wide">Capacity</span>
-                <span className={cn("font-medium", used > capacity ? "text-red-300" : "text-foreground")}>
-                  {used}/{capacity}m
+                <span className={cn("font-medium", used > capacity ? "text-red-300" : "text-foreground")} title="Daily capacity in minutes">
+                  {used} / {capacity} min
                 </span>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/40">
@@ -474,7 +485,7 @@ export default function NowPage() {
           )}
 
           <label className="min-w-[160px] text-[11px] font-semibold uppercase tracking-wide text-muted">
-            Energy
+            Filter by energy
             <select
               className="mt-1 w-full rounded-lg border border-white/10 bg-surface px-2 py-2 text-xs font-normal text-foreground"
               value={energyFilter}
@@ -507,19 +518,27 @@ export default function NowPage() {
           label="What am I doing today?"
           value={activeItem?.title ?? todayFocusItems[0]?.title ?? "Nothing locked yet"}
           meta={activeItem?.parentTitle ?? `${todayFocusItems.length} task(s) selected`}
+          action={!activeItem && todayFocusItems.length === 0 ? (
+            <Link href="/backlog" className="inline-flex items-center gap-1.5 rounded-md bg-primary/15 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-primary/25 transition-colors">
+              <CalendarPlus size={12} />
+              Lock tasks
+            </Link>
+          ) : undefined}
         />
         <QuestionTile
           Icon={PackageCheck}
           label="What am I shipping next?"
           value={nextShipTask?.title ?? upNextItems[0]?.title ?? "No minimum ship visible"}
-          meta={nextShipTask ? `${contentStage(nextShipTask)} - ${taskDateLabel(nextShipTask)}` : "Pull one from Inbox"}
+          meta={nextShipTask ? `${contentStage(nextShipTask)} · ${taskDateLabel(nextShipTask)}` : "Pull one from Inbox →"}
+          metaHref={nextShipTask ? undefined : "/backlog"}
           tone="text-emerald-300"
         />
         <QuestionTile
           Icon={Banknote}
           label="What makes money this week?"
           value={topMoneyTask?.title ?? "No money move visible"}
-          meta={topMoneyTask ? `${topMoneyTask.priority} - ${taskDateLabel(topMoneyTask)}` : "Tag or title one revenue task"}
+          meta={topMoneyTask ? `${topMoneyTask.priority} · ${taskDateLabel(topMoneyTask)}` : "Tag or title one revenue task →"}
+          metaHref={topMoneyTask ? undefined : "/backlog"}
           tone="text-amber-300"
         />
       </section>
@@ -589,23 +608,37 @@ export default function NowPage() {
       )}
 
       {overdueRoots.length >= 3 && !rescueDismissed && (
-        <div className="flex flex-col gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-foreground sm:flex-row sm:items-center sm:justify-between">
-          <span>{overdueRoots.length} overdue tasks. Move them into today?</span>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => rescueMut.mutate(overdueRoots.map((t) => t.id))}
-              disabled={rescueMut.isPending}
-              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
-            >
-              Reschedule all
-            </button>
-            <button
-              onClick={() => setRescueDismissed(true)}
-              className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-muted hover:bg-white/5"
-            >
-              Dismiss
-            </button>
+        <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-foreground">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span className="font-medium">{overdueRoots.length} overdue tasks. Move them into today?</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => rescueMut.mutate(overdueRoots.map((t) => t.id))}
+                disabled={rescueMut.isPending}
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
+              >
+                Reschedule all
+              </button>
+              <button
+                onClick={() => setRescueDismissed(true)}
+                className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-muted hover:bg-white/5"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
+          <ul className="mt-2 space-y-1">
+            {overdueRoots.slice(0, 5).map((t) => (
+              <li key={t.id} className="flex items-center gap-2 text-xs text-amber-200/80">
+                <AlertTriangle size={10} className="shrink-0 text-amber-400/60" />
+                <span className="truncate">{t.title}</span>
+                <span className="shrink-0 text-amber-400/50">{t.dueDate?.slice(0, 10) ?? t.scheduledDate?.slice(0, 10)}</span>
+              </li>
+            ))}
+            {overdueRoots.length > 5 && (
+              <li className="text-xs text-amber-400/50">…and {overdueRoots.length - 5} more</li>
+            )}
+          </ul>
         </div>
       )}
 
@@ -687,8 +720,30 @@ export default function NowPage() {
                 </div>
               </div>
             ) : (
-              <div className="p-4 text-sm text-muted">
-                Pick a task from Today Tasks or schedule one from Inbox.
+              <div className="p-4">
+                <p className="text-sm text-muted">Pick a task to start your work block.</p>
+                {unscheduledRoots.length > 0 ? (
+                  <select
+                    className="mt-2 w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground"
+                    defaultValue=""
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      if (id) rescueMut.mutate([id]);
+                    }}
+                  >
+                    <option value="" disabled>Select a task from Inbox…</option>
+                    {unscheduledRoots.slice(0, 10).map((task) => (
+                      <option key={task.id} value={task.id}>
+                        {task.title} ({task.priority})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Link href="/backlog" className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-white/10 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/15 transition-colors">
+                    <Inbox size={14} />
+                    Go to Inbox
+                  </Link>
+                )}
               </div>
             )}
           </section>
@@ -701,7 +756,7 @@ export default function NowPage() {
                   Today tasks
                 </div>
                 <p className="mt-1 text-sm text-foreground">
-                  {todayFocusItems.length}/7 selected
+                  {todayFocusItems.length} task{todayFocusItems.length !== 1 ? "s" : ""} added · Recommended: 3–7
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5 text-[11px] text-muted">
@@ -855,8 +910,18 @@ export default function NowPage() {
               </div>
             ) : (
               <div className="p-4">
-                <div className="rounded-lg border border-dashed border-white/10 px-4 py-6 text-sm text-muted">
-                  No content tasks detected. Add content, draft, edit, scheduled, or published to a task title or tag.
+                <div className="rounded-lg border border-dashed border-white/10 px-4 py-6 text-center">
+                  <FileText size={24} className="mx-auto mb-2 text-primary/40" />
+                  <p className="text-sm text-muted">
+                    No content tasks detected. Add <em>content</em>, <em>draft</em>, <em>edit</em>, <em>scheduled</em>, or <em>published</em> to a task title or tag.
+                  </p>
+                  <Link
+                    href="/backlog"
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-foreground hover:bg-white/15 transition-colors"
+                  >
+                    <FileText size={14} />
+                    Add content task
+                  </Link>
                 </div>
               </div>
             )}
@@ -930,7 +995,7 @@ export default function NowPage() {
                 href="/review"
                 className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
               >
-                Close the week
+                Go to Weekly Review
                 <ArrowRight size={14} />
               </Link>
             </div>

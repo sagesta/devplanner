@@ -113,7 +113,7 @@ function DayCell({
         <span className="absolute text-sm font-semibold text-foreground">{date.getDate()}</span>
       </div>
       <div className="text-[11px] text-muted">
-        {day.plannedUnits === 0 ? "Open" : `${day.completedUnits}/${day.plannedUnits} done`}
+        {day.plannedUnits === 0 ? "No tasks" : `${day.completedUnits}/${day.plannedUnits} done`}
       </div>
     </button>
   );
@@ -286,16 +286,22 @@ export default function InsightsPage() {
             Learned signals
           </div>
           <p className="mt-3 text-2xl font-semibold text-foreground">
-            {previewMut.data?.learning.observedCompletionCount ?? "Ready"}
+            {previewMut.data?.learning.observedCompletionCount ?? "Awaiting data"}
           </p>
-          <p className="mt-1 text-xs text-muted">Completions and timers guide the next scheduling pass.</p>
+          <p className="mt-1 text-xs text-muted">Complete tasks with the timer to collect scheduling data.</p>
         </div>
         <div className="rounded-lg border border-white/10 bg-surface p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
             <Activity size={15} className="text-primary" />
             Daily capacity
           </div>
-          <p className="mt-3 text-2xl font-semibold text-foreground">{monthQuery.data?.dailyCapacity ?? 0}m</p>
+          <p className="mt-3 text-2xl font-semibold text-foreground">
+            {(() => {
+              const cap = monthQuery.data?.dailyCapacity ?? 0;
+              if (cap >= 60) return `${Math.floor(cap / 60)}h ${cap % 60}m`;
+              return `${cap} min`;
+            })()}
+          </p>
           <p className="mt-1 text-xs text-muted">Used as a soft limit for rollover proposals.</p>
         </div>
       </section>

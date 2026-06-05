@@ -133,27 +133,36 @@ export default function ReviewPage() {
         </div>
 
         {/* Progress dots */}
-        <div className="mt-5 flex items-center gap-0">
-          {STEPS.map((_, i) => (
-            <div key={i} className="flex items-center">
-              <button
-                type="button"
-                onClick={() => setStep(i)}
-                className={cn(
-                  "rounded-full transition-all",
-                  i <= step ? "text-primary" : "text-muted/30"
-                )}
-              >
-                {i < step ? (
-                  <CheckCircle2 size={20} />
-                ) : (
-                  <Circle size={20} className={cn(i === step && "text-primary fill-primary/20")} />
-                )}
-              </button>
+        <div className="mt-5 flex items-start gap-0">
+          {STEPS.map((s, i) => (
+            <div key={i} className="flex items-start">
+              <div className="flex flex-col items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setStep(i)}
+                  title={s.title}
+                  className={cn(
+                    "rounded-full transition-all",
+                    i <= step ? "text-primary" : "text-muted/30"
+                  )}
+                >
+                  {i < step ? (
+                    <CheckCircle2 size={20} />
+                  ) : (
+                    <Circle size={20} className={cn(i === step && "text-primary fill-primary/20")} />
+                  )}
+                </button>
+                <span className={cn(
+                  "text-[9px] max-w-[60px] text-center leading-tight",
+                  i <= step ? "text-foreground/70" : "text-muted/40"
+                )}>
+                  {s.title.split(" ").slice(0, 2).join(" ")}
+                </span>
+              </div>
               {i < STEPS.length - 1 && (
                 <div
                   className={cn(
-                    "h-0.5 w-8 transition-colors",
+                    "mt-2.5 h-0.5 w-8",
                     i < step ? "bg-primary" : "bg-white/10"
                   )}
                 />

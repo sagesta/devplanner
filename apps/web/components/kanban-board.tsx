@@ -370,7 +370,14 @@ export function KanbanBoard() {
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Active sprint board</p>
           <h1 className="mt-1 truncate font-display text-xl text-foreground">{activeSprint.name}</h1>
-          <p className="mt-0.5 text-xs text-muted">{activeSprint.startDate} to {activeSprint.endDate}</p>
+          <div className="mt-0.5 flex items-center gap-2">
+            <p className="text-xs text-muted">{activeSprint.startDate} to {activeSprint.endDate}</p>
+            {activeSprint.endDate < todayYmd && (
+              <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-semibold text-red-300">
+                Sprint expired
+              </span>
+            )}
+          </div>
         </div>
         {activeSprints.length > 1 && (
           <label className="flex shrink-0 flex-col gap-1 text-[10px] font-medium uppercase tracking-wide text-muted">
