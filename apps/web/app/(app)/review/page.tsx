@@ -1,7 +1,8 @@
 "use client";
 
-import { CheckCircle2, Circle } from "lucide-react";
+import { BarChart3, CheckCircle2, Circle, ClipboardCheck } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +11,7 @@ import { TimeWeekPanel } from "@/components/TimeWeekPanel";
 import { startOfWeekMonday, addDaysYMD } from "@/lib/timeline-utils";
 import { createSprint, saveReview } from "@/lib/api";
 import { useAppUserId } from "@/hooks/use-app-user-id";
+import InsightsPage from "../insights/page";
 
 const REVIEW_LS = "devplanner.weeklyReview.v1";
 
@@ -33,7 +35,7 @@ function toYmd(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-export default function ReviewPage() {
+function WeeklyReviewContent() {
   const [step, setStep] = useState(0);
   const [notes, setNotes] = useState<string[]>(["", "", "", "", ""]);
   const [hydrated, setHydrated] = useState(false);
@@ -247,6 +249,76 @@ export default function ReviewPage() {
       <div className="hidden lg:block space-y-4">
         <TimeWeekPanel weekStart={lastWeekStart} />
       </div>
+    </div>
+  );
+}
+
+const REVIEW_VIEWS = [
+  {
+    key: "weekly",
+    label: "Weekly review",
+    href: "/review?view=weekly",
+    Icon: ClipboardCheck,
+    description: "Record wins, carryover, and next-week intentions.",
+  },
+  {
+    key: "progress",
+    label: "Progress",
+    href: "/review?view=progress",
+    Icon: BarChart3,
+    description: "Read progress rings, capacity signals, and rollover proposals.",
+  },
+] as const;
+
+type ReviewView = (typeof REVIEW_VIEWS)[number]["key"];
+
+function normalizeReviewView(value: string | null): ReviewView {
+  return value === "progress" ? "progress" : "weekly";
+}
+
+export default function ReviewPage() {
+  const searchParams = useSearchParams();
+  const activeView = normalizeReviewView(searchParams.get("view"));
+
+  return (
+    <div className="mx-auto flex max-w-[1440px] flex-col gap-5 pb-10">
+      <header className="flex flex-col gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Review room</p>
+          <h1 className="mt-1 text-2xl font-semibold text-foreground">Review</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted">
+            Close the loop with reflection, progress signals, and deliberate rollover.
+          </p>
+        </div>
+      </header>
+
+      <nav className="grid gap-2 md:grid-cols-2" aria-label="Review views">
+        {REVIEW_VIEWS.map(({ key, href, label, Icon, description }) => {
+          const selected = activeView === key;
+          return (
+            <Link
+              key={key}
+              href={href}
+              className={cn(
+                "rounded-lg border px-3 py-3 transition-colors",
+                selected
+                  ? "border-primary/50 bg-primary/10 text-foreground"
+                  : "border-white/10 bg-surface text-muted hover:bg-white/5 hover:text-foreground"
+              )}
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                <Icon size={15} className={selected ? "text-primary" : "text-muted"} />
+                {label}
+              </span>
+              <span className="mt-1 block text-xs leading-snug text-muted">{description}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      <section className="rounded-lg border border-white/10 bg-background/20 p-4">
+        {activeView === "weekly" ? <WeeklyReviewContent /> : <InsightsPage />}
+      </section>
     </div>
   );
 }

@@ -2,7 +2,6 @@
 
 import { Command } from "cmdk";
 import {
-  BarChart3,
   CalendarCheck,
   ChartGantt,
   Inbox,
@@ -13,6 +12,7 @@ import {
   Target,
   Zap,
   CheckCircle2,
+  Trophy,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -21,15 +21,17 @@ import { useAppUserId } from "@/hooks/use-app-user-id";
 import { fetchTasks } from "@/lib/api";
 
 const NAV_ITEMS = [
-  { href: "/board", label: "Board", icon: KanbanSquare },
-  { href: "/now", label: "Now", icon: Zap },
+  { href: "/now", label: "Today", icon: Zap },
+  { href: "/backlog", label: "Inbox", icon: Inbox },
+  { href: "/plan", label: "Plan", icon: CalendarCheck },
+  { href: "/review", label: "Review", icon: Trophy },
   { href: "/goals", label: "Goals", icon: Target },
-  { href: "/timeline", label: "Timeline", icon: ChartGantt },
-  { href: "/table", label: "Table", icon: LayoutList },
-  { href: "/backlog", label: "Backlog", icon: Inbox },
-  { href: "/sprints", label: "Sprints", icon: CalendarCheck },
-  { href: "/review", label: "Weekly review", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/plan?view=sprints", label: "Plan: Sprints", icon: CalendarCheck },
+  { href: "/plan?view=board", label: "Plan: Board", icon: KanbanSquare },
+  { href: "/plan?view=timeline", label: "Plan: Timeline", icon: ChartGantt },
+  { href: "/plan?view=table", label: "Plan: Table", icon: LayoutList },
+  { href: "/review?view=progress", label: "Review: Progress", icon: ChartGantt },
 ] as const;
 
 export function CommandMenu({

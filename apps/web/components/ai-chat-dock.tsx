@@ -36,12 +36,14 @@ const LS_TOOLS = "devplanner.aiToolsEnabled";
 const VIEW_NAMES: Record<string, string> = {
   board: "Board",
   goals: "Goals",
+  plan: "Plan",
   now: "Now",
   timeline: "Timeline",
   table: "Table",
   backlog: "Backlog",
   sprints: "Sprints",
   review: "Review",
+  insights: "Review",
 };
 
 const SUGGESTED_PROMPTS = [

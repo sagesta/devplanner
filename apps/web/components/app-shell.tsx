@@ -1,13 +1,9 @@
 "use client";
 
 import {
-  BarChart3,
   Bell,
   CalendarCheck,
-  ChartGantt,
   Inbox,
-  KanbanSquare,
-  LayoutList,
   Lightbulb,
   PanelLeftClose,
   PanelLeftOpen,
@@ -32,17 +28,17 @@ import { useAppUserId } from "@/hooks/use-app-user-id";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  ["/now", "Today", Zap],
-  ["/goals", "Goals", Target],
-  ["/backlog", "Inbox", Inbox],
-  ["/board", "Board", KanbanSquare],
-  ["/sprints", "Sprints", CalendarCheck],
-  ["/review", "Review", Trophy],
-  ["/timeline", "Timeline", ChartGantt],
-  ["/table", "Table", LayoutList],
-  ["/insights", "Insights", BarChart3],
-  ["/settings", "Settings", Settings],
+  { href: "/now", label: "Today", Icon: Zap, matches: ["/now"] },
+  { href: "/backlog", label: "Inbox", Icon: Inbox, matches: ["/backlog"] },
+  { href: "/plan", label: "Plan", Icon: CalendarCheck, matches: ["/plan", "/sprints", "/board", "/timeline", "/table"] },
+  { href: "/review", label: "Review", Icon: Trophy, matches: ["/review", "/insights"] },
+  { href: "/goals", label: "Goals", Icon: Target, matches: ["/goals"] },
+  { href: "/settings", label: "Settings", Icon: Settings, matches: ["/settings"] },
 ] as const;
+
+function isNavActive(pathname: string, matches: readonly string[]) {
+  return matches.some((href) => pathname === href || pathname.startsWith(`${href}/`));
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -64,8 +60,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Per-page <title> for browser tabs / history — "Today — DevPlanner" etc.
   useEffect(() => {
-    const match = NAV.find(([href]) => pathname === href || pathname.startsWith(`${href}/`));
-    const label = match?.[1];
+    const match = NAV.find((item) => isNavActive(pathname, item.matches));
+    const label = match?.label;
     document.title = label ? `${label} — DevPlanner` : "DevPlanner";
   }, [pathname]);
 
@@ -108,8 +104,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </div>
           <nav className={cn("flex flex-1 flex-col gap-0.5 pb-4", collapsed ? "px-1" : "px-3")}>
-            {NAV.map(([href, label, Icon]) => {
-              const active = pathname === href || pathname.startsWith(`${href}/`);
+            {NAV.map(({ href, label, Icon, matches }) => {
+              const active = isNavActive(pathname, matches);
               return (
                 <Link
                   key={href}
@@ -232,8 +228,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className="flex gap-0.5 overflow-x-auto border-t border-white/5 px-2 py-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               aria-label="Main"
             >
-              {NAV.map(([href, label, Icon]) => {
-                const active = pathname === href || pathname.startsWith(`${href}/`);
+              {NAV.map(({ href, label, Icon, matches }) => {
+                const active = isNavActive(pathname, matches);
                 return (
                   <Link
                     key={href}
