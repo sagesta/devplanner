@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { ChevronDown, ChevronRight, Inbox, CheckCircle2, Trash2, Plus, Circle } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronRight, Inbox, CheckCircle2, Trash2, Plus, Circle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -152,8 +152,29 @@ export default function BacklogPage() {
     <div>
       <h1 className="font-display text-2xl text-foreground">Inbox</h1>
       <p className="mt-1 text-sm text-muted">
-        Unassigned tasks — {q.data?.length ?? 0} total.
+        Captured work that has not been committed to a sprint yet — {q.data?.length ?? 0} total.
       </p>
+      <div className="mt-4 grid gap-2 rounded-lg border border-white/10 bg-surface p-3 text-xs text-muted lg:grid-cols-4">
+        <div className="flex items-center gap-2">
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-white/5 text-[10px] font-semibold text-foreground">1</span>
+          Capture via Brain dump or quick add.
+        </div>
+        <div className="flex items-center gap-2">
+          <ArrowRight size={13} className="hidden shrink-0 text-muted/50 lg:block" />
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-white/5 text-[10px] font-semibold text-foreground">2</span>
+          Clarify priority, area, energy, and subtasks.
+        </div>
+        <div className="flex items-center gap-2">
+          <ArrowRight size={13} className="hidden shrink-0 text-muted/50 lg:block" />
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-white/5 text-[10px] font-semibold text-foreground">3</span>
+          Add the few that matter to a sprint.
+        </div>
+        <div className="flex items-center gap-2">
+          <ArrowRight size={13} className="hidden shrink-0 text-muted/50 lg:block" />
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-primary/15 text-[10px] font-semibold text-primary">4</span>
+          Execute from Today, Board, or Timeline.
+        </div>
+      </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {(["all", "work", "personal", "growth"] as const).map((key) => (
           <button

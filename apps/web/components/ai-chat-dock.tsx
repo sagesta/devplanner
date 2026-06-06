@@ -35,6 +35,7 @@ const LS_TOOLS = "devplanner.aiToolsEnabled";
 /** Map pathname segments to view names the backend recognises */
 const VIEW_NAMES: Record<string, string> = {
   board: "Board",
+  goals: "Goals",
   now: "Now",
   timeline: "Timeline",
   table: "Table",
