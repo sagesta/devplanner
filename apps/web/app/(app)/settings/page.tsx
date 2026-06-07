@@ -40,7 +40,7 @@ const TABS = [
   { key: "areas", label: "Areas", icon: Layers, hint: "Life areas and weekly time budgets" },
   { key: "calendar", label: "Calendar", icon: Calendar, hint: "Sync tasks with Google Calendar or CalDAV" },
   { key: "focus", label: "Focus", icon: Zap, hint: "Pomodoro timers and distraction settings" },
-  { key: "ai", label: "AI", icon: Cpu, hint: "Chat model, cost tracking, and assistant behavior" },
+  { key: "ai", label: "AI", icon: Cpu, hint: "Chat model and assistant behavior" },
 ] as const;
 
 export default function SettingsPage() {
@@ -664,7 +664,7 @@ export default function SettingsPage() {
             </p>
           </div>
           <section className="rounded-xl border border-white/10 bg-surface p-5">
-            <h2 className="text-sm font-semibold text-foreground">AI cost log</h2>
+            <h2 className="text-sm font-semibold text-foreground">AI usage log</h2>
             {logsQ.isLoading && (
               <div className="mt-3 space-y-2">
                 <Skeleton className="h-8 w-full rounded" />
@@ -681,7 +681,6 @@ export default function SettingsPage() {
                       <th className="p-2">Job</th>
                       <th className="p-2">Model</th>
                       <th className="p-2 text-right">Tokens</th>
-                      <th className="p-2 text-right">Cost</th>
                       <th className="p-2 text-right">Latency</th>
                     </tr>
                   </thead>
@@ -695,9 +694,6 @@ export default function SettingsPage() {
                         <td className="p-2 text-muted font-mono">{l.model}</td>
                         <td className="p-2 text-right text-muted">
                           {l.inputTokens ?? "—"}/{l.outputTokens ?? "—"}
-                        </td>
-                        <td className="p-2 text-right text-muted">
-                          {l.costUsdEstimate != null ? `$${l.costUsdEstimate.toFixed(4)}` : "—"}
                         </td>
                         <td className="p-2 text-right text-muted">
                           {l.latencyMs ? `${l.latencyMs}ms` : "—"}

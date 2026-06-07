@@ -132,7 +132,7 @@ export const priorityRoutes = new Hono<AppEnv>()
     return c.json({ ok: true, upserted: upserts.length, deleted: deletes.length });
   })
   /**
-   * Suggest 3 anchors (Work / Personal / Growth) for the given period
+   * Suggest 3 anchors (Work / Personal / Professional) for the given period
    * based on the user's recent task history. Returns drafts — never writes.
    */
   .post("/suggest", async (c) => {
@@ -184,7 +184,7 @@ export const priorityRoutes = new Hono<AppEnv>()
       userId,
       jobType: "suggest_priorities",
       model,
-      system: `Return JSON: {"anchors":[{"category":"work"|"personal"|"growth","statement":string}]}. Exactly three items, one per category, in that order. Each statement is one sentence, outcome-focused (not a to-do), tied to a theme you observed in the user's recent task history. Do not invent commitments the user hasn't already started. If the user's history shows little personal or growth activity, write an aspirational but realistic statement for those categories rather than leaving them blank. Period: the ${periodLabel}.`,
+      system: `Return JSON: {"anchors":[{"category":"work"|"personal"|"growth","statement":string}]}. Exactly three items: work, personal, and professional development. Use category "growth" for the professional-development item because that is the stored enum. Each statement is one sentence, outcome-focused (not a to-do), tied to a theme you observed in the user's recent task history. Do not invent commitments the user hasn't already started. If the user's history shows little personal or professional activity, write an aspirational but realistic statement for those categories rather than leaving them blank. Period: the ${periodLabel}.`,
       user: summary || "No recent task history yet.",
     });
     let drafts: { category: Category; statement: string }[] = [];

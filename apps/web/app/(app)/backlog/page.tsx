@@ -38,13 +38,18 @@ const RECURRENCE_PRESETS: { label: string; value: string }[] = [
   { label: "Monthly", value: "FREQ=MONTHLY" },
 ];
 
-type AreaFilter = "all" | "work" | "personal" | "growth";
+type AreaFilter = "all" | "work" | "personal" | "professional";
 
 function localISODate(d = new Date()) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function displayAreaName(area?: AreaRow): string {
+  if (!area) return "Unknown area";
+  return area.name.trim().toLowerCase() === "growth" ? "Professional" : area.name;
 }
 
 export default function BacklogPage() {
@@ -141,7 +146,7 @@ export default function BacklogPage() {
     const n = (area?.name ?? "").toLowerCase();
     if (areaFilter === "work") return n.includes("work");
     if (areaFilter === "personal") return n.includes("personal");
-    return n.includes("growth");
+    return n.includes("professional") || n.includes("growth");
   }
 
   const filteredGroups = Array.from(grouped.entries()).filter(([areaId]) =>
@@ -176,7 +181,7 @@ export default function BacklogPage() {
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
-        {(["all", "work", "personal", "growth"] as const).map((key) => (
+        {(["all", "work", "personal", "professional"] as const).map((key) => (
           <button
             key={key}
             type="button"
@@ -188,7 +193,7 @@ export default function BacklogPage() {
                 : "bg-white/5 text-muted hover:bg-white/10 hover:text-foreground"
             )}
           >
-            {key === "all" ? "All areas" : key === "work" ? "Work" : key === "personal" ? "Personal" : "Growth"}
+            {key === "all" ? "All areas" : key === "work" ? "Work" : key === "personal" ? "Personal" : "Professional"}
           </button>
         ))}
       </div>
@@ -211,7 +216,7 @@ export default function BacklogPage() {
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: area.color }} />
                 )}
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                  {area?.name ?? "Unknown area"}
+                  {displayAreaName(area)}
                 </h2>
                 <span className="text-[10px] text-muted/60">{tasks.length}</span>
               </div>
@@ -285,7 +290,7 @@ export default function BacklogPage() {
                         >
                           {(areasQ.data ?? []).map((a) => (
                             <option key={a.id} value={a.id}>
-                              {a.name}
+                              {displayAreaName(a)}
                             </option>
                           ))}
                         </select>

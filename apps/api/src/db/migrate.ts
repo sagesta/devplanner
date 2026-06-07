@@ -208,6 +208,24 @@ export async function runMigrations(pool: pg.Pool): Promise<void> {
         ON priorities (user_id, period_type, period_start);
     `);
 
+    // ── rename the legacy third default area → Professional ───────
+    await client.query(`
+      UPDATE "areas"
+      SET "name" = 'Professional'
+      WHERE lower(trim("name")) = 'growth';
+    `);
+
+    // ── synced goal horizon matrix ────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS goal_horizons (
+        user_id    UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        owner_name VARCHAR(255),
+        goals      JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
     await client.query("COMMIT");
     console.log("[migrate] Schema up-to-date ✓");
   } catch (err) {

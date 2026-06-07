@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Briefcase, Check, Compass, Heart, Pencil, Sparkles, Sprout, X } from "lucide-react";
+import { Briefcase, Check, Compass, GraduationCap, Heart, Pencil, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -32,8 +32,8 @@ const CATEGORY_META: Record<
     accent: "text-rose-300",
   },
   growth: {
-    label: "Growth",
-    Icon: Sprout,
+    label: "Professional",
+    Icon: GraduationCap,
     accent: "text-emerald-300",
   },
 };
@@ -46,7 +46,7 @@ const PERIOD_LABEL: Record<PriorityPeriod, string> = {
 function placeholderFor(category: PriorityCategory): string {
   if (category === "work") return "Ship the thing that matters this week…";
   if (category === "personal") return "What does future-you want to thank you for?";
-  return "What are you learning or practicing?";
+  return "Which professional skill or habit are you improving?";
 }
 
 export function PriorityAnchorsCard({

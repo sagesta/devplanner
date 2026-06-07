@@ -6,12 +6,10 @@ import confetti from "canvas-confetti";
 import {
   AlertTriangle,
   ArrowRight,
-  Banknote,
   CalendarPlus,
   CheckCircle2,
   Circle,
   Clock,
-  FileText,
   Inbox,
   ListChecks,
   PackageCheck,
@@ -26,6 +24,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
 import {
+  fetchBacklog,
   fetchTasks,
   fetchToday,
   patchTask,
@@ -51,54 +50,6 @@ function localISODate(d = new Date()) {
 
 const PRIORITY_ORDER: Record<string, number> = { urgent: 3, high: 2, normal: 1, low: 0 };
 
-const MONEY_KEYWORDS = [
-  "money",
-  "revenue",
-  "sales",
-  "sell",
-  "client",
-  "invoice",
-  "proposal",
-  "pitch",
-  "sponsor",
-  "sponsorship",
-  "offer",
-  "pricing",
-  "paid",
-  "contract",
-  "lead",
-  "deal",
-];
-
-const CONTENT_KEYWORDS = [
-  "content",
-  "idea",
-  "draft",
-  "edit",
-  "publish",
-  "published",
-  "schedule",
-  "scheduled",
-  "post",
-  "article",
-  "newsletter",
-  "video",
-  "youtube",
-  "thread",
-  "essay",
-  "script",
-];
-
-type PipelineStageKey = "idea" | "draft" | "edit" | "scheduled" | "published";
-
-const PIPELINE_STAGES: Array<{ key: PipelineStageKey; label: string; accent: string }> = [
-  { key: "idea", label: "Idea", accent: "bg-sky-400" },
-  { key: "draft", label: "Draft", accent: "bg-violet-400" },
-  { key: "edit", label: "Edit", accent: "bg-amber-400" },
-  { key: "scheduled", label: "Scheduled", accent: "bg-teal-400" },
-  { key: "published", label: "Published", accent: "bg-emerald-400" },
-];
-
 type NowItem = {
   id: string;
   type: "subtask" | "task";
@@ -113,39 +64,8 @@ type NowItem = {
   physicalEnergy: string;
 };
 
-function taskText(task: TaskRow): string {
-  const tags = (task._tags ?? []).map((tag) => tag.name).join(" ");
-  return [task.title, task.description ?? "", task.status, tags].join(" ").toLowerCase();
-}
-
-function matchesAnyKeyword(task: TaskRow, keywords: string[]): boolean {
-  const haystack = taskText(task);
-  return keywords.some((keyword) => haystack.includes(keyword));
-}
-
 function isOpenTask(task: TaskRow): boolean {
   return task.status !== "done" && task.status !== "cancelled";
-}
-
-function isContentTask(task: TaskRow): boolean {
-  return matchesAnyKeyword(task, CONTENT_KEYWORDS);
-}
-
-function isMoneyTask(task: TaskRow): boolean {
-  return matchesAnyKeyword(task, MONEY_KEYWORDS);
-}
-
-function contentStage(task: TaskRow): PipelineStageKey {
-  const text = taskText(task);
-  if (task.status === "done" || text.includes("published") || text.includes("shipped")) {
-    return "published";
-  }
-  if (text.includes("scheduled") || task.scheduledDate || task.dueDate) return "scheduled";
-  if (task.status === "in_progress" || text.includes("edit") || text.includes("review")) {
-    return "edit";
-  }
-  if (task.status === "todo" || text.includes("draft") || text.includes("script")) return "draft";
-  return "idea";
 }
 
 function compareTasksForExecution(a: TaskRow, b: TaskRow): number {
@@ -245,6 +165,12 @@ export default function NowPage() {
     enabled: Boolean(userId),
   });
 
+  const inboxQ = useQuery({
+    queryKey: ["backlog", userId],
+    queryFn: () => fetchBacklog(),
+    enabled: Boolean(userId),
+  });
+
   const doneMut = useMutation({
     mutationFn: async ({ id, type }: { id: string; type: "task" | "subtask" }) => {
       if (type === "task") return patchTask(id, { status: "done" });
@@ -259,6 +185,7 @@ export default function NowPage() {
       });
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId, todayLocal] });
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["backlog", userId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -269,6 +196,7 @@ export default function NowPage() {
       toast.success("Tasks scheduled for today");
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId, todayLocal] });
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["backlog", userId] });
     },
   });
 
@@ -292,6 +220,7 @@ export default function NowPage() {
       setSelectedProposalIds([]);
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId, todayLocal] });
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["backlog", userId] });
       void qc.invalidateQueries({ queryKey: ["calendar-progress"] });
     },
     onError: (e: Error) => toast.error(`Could not apply schedule: ${e.message}`),
@@ -386,36 +315,10 @@ export default function NowPage() {
   }, [allRootTasks, todayLocal]);
 
   const unscheduledRoots = useMemo(() => {
-    return allRootTasks
-      .filter((t) => isOpenTask(t) && !isTaskOverdue(t, todayLocal))
+    return (inboxQ.data ?? [])
+      .filter((t) => isOpenTask(t) && !t.scheduledDate && !isTaskOverdue(t, todayLocal))
       .sort(compareTasksForExecution);
-  }, [allRootTasks, todayLocal]);
-
-  const contentTasks = useMemo(() => {
-    return allRootTasks.filter(isContentTask).sort(compareTasksForExecution);
-  }, [allRootTasks]);
-
-  const moneyTasks = useMemo(() => {
-    return allRootTasks.filter((task) => isOpenTask(task) && isMoneyTask(task)).sort(compareTasksForExecution);
-  }, [allRootTasks]);
-
-  const pipeline = useMemo(() => {
-    return PIPELINE_STAGES.map((stage) => ({
-      ...stage,
-      tasks: contentTasks.filter((task) => contentStage(task) === stage.key),
-    }));
-  }, [contentTasks]);
-
-  const nextShipTask = useMemo(() => {
-    const openContent = contentTasks.filter(isOpenTask);
-    return (
-      openContent.find((task) => contentStage(task) === "scheduled") ??
-      openContent.find((task) => contentStage(task) === "edit") ??
-      openContent.find((task) => contentStage(task) === "draft") ??
-      openContent[0] ??
-      null
-    );
-  }, [contentTasks]);
+  }, [inboxQ.data, todayLocal]);
 
   const taskMix = useMemo(() => {
     return todayFocusItems.reduce(
@@ -445,8 +348,10 @@ export default function NowPage() {
   const capacityPercent = hasCapacityData ? Math.min(100, Math.round((used / capacity) * 100)) : 0;
   const selectedProposals = scheduleProposals.filter((p) => selectedProposalIds.includes(p.id));
   const winsToday = q.data?.doneTodayCount ?? allItems.filter((item) => item.completed).length;
-  const publishedContentCount = contentTasks.filter((task) => contentStage(task) === "published").length;
-  const topMoneyTask = moneyTasks[0] ?? null;
+  const plannedTodayCount = todayFocusItems.length;
+  const nextVisibleTask = upNextItems[0] ?? null;
+  const nextInboxTask = unscheduledRoots[0] ?? null;
+  const attentionTask = overdueRoots[0] ?? null;
 
   return (
     <div className="mx-auto flex max-w-[1440px] flex-col gap-5 pb-10">
@@ -527,18 +432,21 @@ export default function NowPage() {
         />
         <QuestionTile
           Icon={PackageCheck}
-          label="What am I shipping next?"
-          value={nextShipTask?.title ?? upNextItems[0]?.title ?? "No minimum ship visible"}
-          meta={nextShipTask ? `${contentStage(nextShipTask)} · ${taskDateLabel(nextShipTask)}` : "Pull one from Inbox →"}
-          metaHref={nextShipTask ? undefined : "/backlog"}
+          label="What is next?"
+          value={nextVisibleTask?.title ?? nextInboxTask?.title ?? "No next task visible"}
+          meta={
+            nextVisibleTask?.parentTitle ??
+            (nextInboxTask ? `Available in Inbox · ${nextInboxTask.priority}` : "Pull one from Inbox →")
+          }
+          metaHref={nextVisibleTask || nextInboxTask ? undefined : "/backlog"}
           tone="text-emerald-300"
         />
         <QuestionTile
-          Icon={Banknote}
-          label="What makes money this week?"
-          value={topMoneyTask?.title ?? "No money move visible"}
-          meta={topMoneyTask ? `${topMoneyTask.priority} · ${taskDateLabel(topMoneyTask)}` : "Tag or title one revenue task →"}
-          metaHref={topMoneyTask ? undefined : "/backlog"}
+          Icon={AlertTriangle}
+          label="What needs attention?"
+          value={attentionTask?.title ?? "No overdue tasks"}
+          meta={attentionTask ? taskDateLabel(attentionTask) : "Clean for now"}
+          metaHref={attentionTask ? undefined : "/review?view=progress"}
           tone="text-amber-300"
         />
       </section>
@@ -828,7 +736,7 @@ export default function NowPage() {
               </div>
             )}
 
-            {!q.isLoading && !hasScheduledItems && !tasksForRescue.isLoading && unscheduledRoots.length > 0 && (
+            {!q.isLoading && !hasScheduledItems && !inboxQ.isLoading && unscheduledRoots.length > 0 && (
               <div className="border-t border-white/10 p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted">
@@ -863,115 +771,9 @@ export default function NowPage() {
               </div>
             )}
           </section>
-
-          <section className="rounded-lg border border-white/10 bg-surface">
-            <div className="flex flex-col gap-2 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                  <FileText size={14} className="text-primary" />
-                  Content pipeline
-                </div>
-                <p className="mt-1 text-sm text-foreground">{contentTasks.length} content task(s)</p>
-              </div>
-              <div className="hidden items-center gap-1 text-muted sm:flex">
-                {PIPELINE_STAGES.map((stage, index) => (
-                  <div key={stage.key} className="flex items-center gap-1">
-                    <span className="text-[11px]">{stage.label}</span>
-                    {index < PIPELINE_STAGES.length - 1 && <ArrowRight size={12} />}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {contentTasks.length > 0 ? (
-              <div className="grid gap-2 p-3 md:grid-cols-5">
-                {pipeline.map((stage) => (
-                  <div key={stage.key} className="rounded-lg border border-white/10 bg-background/35 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className={cn("h-2 w-2 rounded-full", stage.accent)} />
-                        <h3 className="text-xs font-semibold text-foreground">{stage.label}</h3>
-                      </div>
-                      <span className="text-[11px] text-muted">{stage.tasks.length}</span>
-                    </div>
-                    <ul className="mt-3 space-y-2">
-                      {stage.tasks.slice(0, 2).map((task) => (
-                        <li key={task.id} className="text-xs leading-snug text-muted">
-                          <span className="line-clamp-2 text-foreground">{task.title}</span>
-                          <span className="mt-1 block capitalize">{task.priority}</span>
-                        </li>
-                      ))}
-                      {stage.tasks.length === 0 && (
-                        <li className="text-xs text-muted/60">Empty</li>
-                      )}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-4">
-                <div className="rounded-lg border border-dashed border-white/10 px-4 py-6 text-center">
-                  <FileText size={24} className="mx-auto mb-2 text-primary/40" />
-                  <p className="text-sm text-muted">
-                    No content tasks detected. Add <em>content</em>, <em>draft</em>, <em>edit</em>, <em>scheduled</em>, or <em>published</em> to a task title or tag.
-                  </p>
-                  <Link
-                    href="/backlog"
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-foreground hover:bg-white/15 transition-colors"
-                  >
-                    <FileText size={14} />
-                    Add content task
-                  </Link>
-                </div>
-              </div>
-            )}
-          </section>
         </div>
 
         <aside className="space-y-5">
-          <section className="rounded-lg border border-white/10 bg-surface">
-            <div className="border-b border-white/10 px-4 py-3">
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                <Banknote size={14} className="text-amber-300" />
-                Money moves
-              </div>
-              <p className="mt-1 text-sm text-foreground">{moneyTasks.length} revenue task(s)</p>
-            </div>
-            {moneyTasks.length > 0 ? (
-              <ul className="divide-y divide-white/5">
-                {moneyTasks.slice(0, 5).map((task) => (
-                  <li key={task.id} className="px-4 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="line-clamp-2 text-sm font-medium text-foreground">{task.title}</p>
-                        <p className="mt-1 text-xs text-muted">{taskDateLabel(task)}</p>
-                      </div>
-                      <span
-                        className={cn(
-                          "shrink-0 rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
-                          priorityClass(task.priority)
-                        )}
-                      >
-                        {task.priority}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="p-4 text-sm text-muted">
-                <p>No revenue task is visible.</p>
-                <Link
-                  href="/backlog"
-                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-foreground hover:bg-white/15"
-                >
-                  <Inbox size={14} />
-                  Add money task
-                </Link>
-              </div>
-            )}
-          </section>
-
           <section className="rounded-lg border border-white/10 bg-surface">
             <div className="border-b border-white/10 px-4 py-3">
               <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
@@ -986,8 +788,8 @@ export default function NowPage() {
                 <p className="text-xs text-muted">done today</p>
               </div>
               <div className="px-4 py-3">
-                <p className="text-2xl font-semibold text-foreground">{publishedContentCount}</p>
-                <p className="text-xs text-muted">published</p>
+                <p className="text-2xl font-semibold text-foreground">{plannedTodayCount}</p>
+                <p className="text-xs text-muted">planned today</p>
               </div>
             </div>
             <div className="p-4">

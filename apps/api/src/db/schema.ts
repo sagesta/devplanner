@@ -294,7 +294,7 @@ export const priorities = pgTable(
     periodType: priorityPeriodEnum("period_type").notNull(),
     /** Monday of the week, or 1st of the month — stored as DATE for cheap range queries. */
     periodStart: date("period_start").notNull(),
-    /** Fixed slot: Work / Personal / Growth. */
+    /** Fixed slot: Work / Personal / Professional. Stored as "growth" for legacy enum compatibility. */
     category: priorityCategoryEnum("category").notNull(),
     /** The compass sentence itself. Free-form, not a task title. */
     statement: text("statement").notNull(),
@@ -306,6 +306,17 @@ export const priorities = pgTable(
     index("priorities_user_period_idx").on(t.userId, t.periodType, t.periodStart),
   ]
 );
+
+/** Per-user goal horizon matrix. The UI owns the cell shape; the API syncs it across devices. */
+export const goalHorizons = pgTable("goal_horizons", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  ownerName: varchar("owner_name", { length: 255 }),
+  goals: jsonb("goals").$type<Record<string, string>>().notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
 export const caldavSyncLog = pgTable(
   "caldav_sync_log",

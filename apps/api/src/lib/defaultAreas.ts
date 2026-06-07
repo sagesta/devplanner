@@ -4,7 +4,7 @@ import { areas } from "../db/schema.js";
 export const DEFAULT_AREAS = [
   { name: "Work", color: "#01696f", sortOrder: 0 },
   { name: "Personal", color: "#6b7280", sortOrder: 1 },
-  { name: "Growth", color: "#f59e0b", sortOrder: 2 },
+  { name: "Professional", color: "#f59e0b", sortOrder: 2 },
 ] as const;
 
 function normalizeAreaName(name: string): string {

@@ -8,7 +8,15 @@ import {
   Target,
   UserRound,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useAppUserId } from "@/hooks/use-app-user-id";
+import {
+  fetchGoalHorizons,
+  saveGoalHorizons,
+  type GoalMatrix,
+} from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "devplanner.goalHorizons.v1";
@@ -23,13 +31,12 @@ const HORIZONS = [
 const AREAS = [
   { key: "personal", label: "Personal", prompt: "Health, home, relationships, rhythm." },
   { key: "professional", label: "Professional", prompt: "Skills, reputation, learning, career capital." },
-  { key: "work", label: "Work", prompt: "Shipping, clients, revenue, obligations." },
+  { key: "work", label: "Work", prompt: "Shipping, stakeholders, obligations." },
 ] as const;
 
 type HorizonKey = (typeof HORIZONS)[number]["key"];
 type AreaKey = (typeof AREAS)[number]["key"];
-type GoalCellKey = `${HorizonKey}:${AreaKey}`;
-type GoalMatrix = Record<GoalCellKey, string>;
+type GoalCellKey = keyof GoalMatrix & `${HorizonKey}:${AreaKey}`;
 
 const EMPTY_GOALS: GoalMatrix = {
   "short:personal": "",
@@ -46,13 +53,13 @@ const EMPTY_GOALS: GoalMatrix = {
 const STARTER_GOALS: GoalMatrix = {
   "short:personal": "Protect sleep and morning planning rhythm\nClear one home admin item",
   "short:professional": "Choose one skill to sharpen this month\nPublish one proof-of-work update",
-  "short:work": "Ship the next highest-value task\nFollow up on active revenue conversations",
+  "short:work": "Ship the next highest-value task\nFollow up on one important commitment",
   "mid:personal": "Build a reliable weekly reset\nCreate a sustainable exercise cadence",
   "mid:professional": "Complete a focused learning project\nDocument a repeatable workflow",
-  "mid:work": "Finish the current sprint outcome\nPackage one offer or delivery system",
+  "mid:work": "Finish the current sprint outcome\nDocument the delivery system",
   "long:personal": "Design a calmer default week\nReduce recurring friction points",
   "long:professional": "Build a stronger public portfolio\nDeepen domain expertise",
-  "long:work": "Grow predictable revenue\nCreate leverage through systems",
+  "long:work": "Build a predictable delivery cadence\nCreate leverage through systems",
 };
 
 function cellKey(horizon: HorizonKey, area: AreaKey): GoalCellKey {
@@ -106,6 +113,38 @@ function goalsAreEmpty(goals: GoalMatrix): boolean {
   return goalCount(goals) === 0;
 }
 
+function readLocalDraft(defaultOwnerName: string): { goals: GoalMatrix; ownerName: string } | null {
+  try {
+    const rawGoals = localStorage.getItem(STORAGE_KEY);
+    const rawOwner = localStorage.getItem(OWNER_STORAGE_KEY);
+    if (!rawGoals && !rawOwner) return null;
+    const parsed = rawGoals ? (JSON.parse(rawGoals) as Partial<GoalMatrix>) : {};
+    return {
+      goals: { ...EMPTY_GOALS, ...parsed },
+      ownerName: rawOwner?.trim() || defaultOwnerName,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalDraft(ownerName: string, goals: GoalMatrix) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
+    localStorage.setItem(OWNER_STORAGE_KEY, ownerName);
+  } catch {
+    /* local cache is best-effort only */
+  }
+}
+
+function formatSavedTime(value?: string | null): string | null {
+  if (!value) return null;
+  return new Date(value).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function GoalHorizonsMatrix({
   className,
   ownerName,
@@ -114,46 +153,112 @@ export function GoalHorizonsMatrix({
   ownerName?: string | null;
 }) {
   const defaultOwnerName = ownerName?.trim() || "My Goals";
+  const userId = useAppUserId();
+  const qc = useQueryClient();
   const [goals, setGoals] = useState<GoalMatrix>(EMPTY_GOALS);
   const [ownerDraft, setOwnerDraft] = useState(defaultOwnerName);
   const [hydrated, setHydrated] = useState(false);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const loadedRef = useRef(false);
+  const skipAutosaveRef = useRef(false);
   const filledCount = useMemo(() => goalCount(goals), [goals]);
   const progressPercent = Math.round((filledCount / Object.keys(EMPTY_GOALS).length) * 100);
 
-  useEffect(() => {
-    try {
-      const rawGoals = localStorage.getItem(STORAGE_KEY);
-      if (rawGoals) {
-        const parsed = JSON.parse(rawGoals) as Partial<GoalMatrix>;
-        setGoals({ ...EMPTY_GOALS, ...parsed });
-      }
+  const goalsQ = useQuery({
+    queryKey: ["goal-horizons", userId],
+    queryFn: fetchGoalHorizons,
+    enabled: Boolean(userId),
+  });
 
-      const rawOwner = localStorage.getItem(OWNER_STORAGE_KEY);
-      setOwnerDraft(rawOwner?.trim() || defaultOwnerName);
-    } catch {
-      /* ignore invalid saved state */
-    } finally {
+  const saveMut = useMutation({
+    mutationFn: saveGoalHorizons,
+    onSuccess: (data) => {
+      writeLocalDraft(data.ownerName?.trim() || ownerDraft, data.goals);
+      setLastSavedAt(formatSavedTime(data.updatedAt) ?? formatSavedTime(new Date().toISOString()));
+      setSaveState("saved");
+      qc.setQueryData(["goal-horizons", userId], data);
+    },
+    onError: (error: Error) => {
+      setSaveState("error");
+      toast.error(`Goals saved locally only: ${error.message}`);
+    },
+  });
+
+  const saveGoalRef = useRef(saveMut.mutate);
+  useEffect(() => {
+    saveGoalRef.current = saveMut.mutate;
+  }, [saveMut.mutate]);
+
+  useEffect(() => {
+    if (loadedRef.current) return;
+
+    if (!userId) {
+      const localDraft = readLocalDraft(defaultOwnerName);
+      if (localDraft) {
+        setGoals(localDraft.goals);
+        setOwnerDraft(localDraft.ownerName);
+      }
       setHydrated(true);
+      loadedRef.current = true;
+      return;
     }
-  }, [defaultOwnerName]);
+
+    if (goalsQ.data) {
+      const serverGoals = { ...EMPTY_GOALS, ...goalsQ.data.goals };
+      const serverHasGoals = !goalsAreEmpty(serverGoals);
+      const localDraft = readLocalDraft(defaultOwnerName);
+      const localHasGoals = localDraft ? !goalsAreEmpty(localDraft.goals) : false;
+
+      if (!serverHasGoals && localDraft && localHasGoals) {
+        setGoals(localDraft.goals);
+        setOwnerDraft(localDraft.ownerName);
+        setSaveState("saving");
+      } else {
+        skipAutosaveRef.current = true;
+        setGoals(serverGoals);
+        setOwnerDraft(goalsQ.data.ownerName?.trim() || defaultOwnerName);
+        setLastSavedAt(formatSavedTime(goalsQ.data.updatedAt));
+        setSaveState(goalsQ.data.updatedAt ? "saved" : "idle");
+      }
+      setHydrated(true);
+      loadedRef.current = true;
+      return;
+    }
+
+    if (goalsQ.isError) {
+      const localDraft = readLocalDraft(defaultOwnerName);
+      if (localDraft) {
+        setGoals(localDraft.goals);
+        setOwnerDraft(localDraft.ownerName);
+      }
+      skipAutosaveRef.current = true;
+      setSaveState("error");
+      setHydrated(true);
+      loadedRef.current = true;
+    }
+  }, [defaultOwnerName, goalsQ.data, goalsQ.isError, userId]);
 
   useEffect(() => {
     if (!hydrated) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
-      localStorage.setItem(OWNER_STORAGE_KEY, ownerDraft);
-      setLastSavedAt(
-        new Date().toLocaleTimeString(undefined, {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      );
-    } catch {
-      /* ignore storage failures */
+    writeLocalDraft(ownerDraft, goals);
+    if (!userId) {
+      setLastSavedAt(formatSavedTime(new Date().toISOString()));
+      setSaveState("saved");
+      return;
     }
-  }, [goals, hydrated, ownerDraft]);
+    if (skipAutosaveRef.current) {
+      skipAutosaveRef.current = false;
+      return;
+    }
+
+    setSaveState("saving");
+    const timeout = window.setTimeout(() => {
+      saveGoalRef.current({ ownerName: ownerDraft, goals });
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [goals, hydrated, ownerDraft, userId]);
 
   useEffect(() => {
     if (copyState === "idle") return;
@@ -162,6 +267,16 @@ export function GoalHorizonsMatrix({
   }, [copyState]);
 
   const markdown = useMemo(() => goalsToMarkdown(ownerDraft, goals), [goals, ownerDraft]);
+  const saveLabel =
+    goalsQ.isLoading && !hydrated
+      ? "Loading saved goals..."
+      : saveState === "saving" || saveMut.isPending
+        ? "Saving..."
+        : saveState === "error"
+          ? "Local draft only"
+          : lastSavedAt
+            ? `Synced at ${lastSavedAt}`
+            : "Ready to sync";
 
   async function copyMarkdown() {
     try {
@@ -212,11 +327,9 @@ export function GoalHorizonsMatrix({
               <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">
                 {filledCount} of 9 goals set
               </span>
-              {lastSavedAt && (
-                <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">
-                  Autosaved today at {lastSavedAt}
-                </span>
-              )}
+              <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">
+                {saveLabel}
+              </span>
             </div>
           </div>
 

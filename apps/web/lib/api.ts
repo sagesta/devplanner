@@ -372,6 +372,25 @@ export type PriorityRow = {
   updatedAt: string;
 };
 
+export type GoalCellKey =
+  | "short:personal"
+  | "short:professional"
+  | "short:work"
+  | "mid:personal"
+  | "mid:professional"
+  | "mid:work"
+  | "long:personal"
+  | "long:professional"
+  | "long:work";
+
+export type GoalMatrix = Record<GoalCellKey, string>;
+
+export type GoalHorizonsResponse = {
+  ownerName: string | null;
+  goals: GoalMatrix;
+  updatedAt: string | null;
+};
+
 export type PrioritiesResponse = {
   period: { week: string; month: string };
   week_anchors: PriorityRow[];
@@ -406,6 +425,18 @@ export async function suggestPriorities(periodType: PriorityPeriod, periodStart:
   }>(apiUrl("/api/priorities/suggest"), {
     method: "POST",
     body: JSON.stringify({ periodType, periodStart }),
+  });
+}
+
+// ─── Goal horizons ────────────────────────────────────────────────
+export async function fetchGoalHorizons() {
+  return fetchJson<GoalHorizonsResponse>(apiUrl("/api/goals"));
+}
+
+export async function saveGoalHorizons(body: { ownerName: string; goals: GoalMatrix }) {
+  return fetchJson<GoalHorizonsResponse>(apiUrl("/api/goals"), {
+    method: "PUT",
+    body: JSON.stringify(body),
   });
 }
 
