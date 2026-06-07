@@ -179,7 +179,7 @@ function WeeklyReviewContent() {
             <h2 className="font-display text-xl text-foreground">Review complete!</h2>
             <p className="mt-2 text-sm text-muted">
               Your next sprint has been created. Head to{" "}
-              <Link href="/sprints" className="text-primary hover:underline">Sprints</Link>{" "}
+              <Link href="/plan?view=sprints" className="text-primary hover:underline">Plan</Link>{" "}
               to add tasks.
             </p>
             <button

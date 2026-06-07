@@ -83,7 +83,7 @@ export default function PlanPage() {
         </div>
       </header>
 
-      <nav className="grid gap-2 md:grid-cols-5" aria-label="Plan views">
+      <nav className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" aria-label="Plan views">
         {PLAN_VIEWS.map(({ key, href, label, Icon, description }) => {
           const selected = key === activeView;
           return (
@@ -137,4 +137,3 @@ export default function PlanPage() {
     </div>
   );
 }
-

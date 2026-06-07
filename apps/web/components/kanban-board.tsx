@@ -332,8 +332,8 @@ export function KanbanBoard() {
         </form>
 
         <div className="mt-6 border-t border-white/5 pt-4">
-          <Link href="/sprints" className="text-xs text-muted hover:text-white hover:underline transition-colors">
-            Or manage sprints in the Sprints page →
+          <Link href="/plan?view=sprints" className="text-xs text-muted hover:text-white hover:underline transition-colors">
+            Or manage sprints in Plan →
           </Link>
         </div>
       </div>

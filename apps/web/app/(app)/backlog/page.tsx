@@ -500,8 +500,8 @@ export default function BacklogPage() {
           <p className="text-foreground font-medium text-sm">Your backlog is clean!</p>
           <p className="mt-1 text-xs text-muted max-w-sm">
             All caught up. Use the Brain Dump (Ctrl/Cmd+Shift+D) to capture new tasks, or head to the{" "}
-            <Link href="/board" className="text-primary hover:underline font-medium">
-              Board
+            <Link href="/plan?view=board" className="text-primary hover:underline font-medium">
+              Plan board
             </Link>.
           </p>
         </div>

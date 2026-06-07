@@ -31,8 +31,9 @@ const NAV = [
   { href: "/backlog", label: "Inbox", Icon: Inbox, matches: ["/backlog"] },
   { href: "/plan", label: "Plan", Icon: CalendarCheck, matches: ["/plan", "/sprints", "/board", "/timeline", "/table", "/goals"] },
   { href: "/review", label: "Review", Icon: Trophy, matches: ["/review", "/insights"] },
-  { href: "/settings", label: "Settings", Icon: Settings, matches: ["/settings"] },
 ] as const;
+
+const SETTINGS_NAV = { href: "/settings", label: "Settings", Icon: Settings, matches: ["/settings"] } as const;
 
 function isNavActive(pathname: string, matches: readonly string[]) {
   return matches.some((href) => pathname === href || pathname.startsWith(`${href}/`));
@@ -58,7 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Per-page <title> for browser tabs / history — "Today — DevPlanner" etc.
   useEffect(() => {
-    const match = NAV.find((item) => isNavActive(pathname, item.matches));
+    const match = [...NAV, SETTINGS_NAV].find((item) => isNavActive(pathname, item.matches));
     const label = match?.label;
     document.title = label ? `${label} — DevPlanner` : "DevPlanner";
   }, [pathname]);
@@ -130,6 +131,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className={cn("border-t border-white/10 p-3 space-y-2", collapsed && "px-1")}>
+            <Link
+              href={SETTINGS_NAV.href}
+              className={cn(
+                "group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all",
+                isNavActive(pathname, SETTINGS_NAV.matches)
+                  ? "bg-primary/10 text-foreground border-l-2 border-primary pl-2.5"
+                  : "text-muted hover:bg-white/5 hover:text-foreground",
+                collapsed && "justify-center px-0 gap-0"
+              )}
+              title={collapsed ? SETTINGS_NAV.label : undefined}
+            >
+              <Settings
+                size={16}
+                className={cn(
+                  "shrink-0 transition-colors",
+                  isNavActive(pathname, SETTINGS_NAV.matches)
+                    ? "text-primary"
+                    : "text-muted group-hover:text-foreground"
+                )}
+              />
+              {!collapsed && SETTINGS_NAV.label}
+            </Link>
             {!collapsed && (
               <div className="flex items-center gap-2">
                 <button
@@ -210,6 +233,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <header className="border-b border-white/10 bg-surface/80 backdrop-blur-sm md:hidden">
             <div className="flex items-center gap-2 px-4 py-2.5">
               <span className="min-w-0 flex-1 truncate font-display text-lg text-foreground">DevPlanner</span>
+              <Link
+                href={SETTINGS_NAV.href}
+                className={cn(
+                  "flex shrink-0 items-center rounded-lg border border-white/10 p-1.5 transition-colors",
+                  isNavActive(pathname, SETTINGS_NAV.matches)
+                    ? "bg-primary/15 text-foreground"
+                    : "text-muted hover:bg-white/5 hover:text-foreground"
+                )}
+                aria-label="Settings"
+              >
+                <Settings size={14} />
+              </Link>
               <button
                 type="button"
                 className="flex shrink-0 items-center gap-1 rounded-lg bg-primary/80 px-2.5 py-1.5 text-xs text-white"

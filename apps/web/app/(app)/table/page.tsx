@@ -262,8 +262,8 @@ export default function TablePage() {
       {!q.isLoading && roots.length === 0 && (
         <p className="mt-6 text-center text-sm text-muted">
           No tasks yet. Add some from the{" "}
-          <a href="/board" className="text-primary hover:underline">
-            Board
+          <a href="/plan?view=board" className="text-primary hover:underline">
+            Plan board
           </a>{" "}
           or Brain dump.
         </p>
