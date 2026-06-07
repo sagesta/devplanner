@@ -34,14 +34,14 @@ const LS_TOOLS = "devplanner.aiToolsEnabled";
 
 /** Map pathname segments to view names the backend recognises */
 const VIEW_NAMES: Record<string, string> = {
-  board: "Board",
-  goals: "Goals",
+  board: "Plan",
+  goals: "Plan",
   plan: "Plan",
   now: "Now",
-  timeline: "Timeline",
-  table: "Table",
+  timeline: "Plan",
+  table: "Plan",
   backlog: "Backlog",
-  sprints: "Sprints",
+  sprints: "Plan",
   review: "Review",
   insights: "Review",
 };

@@ -1,13 +1,21 @@
 "use client";
 
-import { CalendarCheck, ChartGantt, KanbanSquare, LayoutList } from "lucide-react";
+import { CalendarCheck, ChartGantt, KanbanSquare, LayoutList, Target } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { KanbanBoard } from "@/components/kanban-board";
+import { GoalHorizonsMatrix } from "@/components/goal-horizons-matrix";
 import { TimelineBoard } from "@/components/timeline-board";
 import { cn } from "@/lib/utils";
 import SprintsPage from "../sprints/page";
 import TablePage from "../table/page";
+
+function displayNameFromSession(name?: string | null, email?: string | null) {
+  if (name?.trim()) return name.trim();
+  if (email?.trim()) return email.split("@")[0];
+  return "Me";
+}
 
 const PLAN_VIEWS = [
   {
@@ -38,12 +46,19 @@ const PLAN_VIEWS = [
     Icon: LayoutList,
     description: "Sort, select, and bulk-clean task metadata.",
   },
+  {
+    key: "goals",
+    label: "Goals",
+    href: "/plan?view=goals",
+    Icon: Target,
+    description: "Keep the big picture visible across short, mid, and long-term horizons.",
+  },
 ] as const;
 
 type PlanView = (typeof PLAN_VIEWS)[number]["key"];
 
 function normalizePlanView(value: string | null): PlanView {
-  if (value === "board" || value === "timeline" || value === "table" || value === "sprints") {
+  if (value === "board" || value === "timeline" || value === "table" || value === "sprints" || value === "goals") {
     return value;
   }
   return "sprints";
@@ -53,6 +68,8 @@ export default function PlanPage() {
   const searchParams = useSearchParams();
   const activeView = normalizePlanView(searchParams.get("view"));
   const active = PLAN_VIEWS.find((view) => view.key === activeView) ?? PLAN_VIEWS[0];
+  const { data: session } = useSession();
+  const ownerName = displayNameFromSession(session?.user?.name, session?.user?.email);
 
   return (
     <div className="mx-auto flex max-w-[1440px] flex-col gap-5 pb-10">
@@ -61,12 +78,12 @@ export default function PlanPage() {
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Planning room</p>
           <h1 className="mt-1 text-2xl font-semibold text-foreground">Plan</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            One place for sprint commitment, status movement, schedule repair, and bulk task cleanup.
+            Sprint commitment, status movement, schedule repair, bulk cleanup, and long-term direction — all in one place.
           </p>
         </div>
       </header>
 
-      <nav className="grid gap-2 md:grid-cols-4" aria-label="Plan views">
+      <nav className="grid gap-2 md:grid-cols-5" aria-label="Plan views">
         {PLAN_VIEWS.map(({ key, href, label, Icon, description }) => {
           const selected = key === activeView;
           return (
@@ -115,7 +132,9 @@ export default function PlanPage() {
           </div>
         )}
         {active.key === "table" && <TablePage />}
+        {active.key === "goals" && <GoalHorizonsMatrix ownerName={ownerName} />}
       </section>
     </div>
   );
 }
+

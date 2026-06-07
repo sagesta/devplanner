@@ -25,12 +25,12 @@ const NAV_ITEMS = [
   { href: "/backlog", label: "Inbox", icon: Inbox },
   { href: "/plan", label: "Plan", icon: CalendarCheck },
   { href: "/review", label: "Review", icon: Trophy },
-  { href: "/goals", label: "Goals", icon: Target },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/plan?view=sprints", label: "Plan: Sprints", icon: CalendarCheck },
   { href: "/plan?view=board", label: "Plan: Board", icon: KanbanSquare },
   { href: "/plan?view=timeline", label: "Plan: Timeline", icon: ChartGantt },
   { href: "/plan?view=table", label: "Plan: Table", icon: LayoutList },
+  { href: "/plan?view=goals", label: "Plan: Goals", icon: Target },
   { href: "/review?view=progress", label: "Review: Progress", icon: ChartGantt },
 ] as const;
 

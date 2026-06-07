@@ -9,7 +9,6 @@ import {
   PanelLeftOpen,
   Settings,
   Sun,
-  Target,
   Moon,
   Trophy,
   Zap,
@@ -30,9 +29,8 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/now", label: "Today", Icon: Zap, matches: ["/now"] },
   { href: "/backlog", label: "Inbox", Icon: Inbox, matches: ["/backlog"] },
-  { href: "/plan", label: "Plan", Icon: CalendarCheck, matches: ["/plan", "/sprints", "/board", "/timeline", "/table"] },
+  { href: "/plan", label: "Plan", Icon: CalendarCheck, matches: ["/plan", "/sprints", "/board", "/timeline", "/table", "/goals"] },
   { href: "/review", label: "Review", Icon: Trophy, matches: ["/review", "/insights"] },
-  { href: "/goals", label: "Goals", Icon: Target, matches: ["/goals"] },
   { href: "/settings", label: "Settings", Icon: Settings, matches: ["/settings"] },
 ] as const;
 
