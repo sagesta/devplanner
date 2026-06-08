@@ -2,7 +2,7 @@ import postgres from "postgres";
 
 let sql: ReturnType<typeof postgres> | null = null;
 
-function getSql() {
+export function getAppSql() {
   const url = process.env.DATABASE_URL?.trim();
   if (!url) {
     throw new Error("DATABASE_URL is not set");
@@ -15,7 +15,7 @@ function getSql() {
 
 /** Upsert app user by Google email; returns internal UUID used as JWT sub and API userId. */
 export async function upsertUserByEmail(email: string, name: string | null): Promise<string> {
-  const client = getSql();
+  const client = getAppSql();
   const rows = await client`
     INSERT INTO users (email, name, updated_at)
     VALUES (${email}, ${name}, NOW())
@@ -39,7 +39,15 @@ export async function upsertUserByEmail(email: string, name: string | null): Pro
       INSERT INTO areas (user_id, name, color, sort_order)
       VALUES
         (${id}, 'Work', '#01696f', 0),
-        (${id}, 'Personal', '#6b7280', 1)
+        (${id}, 'Personal', '#6b7280', 1),
+        (${id}, 'Professional', '#f59e0b', 2)
+    `;
+  } else {
+    await client`
+      UPDATE areas
+      SET name = 'Professional'
+      WHERE user_id = ${id}
+        AND lower(trim(name)) = 'growth'
     `;
   }
 

@@ -430,11 +430,11 @@ export async function suggestPriorities(periodType: PriorityPeriod, periodStart:
 
 // ─── Goal horizons ────────────────────────────────────────────────
 export async function fetchGoalHorizons() {
-  return fetchJson<GoalHorizonsResponse>(apiUrl("/api/goals"));
+  return fetchJson<GoalHorizonsResponse>("/api/goals");
 }
 
 export async function saveGoalHorizons(body: { ownerName: string; goals: GoalMatrix }) {
-  return fetchJson<GoalHorizonsResponse>(apiUrl("/api/goals"), {
+  return fetchJson<GoalHorizonsResponse>("/api/goals", {
     method: "PUT",
     body: JSON.stringify(body),
   });
