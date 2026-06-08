@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/client.js";
@@ -146,6 +146,18 @@ export const sprintRoutes = new Hono<AppEnv>()
       .set(updates)
       .where(and(eq(sprints.id, id), eq(sprints.userId, userId)))
       .returning();
+    if (updates.endDate !== undefined && updates.endDate !== current.endDate) {
+      await db
+        .update(tasks)
+        .set({ dueDate: nextEnd, updatedAt: new Date() })
+        .where(
+          and(
+            eq(tasks.sprintId, id),
+            isNull(tasks.deletedAt),
+            or(isNull(tasks.dueDate), eq(tasks.dueDate, current.endDate))
+          )
+        );
+    }
     return c.json({ sprint: row });
   })
   .delete("/:id", async (c) => {

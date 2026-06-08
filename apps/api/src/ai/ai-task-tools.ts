@@ -28,6 +28,13 @@ function liftYmd(v: unknown): string | null {
   return s ? liftStaleScheduleYear(s) : null;
 }
 
+async function resolveSprintForUser(userId: string, sprintId: string | null) {
+  if (!sprintId) return null;
+  return db.query.sprints.findFirst({
+    where: and(eq(sprints.id, sprintId), eq(sprints.userId, userId)),
+  });
+}
+
 async function resolveAreaForUser(
   userId: string,
   areaId: unknown,
@@ -440,6 +447,10 @@ export async function executePlannerTool(
       const areaRes = await resolveAreaForUser(userId, obj.areaId, obj.areaKind);
       if ("error" in areaRes) return { error: areaRes.error };
       const areaId = areaRes.id;
+      const sprintId = typeof obj.sprintId === "string" && obj.sprintId.trim() ? obj.sprintId.trim() : null;
+      const sprint = await resolveSprintForUser(userId, sprintId);
+      if (sprintId && !sprint) return { error: "sprint not found for user" };
+      const dueDate = liftYmd(obj.dueDate) ?? sprint?.endDate ?? null;
       const status =
         typeof obj.status === "string" && STATUS_ENUM.includes(obj.status as (typeof STATUS_ENUM)[number])
           ? (obj.status as (typeof STATUS_ENUM)[number])
@@ -473,9 +484,9 @@ export async function executePlannerTool(
             obj.physicalEnergy === "low" || obj.physicalEnergy === "medium" || obj.physicalEnergy === "high"
               ? obj.physicalEnergy
               : "medium",
-          dueDate: liftYmd(obj.dueDate),
+          dueDate,
           recurrenceRule: typeof obj.recurrenceRule === "string" && obj.recurrenceRule.trim() ? obj.recurrenceRule : null,
-          sprintId: typeof obj.sprintId === "string" && obj.sprintId.trim() ? obj.sprintId.trim() : null,
+          sprintId,
           description: typeof obj.description === "string" ? obj.description : null,
         })
         .returning();
@@ -759,10 +770,17 @@ export async function executePlannerTool(
         where: and(eq(tasks.id, taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt)),
       });
       if (!existing) return { error: "task not found" };
+      const sprint = await resolveSprintForUser(userId, sprintId);
+      if (!sprint) return { error: "sprint not found for user" };
 
       const [row] = await db
         .update(tasks)
-        .set({ sprintId, updatedAt: new Date() })
+        .set({
+          sprintId,
+          dueDate: sprint.endDate,
+          status: existing.status === "backlog" ? "todo" : existing.status,
+          updatedAt: new Date(),
+        })
         .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
         .returning();
       if (!row) return { error: "not found" };

@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, sql, or } from "drizzle
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/client.js";
-import { areas, tags, taskTags, tasks, subtasks } from "../db/schema.js";
+import { areas, sprints, tags, taskTags, tasks, subtasks } from "../db/schema.js";
 import { generateAndStoreEmbedding, buildEmbeddingText, deleteStaleEmbedding } from "../ai/embeddings.js";
 import { enqueueTaskCalendarSync } from "../queues/definitions.js";
 import { taskCreatedTotal } from "../lib/metrics.js";
@@ -54,6 +54,13 @@ function withTaskApiFields<T extends { recurrenceRule: string | null; deletedAt?
     ...rest,
     recurring: Boolean(t.recurrenceRule?.trim()),
   };
+}
+
+async function getSprintForTaskDefaults(userId: string, sprintId: string | null | undefined) {
+  if (!sprintId) return null;
+  return db.query.sprints.findFirst({
+    where: and(eq(sprints.id, sprintId), eq(sprints.userId, userId)),
+  });
 }
 
 /** Calendar day in the API server's local timezone (matches typical task date inputs). */
@@ -481,6 +488,10 @@ export const taskRoutes = new Hono<AppEnv>()
     } catch (e) {
       return c.json({ error: String(e) }, 422);
     }
+    const sprintDefaults = await getSprintForTaskDefaults(userId, v.sprintId ?? null);
+    if (v.sprintId && !sprintDefaults) {
+      return c.json({ error: "sprint not found for user" }, 404);
+    }
     const [row] = await db
       .insert(tasks)
       .values({
@@ -495,7 +506,7 @@ export const taskRoutes = new Hono<AppEnv>()
         workDepth: v.workDepth ?? "normal",
         physicalEnergy: v.physicalEnergy ?? "medium",
         description: v.description ?? null,
-        dueDate: v.dueDate ?? null,
+        dueDate: v.dueDate ?? sprintDefaults?.endDate ?? null,
         scheduledDate: v.scheduledDate ?? null,
         recurrenceRule: v.recurrenceRule ?? null,
         tags: v.tags ?? null,
@@ -558,6 +569,17 @@ export const taskRoutes = new Hono<AppEnv>()
       }
     }
     const userId = c.get("userId");
+
+    const sprintDefaults =
+      v.sprintId !== undefined && v.sprintId !== null
+        ? await getSprintForTaskDefaults(userId, v.sprintId)
+        : null;
+    if (v.sprintId && !sprintDefaults) {
+      return c.json({ error: "sprint not found for user" }, 404);
+    }
+    if (sprintDefaults && v.dueDate === undefined) {
+      updates.dueDate = sprintDefaults.endDate;
+    }
 
     // Auto-promote backlog → todo when a task is moved into a sprint, so it
     // appears on the Plan board (which only renders todo/in_progress/done).

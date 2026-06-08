@@ -174,6 +174,16 @@ export async function runMigrations(pool: pg.Pool): Promise<void> {
         AND "deleted_at" IS NULL;
     `);
 
+    // ── backfill: sprint tasks inherit sprint end date as due date ──
+    await client.query(`
+      UPDATE "tasks" t
+      SET "due_date" = s."end_date"
+      FROM "sprints" s
+      WHERE t."sprint_id" = s."id"
+        AND t."due_date" IS NULL
+        AND t."deleted_at" IS NULL;
+    `);
+
     // ── priorities table (weekly/monthly "compass" anchors) ───────
     await client.query(`
       DO $$ BEGIN
