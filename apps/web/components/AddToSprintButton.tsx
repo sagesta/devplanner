@@ -2,7 +2,9 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { CopyPlus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { useAddToSprint } from "@/hooks/useAddToSprint";
 import { fetchSprints } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -10,6 +12,7 @@ import { useAppUserId } from "@/hooks/use-app-user-id";
 
 export function AddToSprintButton({ taskId, className }: { taskId: string; className?: string }) {
   const userId = useAppUserId();
+  const router = useRouter();
   const { mutate, isPending } = useAddToSprint();
   const [selectedSprintId, setSelectedSprintId] = useState("");
 
@@ -28,7 +31,13 @@ export function AddToSprintButton({ taskId, className }: { taskId: string; class
 
   const handleAdd = () => {
     if (!selectedSprint?.id) {
-      alert("No active sprint found. Please start a sprint first.");
+      toast.error("No active sprint found.", {
+        description: "Start a sprint first, then add tasks to it.",
+        action: {
+          label: "Open Sprints",
+          onClick: () => router.push("/sprints"),
+        },
+      });
       return;
     }
     mutate({ taskId, sprintId: selectedSprint.id });

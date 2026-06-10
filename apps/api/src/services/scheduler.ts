@@ -1,15 +1,70 @@
 import { and, asc, eq, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { subtasks, tasks, users } from "../db/schema.js";
 
-/** Calculate capacity in minutes for a given user. */
+/**
+ * Calculate capacity in minutes for a given user.
+ *
+ * Behavior-aware: the configured capacity (prefs) is blended with what the
+ * user actually completes per active day over the last 28 days, so the
+ * target tracks reality instead of wishful settings. The observed signal
+ * only kicks in after 5+ active days and is clamped to ±50% of the
+ * configured value so one outlier week can't whipsaw the schedule.
+ */
 export async function calculateDailyCapacity(db: any, userId: string): Promise<number> {
   const [user] = await db.select().from(users).where(eq(users.id, userId));
   if (!user) return 0;
-  // capacity = dailyCapacityMinutes * efficiencyFactor * (1 - bufferFactor)
+  // configured = dailyCapacityMinutes * efficiencyFactor * (1 - bufferFactor)
   const baseMinutes = user.dailyCapacityMinutes ?? 240;
   const eff = user.efficiencyFactor ?? 0.8;
   const buffer = user.bufferFactor ?? 0.2;
-  return Math.floor(baseMinutes * eff * (1 - buffer));
+  const configured = Math.floor(baseMinutes * eff * (1 - buffer));
+
+  const observed = await getObservedDailyMinutes(db, userId);
+  if (observed == null) return configured;
+
+  const blended = Math.round(configured * 0.6 + observed * 0.4);
+  const lower = Math.floor(configured * 0.5);
+  const upper = Math.ceil(configured * 1.5);
+  return Math.max(lower, Math.min(upper, blended));
+}
+
+/**
+ * Median completed minutes per active day over the last 28 days
+ * (completed subtasks + standalone done tasks, estimates defaulting to 30m).
+ * Returns null when there are fewer than 5 active days of history.
+ */
+export async function getObservedDailyMinutes(db: any, userId: string): Promise<number | null> {
+  const result = (await db.execute(sql`
+    WITH done_units AS (
+      SELECT st.completed_at::date AS day, COALESCE(st.estimated_minutes, 30) AS minutes
+      FROM subtasks st
+      JOIN tasks tk ON tk.id = st.task_id
+      WHERE tk.user_id = ${userId}
+        AND tk.deleted_at IS NULL
+        AND st.completed_at IS NOT NULL
+        AND st.completed_at > NOW() - INTERVAL '28 days'
+      UNION ALL
+      SELECT tk.completed_at::date AS day, 30 AS minutes
+      FROM tasks tk
+      LEFT JOIN subtasks st ON st.task_id = tk.id
+      WHERE tk.user_id = ${userId}
+        AND tk.deleted_at IS NULL
+        AND tk.completed_at IS NOT NULL
+        AND tk.completed_at > NOW() - INTERVAL '28 days'
+        AND st.id IS NULL
+    ),
+    per_day AS (
+      SELECT day, SUM(minutes)::float AS total FROM done_units GROUP BY day
+    )
+    SELECT
+      COUNT(*)::int AS active_days,
+      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY total) AS median_minutes
+    FROM per_day
+  `)) as { rows: Array<{ active_days: number; median_minutes: number | null }> };
+
+  const row = result.rows[0];
+  if (!row || Number(row.active_days) < 5 || row.median_minutes == null) return null;
+  return Math.round(Number(row.median_minutes));
 }
 
 function getPriorityScore(priority: string | null): number {

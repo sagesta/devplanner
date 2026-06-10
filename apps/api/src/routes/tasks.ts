@@ -6,7 +6,14 @@ import { areas, sprints, tags, taskTags, tasks, subtasks } from "../db/schema.js
 import { generateAndStoreEmbedding, buildEmbeddingText, deleteStaleEmbedding } from "../ai/embeddings.js";
 import { enqueueTaskCalendarSync } from "../queues/definitions.js";
 import { taskCreatedTotal } from "../lib/metrics.js";
+import { spawnNextRecurrence } from "../services/recurrence.js";
+import { logger } from "../lib/logger.js";
 import type { AppEnv } from "../types.js";
+
+const logSyncError = (taskId: string) => (err: unknown) =>
+  logger.error({ err, taskId }, "calendar sync enqueue failed");
+const logEmbedError = (taskId: string) => (err: unknown) =>
+  logger.warn({ err, taskId }, "embedding generation failed");
 
 const uuidParam = z.string().uuid();
 
@@ -309,9 +316,9 @@ export const taskRoutes = new Hono<AppEnv>()
         resourceFilename: t.caldavResourceFilename,
         googleEventId: t.googleEventId,
         action: "create",
-      }).catch(() => {});
+      }).catch(logSyncError(t.id));
       // Fire-and-forget embedding for RAG
-      generateAndStoreEmbedding(t.id, buildEmbeddingText(t.title)).catch(() => {});
+      generateAndStoreEmbedding(t.id, buildEmbeddingText(t.title)).catch(logEmbedError(t.id));
     }
     // If scheduledDate provided, create one subtask per inserted task
     if (parsed.data.scheduledDate) {
@@ -340,6 +347,21 @@ export const taskRoutes = new Hono<AppEnv>()
     const userId = c.get("userId");
     const { taskIds, status } = parsed.data;
     const completedAt = status === "done" ? new Date() : null;
+
+    // Snapshot recurring tasks transitioning to done so we can respawn them.
+    let recurringCandidates: (typeof tasks.$inferSelect)[] = [];
+    if (status === "done") {
+      recurringCandidates = await db.query.tasks.findMany({
+        where: and(
+          eq(tasks.userId, userId),
+          inArray(tasks.id, taskIds),
+          taskActive,
+          isNotNull(tasks.recurrenceRule),
+          sql`${tasks.status} != 'done'`
+        ),
+      });
+    }
+
     const updated = await db
       .update(tasks)
       .set({ status, updatedAt: new Date(), completedAt })
@@ -358,7 +380,12 @@ export const taskRoutes = new Hono<AppEnv>()
         resourceFilename: row.caldavResourceFilename,
         googleEventId: row.googleEventId,
         action: "update",
-      }).catch(() => {});
+      }).catch(logSyncError(row.id));
+    }
+    for (const candidate of recurringCandidates) {
+      await spawnNextRecurrence(db, candidate, serverTodayYmd()).catch((err) =>
+        logger.error({ err, taskId: candidate.id }, "recurrence respawn failed")
+      );
     }
     return c.json({ updated: updated.length });
   })
@@ -385,7 +412,12 @@ export const taskRoutes = new Hono<AppEnv>()
       resourceFilename: row.caldavResourceFilename,
       googleEventId: row.googleEventId,
       action: "create",
-    }).catch(() => {});
+    }).catch(logSyncError(row.id));
+    // Re-add to RAG (delete removed the embedding).
+    generateAndStoreEmbedding(
+      row.id,
+      buildEmbeddingText(row.title, row.description)
+    ).catch(logEmbedError(row.id));
     return c.json({ task: withTaskApiFields(row) });
   })
   .post("/auto-schedule", async (c) => {
@@ -519,12 +551,12 @@ export const taskRoutes = new Hono<AppEnv>()
       resourceFilename: row.caldavResourceFilename,
       googleEventId: row.googleEventId,
       action: "create",
-    }).catch(() => {});
+    }).catch(logSyncError(row.id));
     // Fire-and-forget embedding for RAG
     generateAndStoreEmbedding(
       row.id,
       buildEmbeddingText(row.title, row.description)
-    ).catch(() => {});
+    ).catch(logEmbedError(row.id));
     taskCreatedTotal.inc();
 
     return c.json({
@@ -569,6 +601,17 @@ export const taskRoutes = new Hono<AppEnv>()
       }
     }
     const userId = c.get("userId");
+
+    // Detect the not-done → done transition for recurring respawn.
+    let wasAlreadyDone = false;
+    if (v.status === "done") {
+      const [prior] = await db
+        .select({ status: tasks.status })
+        .from(tasks)
+        .where(and(eq(tasks.id, id), eq(tasks.userId, userId), taskActive))
+        .limit(1);
+      wasAlreadyDone = prior?.status === "done";
+    }
 
     const sprintDefaults =
       v.sprintId !== undefined && v.sprintId !== null
@@ -615,15 +658,23 @@ export const taskRoutes = new Hono<AppEnv>()
       resourceFilename: row.caldavResourceFilename,
       googleEventId: row.googleEventId,
       action: "update",
-    }).catch(() => {});
+    }).catch(logSyncError(row.id));
     // Re-embed if title or description changed
     if (v.title !== undefined || v.description !== undefined) {
       generateAndStoreEmbedding(
         row.id,
         buildEmbeddingText(row.title, row.description)
-      ).catch(() => {});
+      ).catch(logEmbedError(row.id));
     }
-    return c.json({ task: withTaskApiFields(row) });
+    let spawnedNext: ReturnType<typeof withTaskApiFields> | null = null;
+    if (v.status === "done" && !wasAlreadyDone && row.recurrenceRule?.trim()) {
+      const clone = await spawnNextRecurrence(db, row, serverTodayYmd()).catch((err) => {
+        logger.error({ err, taskId: row.id }, "recurrence respawn failed");
+        return null;
+      });
+      if (clone) spawnedNext = withTaskApiFields(clone);
+    }
+    return c.json({ task: withTaskApiFields(row), spawnedNext });
   })
   .delete("/:id", async (c) => {
     const idParsed = uuidParam.safeParse(c.req.param("id"));
@@ -632,9 +683,12 @@ export const taskRoutes = new Hono<AppEnv>()
     }
     const id = idParsed.data;
     const userId = c.get("userId");
+    // Soft delete: the schema's deletedAt + the restore endpoint expect it,
+    // and it's what makes the client-side Undo toast possible.
     const [row] = await db
-      .delete(tasks)
-      .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+      .update(tasks)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(tasks.id, id), eq(tasks.userId, userId), taskActive))
       .returning();
     if (!row) {
       return c.json({ error: "not found" }, 404);
@@ -646,8 +700,8 @@ export const taskRoutes = new Hono<AppEnv>()
       resourceFilename: row.caldavResourceFilename,
       googleEventId: row.googleEventId,
       action: "delete",
-    }).catch(() => {});
-    // Cleanup stale embedding
-    deleteStaleEmbedding(row.id).catch(() => {});
+    }).catch(logSyncError(row.id));
+    // Drop from RAG while deleted; restore regenerates it.
+    deleteStaleEmbedding(row.id).catch(logEmbedError(row.id));
     return c.json({ ok: true });
   });

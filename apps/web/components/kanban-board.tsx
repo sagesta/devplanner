@@ -524,14 +524,29 @@ export function KanbanBoard() {
                           className="rounded p-0.5 text-muted hover:bg-red-500/15 hover:text-red-300"
                           title="Delete task"
                           onClick={() => {
-                            if (!confirm(`Delete “${t.title}”?`)) return;
                             void (async () => {
                               try {
+                                const invalidate = () => {
+                                  void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
+                                  void qc.invalidateQueries({ queryKey: ["tasks"] });
+                                  void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
+                                };
                                 await deleteTask(t.id);
-                                void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
-                                void qc.invalidateQueries({ queryKey: ["tasks"] });
-                                void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
-                                toast.success(`“${t.title}” deleted`);
+                                invalidate();
+                                toast.success(`“${t.title}” deleted`, {
+                                  duration: 5000,
+                                  action: {
+                                    label: "Undo",
+                                    onClick: () => {
+                                      void restoreTask(t.id)
+                                        .then(() => {
+                                          toast.success("Task restored");
+                                          invalidate();
+                                        })
+                                        .catch((err: unknown) => toast.error(String(err)));
+                                    },
+                                  },
+                                });
                               } catch (e) {
                                 toast.error(String(e));
                               }

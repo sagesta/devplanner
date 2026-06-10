@@ -39,6 +39,7 @@ import { LS_PHYSICAL_ENERGY, type PhysicalEnergyLevel } from "@/lib/planner-pref
 import { SkeletonListItem } from "@/lib/skeleton";
 import { cn, isTaskOverdue } from "@/lib/utils";
 import { PriorityAnchorsCard } from "@/components/priority-anchors-card";
+import { GettingStartedCard } from "@/components/getting-started-card";
 import { useActiveTimer, formatElapsed } from "@/hooks/use-active-timer";
 
 function localISODate(d = new Date()) {
@@ -176,13 +177,18 @@ export default function NowPage() {
       if (type === "task") return patchTask(id, { status: "done" });
       return patchSubtask(id, { completed: true });
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       confetti({
         particleCount: 80,
         spread: 60,
         origin: { y: 0.9 },
         colors: ["#2dd4bf", "#818cf8", "#f472b6"],
       });
+      const next = (data as { spawnedNext?: TaskRow | null }).spawnedNext;
+      if (next) {
+        const nextDate = next.scheduledDate ?? next.dueDate;
+        toast.success(`Recurring task — next one ${nextDate ? `scheduled for ${nextDate}` : "created"}.`);
+      }
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId, todayLocal] });
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
       void qc.invalidateQueries({ queryKey: ["backlog", userId] });
@@ -416,6 +422,13 @@ export default function NowPage() {
           </button>
         </div>
       </header>
+
+      {!q.isLoading && !inboxQ.isLoading && !tasksForRescue.isLoading && (
+        <GettingStartedCard
+          hasAnyTask={allRootTasks.length > 0 || (inboxQ.data?.length ?? 0) > 0}
+          hasTodayPlan={hasScheduledItems}
+        />
+      )}
 
       <section className="grid gap-3 lg:grid-cols-3">
         <QuestionTile

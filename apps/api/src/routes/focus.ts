@@ -37,9 +37,10 @@ export const focusRoutes = new Hono<AppEnv>()
     return c.json({ date: today, tasks: tasksOut });
   })
   .post("/import", async (c) => {
-    return c.json({
-      ok: true,
-      imported: 0,
-      message: "Stub: upload Focus CSV/JSON in a later iteration; sessions not applied yet.",
-    });
+    // Not implemented yet — return an honest 501 instead of a fake success
+    // so callers don't believe their sessions were applied.
+    return c.json(
+      { ok: false, imported: 0, error: "Focus import is not implemented yet." },
+      501
+    );
   });

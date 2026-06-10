@@ -4,6 +4,8 @@
 
 DevPlanner is an intelligent, behavior-aware task planner designed specifically for developers. Built with a calm, modern aesthetic, it helps you seamlessly balance deep work and shallow tasks based on your energy levels and available capacity. DevPlanner automatically adapts to your workflow, learns your peak productivity windows, and shields you from scheduling churn.
 
+> **New to planning?** Read the [Beginner's Planning Guide (PDF)](docs/DevPlanner-Beginners-Planning-Guide.pdf) — how to turn any goal (exams, work, daily life) into months → weeks → days, even with no structure to start from.
+
 ## Why DevPlanner?
 - **Intelligent Scheduling (3-Level Hierarchy)**: Organizes your work neatly into Sprints → Tasks → Subtasks. (Subtasks are the atomic units of execution).
 - **Behavior-Aware Load Balancing**: Adapts your daily/weekly goals to your historical completion behavior instead of setting rigid, punitive deadlines.

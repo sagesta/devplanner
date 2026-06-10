@@ -78,6 +78,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Let any page (e.g. the getting-started checklist) open the capture modal.
+  useEffect(() => {
+    const onOpenBrainDump = () => {
+      setCommandOpen(false);
+      setNotificationsOpen(false);
+      setBrainOpen(true);
+    };
+    window.addEventListener("devplanner:open-brain-dump", onOpenBrainDump);
+    return () => window.removeEventListener("devplanner:open-brain-dump", onOpenBrainDump);
+  }, []);
+
   const { data: session } = useSession();
   const userId = useAppUserId();
 

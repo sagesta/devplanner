@@ -138,11 +138,28 @@ export function TaskDetailPanel({
     mutationFn: () => deleteTask(taskId),
     onSuccess: () => {
       const name = q.data?.task.title ?? "Task";
-      void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
-      void qc.invalidateQueries({ queryKey: ["tasks"] });
-      void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
+      const invalidate = () => {
+        void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
+        void qc.invalidateQueries({ queryKey: ["tasks"] });
+        void qc.invalidateQueries({ queryKey: ["backlog"] });
+        void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
+      };
+      invalidate();
       onClose();
-      toast.success(`“${name}” deleted`);
+      toast.success(`“${name}” deleted`, {
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void restoreTask(taskId)
+              .then(() => {
+                toast.success("Task restored");
+                invalidate();
+              })
+              .catch((err: unknown) => toast.error(String(err)));
+          },
+        },
+      });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -192,12 +209,9 @@ export function TaskDetailPanel({
             <button
               type="button"
               className="rounded-lg p-1.5 text-muted hover:bg-red-500/15 hover:text-red-300"
-              title="Delete task"
+              title="Delete task (undo available)"
               disabled={delTask.isPending}
-              onClick={() => {
-                if (!confirm(`Delete “${title}”?`)) return;
-                delTask.mutate();
-              }}
+              onClick={() => delTask.mutate()}
             >
               <Trash2 size={16} />
             </button>

@@ -557,9 +557,6 @@ export default function SettingsPage() {
                 <Download size={14} />
                 {exporting ? "Exporting…" : "Download export"}
               </button>
-              <p className="mt-3 text-xs text-muted">
-                Import from Focus is stubbed on POST /api/focus/import.
-              </p>
             </div>
           </section>
         )}

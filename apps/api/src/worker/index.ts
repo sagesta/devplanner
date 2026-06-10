@@ -150,7 +150,9 @@ const syncWorker = new Worker(
     const fn = objectFilenameForTask(task);
 
     if (!ics) {
-      await deleteCalendarResourceByFilename(fn).catch(() => {});
+      await deleteCalendarResourceByFilename(fn).catch((err) =>
+        console.warn('[caldav worker] cleanup delete failed for', fn, err)
+      );
       await logCaldavRow({
         userId,
         taskId,

@@ -4,7 +4,17 @@ import { db } from "../db/client.js";
 import { areas, sprints, tasks, subtasks } from "../db/schema.js";
 import { enqueueTaskCalendarSync } from "../queues/definitions.js";
 import { rollupParentTaskStatus } from "../services/task-rollup.js";
+import { spawnNextRecurrence } from "../services/recurrence.js";
+import { logger } from "../lib/logger.js";
 import { liftStaleScheduleYear } from "./schedule-date-normalize.js";
+
+function todayYmdLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+const logSyncError = (taskId: string) => (err: unknown) =>
+  logger.error({ err, taskId }, "ai-tools: calendar sync enqueue failed");
 
 const STATUS_ENUM = [
   "backlog",
@@ -118,7 +128,7 @@ export const PLANNER_CHAT_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = 
     function: {
       name: "createTask",
       description:
-        "Create a new task. Chat uses read-only tools, so this executor is reserved for confirmed server actions.",
+        "Create a new task for the user. Available in chat only when the user has enabled edits.",
       parameters: {
         type: "object",
         properties: {
@@ -500,7 +510,7 @@ export async function executePlannerTool(
         resourceFilename: row.caldavResourceFilename,
         googleEventId: row.googleEventId,
         action: "create",
-      }).catch(() => {});
+      }).catch(logSyncError(row.id));
       return { ok: true, task: { id: row.id, title: row.title, status: row.status } };
     }
     case "updateTask": {
@@ -591,8 +601,17 @@ export async function executePlannerTool(
         resourceFilename: row.caldavResourceFilename,
         googleEventId: row.googleEventId,
         action: "update",
-      }).catch(() => {});
-      return { ok: true, task: { id: row.id, title: row.title, status: row.status } };
+      }).catch(logSyncError(row.id));
+      // Completing a recurring task spawns its next instance.
+      let spawnedNext: { id: string; title: string; date: string | null } | null = null;
+      if (updates.status === "done" && existing.status !== "done" && row.recurrenceRule?.trim()) {
+        const clone = await spawnNextRecurrence(db, row, todayYmdLocal()).catch((err) => {
+          logger.error({ err, taskId: row.id }, "ai-tools: recurrence respawn failed");
+          return null;
+        });
+        if (clone) spawnedNext = { id: clone.id, title: clone.title, date: clone.scheduledDate ?? clone.dueDate };
+      }
+      return { ok: true, task: { id: row.id, title: row.title, status: row.status }, spawnedNext };
     }
     case "deleteTask": {
       const taskId = typeof obj.taskId === "string" ? obj.taskId : "";
@@ -615,7 +634,7 @@ export async function executePlannerTool(
         resourceFilename: row.caldavResourceFilename,
         googleEventId: row.googleEventId,
         action: "delete",
-      }).catch(() => {});
+      }).catch(logSyncError(row.id));
       return { ok: true, deletedId: row.id };
     }
 

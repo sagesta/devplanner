@@ -6,7 +6,7 @@ import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { deleteTask, fetchTasks, patchTask, postBulkStatus } from "@/lib/api";
+import { deleteTask, fetchTasks, patchTask, postBulkStatus, restoreTask } from "@/lib/api";
 import { SkeletonRow } from "@/lib/skeleton";
 import { normalizeYmd } from "@/lib/timeline-utils";
 import { cn, displayPhysicalEnergy, displayWorkDepth } from "@/lib/utils";
@@ -169,29 +169,62 @@ export default function TablePage() {
               Mark todo
             </button>
             <div className="h-3 w-[1px] bg-primary/20" />
-            <button
-              type="button"
-              className={cn("text-[11px] font-medium transition-colors disabled:opacity-40", confirmBulkDelete ? "text-red-500 font-bold" : "text-danger hover:text-red-400")}
-              disabled={bulk.isPending}
-              onClick={() => {
-                if (!confirmBulkDelete) {
-                  setConfirmBulkDelete(true);
-                  setTimeout(() => setConfirmBulkDelete(false), 3000);
-                  return;
-                }
-                const ids = Object.entries(sel).filter(([, v]) => v).map(([k]) => k);
-                if (!ids.length) return;
-                setConfirmBulkDelete(false);
-                // Run deletes sequentially
-                Promise.all(ids.map(id => deleteTask(id))).then(() => {
-                  toast.success(`Deleted ${selCount} tasks`);
-                  setSel({});
-                  void qc.invalidateQueries({ queryKey: ["tasks", userId] });
-                }).catch((e: Error) => toast.error(e.message));
-              }}
-            >
-              {confirmBulkDelete ? "Sure?" : "Delete"}
-            </button>
+            {confirmBulkDelete ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-red-400">Delete {selCount}?</span>
+                <button
+                  type="button"
+                  className="rounded bg-danger px-2 py-0.5 text-[11px] font-bold text-white hover:bg-red-600 disabled:opacity-40"
+                  disabled={bulk.isPending}
+                  onClick={() => {
+                    const ids = Object.entries(sel).filter(([, v]) => v).map(([k]) => k);
+                    if (!ids.length) return;
+                    setConfirmBulkDelete(false);
+                    const invalidate = () => {
+                      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+                      void qc.invalidateQueries({ queryKey: ["backlog"] });
+                      void qc.invalidateQueries({ queryKey: ["tasks-today"] });
+                    };
+                    Promise.all(ids.map(id => deleteTask(id))).then(() => {
+                      setSel({});
+                      invalidate();
+                      toast.success(`Deleted ${ids.length} task(s)`, {
+                        duration: 6000,
+                        action: {
+                          label: "Undo",
+                          onClick: () => {
+                            void Promise.all(ids.map((id) => restoreTask(id)))
+                              .then(() => {
+                                toast.success("Tasks restored");
+                                invalidate();
+                              })
+                              .catch((err: unknown) => toast.error(String(err)));
+                          },
+                        },
+                      });
+                    }).catch((e: Error) => toast.error(e.message));
+                  }}
+                >
+                  Confirm
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-white/15 px-2 py-0.5 text-[11px] text-muted hover:bg-white/5"
+                  onClick={() => setConfirmBulkDelete(false)}
+                >
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="text-[11px] font-medium text-danger transition-colors hover:text-red-400 disabled:opacity-40"
+                disabled={bulk.isPending}
+                onClick={() => setConfirmBulkDelete(true)}
+              >
+                Delete
+              </button>
+            )}
           </div>
         )}
       </div>

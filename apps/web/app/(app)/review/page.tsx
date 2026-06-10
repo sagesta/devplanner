@@ -71,10 +71,8 @@ function WeeklyReviewContent() {
     }
   }, [step, notes, hydrated, finished]);
 
-  const lastWeekStart = useMemo(() => {
-    const thisWeek = startOfWeekMonday(new Date());
-    return addDaysYMD(thisWeek, -7);
-  }, []);
+  const thisWeekStart = useMemo(() => startOfWeekMonday(new Date()), []);
+  const lastWeekStart = useMemo(() => addDaysYMD(thisWeekStart, -7), [thisWeekStart]);
 
   const finishMut = useMutation({
     mutationFn: async () => {
@@ -245,9 +243,16 @@ function WeeklyReviewContent() {
         )}
       </div>
 
-      {/* Right column: time panel */}
-      <div className="hidden lg:block space-y-4">
-        <TimeWeekPanel weekStart={lastWeekStart} />
+      {/* Right column: time vs weekly targets (stacks below the form on mobile) */}
+      <div className="space-y-4">
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">This week so far</p>
+          <TimeWeekPanel weekStart={thisWeekStart} />
+        </div>
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">Week under review</p>
+          <TimeWeekPanel weekStart={lastWeekStart} />
+        </div>
       </div>
     </div>
   );

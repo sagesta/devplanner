@@ -25,6 +25,8 @@ const chatBody = z.object({
   message: z.string().min(1),
   model: z.string().optional(),
   enableTools: z.boolean().optional(),
+  /** Opt-in: let the assistant create/update/delete tasks (off = read-only). */
+  allowWrites: z.boolean().optional(),
   /** User's current physical energy for task suggestions */
   currentPhysicalEnergy: z.enum(["low", "medium", "high"]).optional(),
   /** Which app view the user is currently on */
@@ -51,6 +53,19 @@ const READ_ONLY_TOOL_NAMES = new Set([
   "listSprints",
   "getProgressStats",
   "spreadSubtasksAcrossDays",
+]);
+/** Write tools the chat may use only when the user opted in via allowWrites. */
+const WRITE_TOOL_NAMES = new Set([
+  "createTask",
+  "updateTask",
+  "deleteTask",
+  "createSubtask",
+  "createSubtasks",
+  "updateSubtask",
+  "deleteSubtask",
+  "moveSubtasks",
+  "assignTaskToSprint",
+  "createSprint",
 ]);
 
 function resolveChatModel(requested?: string): string {
@@ -122,9 +137,11 @@ async function runPlannerToolLoop(
     current_view?: string;
     selected_task_ids?: string[];
     history?: { role: "user" | "assistant"; content: string }[];
+    allowWrites?: boolean;
   },
   onChunk?: (chunk: string) => Promise<void>
 ): Promise<{ text: string; approxChars: number }> {
+  const allowWrites = opts?.allowWrites === true;
   const todayIso = new Date().toISOString().split("T")[0]!;
 
   const energyHint = opts?.currentPhysicalEnergy
@@ -151,6 +168,7 @@ async function runPlannerToolLoop(
     energyHint,
     viewHint,
     selectionHint,
+    writesEnabled: allowWrites,
   });
 
   // ── RAG: retrieve semantically similar tasks before first LLM call ──
@@ -183,7 +201,11 @@ async function runPlannerToolLoop(
       const streamResp = await client.chat.completions.create({
         model,
         messages,
-        tools: PLANNER_CHAT_TOOLS.filter((tool) => READ_ONLY_TOOL_NAMES.has(tool.function.name)),
+        tools: PLANNER_CHAT_TOOLS.filter(
+          (tool) =>
+            READ_ONLY_TOOL_NAMES.has(tool.function.name) ||
+            (allowWrites && WRITE_TOOL_NAMES.has(tool.function.name))
+        ),
         tool_choice: "auto",
         max_completion_tokens: 2000,
         stream: true,
@@ -240,7 +262,12 @@ async function runPlannerToolLoop(
       }
 
       if (!content.trim() && messages.some(m => m.role === "tool")) {
-        messages.push({ role: "user", content: "Briefly summarize what you found in 1-2 conversational sentences. Do not claim any changes were made." });
+        messages.push({
+          role: "user",
+          content: allowWrites
+            ? "Briefly summarize what you did in 1-2 conversational sentences, stating exactly which tasks were created or changed based on the tool results."
+            : "Briefly summarize what you found in 1-2 conversational sentences. Do not claim any changes were made.",
+        });
         const summaryStream = await client.chat.completions.create({
           model,
           messages,
@@ -503,6 +530,7 @@ export const aiRoutes = new Hono<AppEnv>()
             current_view: body.current_view,
             selected_task_ids: body.selected_task_ids,
             history: body.history,
+            allowWrites: body.allowWrites === true,
           }, async (chunk) => {
             streamedChars += chunk.length;
             await stream.write(chunk);
@@ -519,7 +547,7 @@ export const aiRoutes = new Hono<AppEnv>()
             latencyMs,
             inputTokens: null,
             outputTokens: Math.ceil(approxChars / 4),
-          }).catch(() => {});
+          }).catch((err) => console.warn('[ai] failed to log chat_tools call:', err));
           return;
         }
 
@@ -572,7 +600,7 @@ export const aiRoutes = new Hono<AppEnv>()
           latencyMs,
           inputTokens: null,
           outputTokens: Math.ceil(totalChars / 4),
-        }).catch(() => {});
+        }).catch((err) => console.warn('[ai] failed to log chat call:', err));
       } catch (e) {
         await stream.write(`[Error: ${String(e)}]`);
       }

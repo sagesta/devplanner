@@ -31,6 +31,7 @@ type TaskSuggestion = {
 };
 
 const LS_TOOLS = "devplanner.aiToolsEnabled";
+const LS_WRITES = "devplanner.aiWritesEnabled";
 
 /** Map pathname segments to view names the backend recognises */
 const VIEW_NAMES: Record<string, string> = {
@@ -67,6 +68,7 @@ function TaskSelectorPanel({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<TaskSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -80,11 +82,16 @@ function TaskSelectorPanel({
         return;
       }
       setLoading(true);
+      setSearchError(false);
       try {
         const res = await fetch(`${getApiBase()}/api/tasks`, {
           credentials: "include",
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          setResults([]);
+          setSearchError(true);
+          return;
+        }
         const data = (await res.json()) as {
           tasks: Array<{
             id: string;
@@ -100,7 +107,8 @@ function TaskSelectorPanel({
             .slice(0, 8)
         );
       } catch {
-        // silent
+        setResults([]);
+        setSearchError(true);
       } finally {
         setLoading(false);
       }
@@ -133,7 +141,10 @@ function TaskSelectorPanel({
         {loading && (
           <p className="px-3 py-2 text-xs text-muted">Searching…</p>
         )}
-        {!loading && query.trim() && results.length === 0 && (
+        {!loading && searchError && (
+          <p className="px-3 py-2 text-xs text-danger">Couldn&apos;t load tasks — check your connection and try again.</p>
+        )}
+        {!loading && !searchError && query.trim() && results.length === 0 && (
           <p className="px-3 py-2 text-xs text-muted">No tasks found</p>
         )}
         {!loading && !query.trim() && (
@@ -200,6 +211,7 @@ export function AiChatDock() {
   const [config, setConfig] = useState<AiConfigResponse | null>(null);
   const [model, setModel] = useState("");
   const [toolsEnabled, setToolsEnabled] = useState(true);
+  const [writesEnabled, setWritesEnabled] = useState(false);
 
   // Task selector
   const [showSelector, setShowSelector] = useState(false);
@@ -223,6 +235,7 @@ export function AiChatDock() {
     const m = localStorage.getItem(LS_CHAT_MODEL);
     if (m) setModel(m);
     setToolsEnabled(localStorage.getItem(LS_TOOLS) !== "0");
+    setWritesEnabled(localStorage.getItem(LS_WRITES) === "1");
 
     // Restore chat history for this session
     try {
@@ -281,6 +294,15 @@ export function AiChatDock() {
     setToolsEnabled(on);
     if (typeof window !== "undefined")
       localStorage.setItem(LS_TOOLS, on ? "1" : "0");
+  }
+
+  function persistWrites(on: boolean) {
+    setWritesEnabled(on);
+    if (typeof window !== "undefined")
+      localStorage.setItem(LS_WRITES, on ? "1" : "0");
+    if (on) {
+      toast.info("The assistant can now create and edit tasks for you. It will say exactly what it changed.");
+    }
   }
 
   function removeSelectedTask(id: string) {
@@ -342,6 +364,7 @@ export function AiChatDock() {
           message: apiMessage,
           model: effectiveModel,
           enableTools: toolsEnabled,
+          allowWrites: toolsEnabled && writesEnabled,
           currentPhysicalEnergy: physicalEnergy,
           current_view:
             VIEW_NAMES[pathname.split("/").filter(Boolean)[0] ?? ""] ??
@@ -505,7 +528,9 @@ export function AiChatDock() {
                     Ask what to work on, inspect your progress, or draft safe
                   schedule changes.{" "}
                   <strong className="text-foreground/70">@</strong> to pin tasks
-                  for context.
+                  for context. Turn on{" "}
+                  <strong className="text-foreground/70">Can edit</strong> below
+                  to let the assistant create and organize tasks for you.
                 </p>
                 <div>
                   <p className="text-[10px] font-medium uppercase tracking-wider text-muted/70 mb-2">
@@ -584,7 +609,28 @@ export function AiChatDock() {
                   checked={toolsEnabled}
                   onChange={(e) => persistTools(e.target.checked)}
                 />
-                Read tools
+                Tools
+              </label>
+              <label
+                className={cn(
+                  "flex items-center gap-1.5 text-[10px] select-none",
+                  toolsEnabled ? "text-muted cursor-pointer" : "text-muted/40 cursor-not-allowed"
+                )}
+                title="When on, the assistant can create, edit, and organize tasks for you"
+              >
+                <input
+                  type="checkbox"
+                  className="rounded border-white/20"
+                  checked={toolsEnabled && writesEnabled}
+                  disabled={!toolsEnabled}
+                  onChange={(e) => persistWrites(e.target.checked)}
+                />
+                Can edit
+                {toolsEnabled && writesEnabled && (
+                  <span className="rounded-full bg-amber-500/15 px-1.5 py-px text-[9px] font-medium text-amber-300">
+                    on
+                  </span>
+                )}
               </label>
             </div>
 

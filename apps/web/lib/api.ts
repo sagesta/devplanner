@@ -213,7 +213,7 @@ export async function createTask(body: {
 }
 
 export async function patchTask(taskId: string, body: Record<string, unknown>) {
-  return fetchJson<{ task: TaskRow }>(apiUrl(`/api/tasks/${taskId}`), {
+  return fetchJson<{ task: TaskRow; spawnedNext?: TaskRow | null }>(apiUrl(`/api/tasks/${taskId}`), {
     method: "PATCH",
     body: JSON.stringify(body),
   });

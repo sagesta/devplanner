@@ -2,7 +2,7 @@ import type { calendar_v3 } from "googleapis";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { DEVPLANNER_UID_RE, parseDevplannerCaldavUid } from "../caldav/parse-incoming.js";
 import { db } from "../db/client.js";
-import { googleCalendarLinks, tasks, users } from "../db/schema.js";
+import { googleCalendarLinks, subtasks, tasks, users } from "../db/schema.js";
 import { resolveOrCreateImportAreaId } from "../lib/importArea.js";
 import { getCalendarForUser } from "./auth.js";
 
@@ -269,12 +269,35 @@ export async function runGooglePushJob(input: {
   const task = await db.query.tasks.findFirst({ where: eq(tasks.id, input.taskId) });
   if (!task) return { ok: false, detail: "task not found" };
 
-  // Build a synthetic view for Google — use dueDate as the scheduledDate for push
+  // Push on the planned execution date (fall back to due date). When the
+  // task has timed subtasks that day, push a timed block instead of all-day:
+  // start = earliest subtask time, duration = sum of estimates (min 60m).
+  const eventDate = task.scheduledDate ?? task.dueDate ?? null;
+  let startTime: string | null = null;
+  let endTime: string | null = null;
+  if (eventDate) {
+    const daySubs = await db.query.subtasks.findMany({
+      where: and(eq(subtasks.taskId, task.id), eq(subtasks.scheduledDate, eventDate)),
+    });
+    const timed = daySubs
+      .filter((s) => parseWallTime(s.scheduledTime))
+      .sort((a, b) => (a.scheduledTime ?? "").localeCompare(b.scheduledTime ?? ""));
+    const first = timed[0] ? parseWallTime(timed[0].scheduledTime) : null;
+    if (first) {
+      const totalMinutes =
+        daySubs.reduce((sum, s) => sum + (s.estimatedMinutes ?? 0), 0) || 60;
+      const startTotal = first.h * 60 + first.m;
+      const endTotal = Math.min(startTotal + totalMinutes, 23 * 60 + 59);
+      startTime = `${pad(first.h)}:${pad(first.m)}`;
+      endTime = `${pad(Math.floor(endTotal / 60))}:${pad(endTotal % 60)}`;
+    }
+  }
+
   const body = taskToGoogleEvent({
     ...task,
-    scheduledDate: task.dueDate ?? null,
-    scheduledStartTime: null,
-    scheduledEndTime: null,
+    scheduledDate: eventDate,
+    scheduledStartTime: startTime,
+    scheduledEndTime: endTime,
   }, tz);
   if (!body) {
     if (task.googleEventId) {
