@@ -9,6 +9,7 @@ import { logger } from "./lib/logger.js";
 import { registry, httpRequestsTotal, httpRequestDurationMs } from "./lib/metrics.js";
 import { aiRateLimit } from "./middleware/aiRateLimit.js";
 import { requireAuth } from "./middleware/requireAuth.js";
+import { accomplishmentRoutes } from "./routes/accomplishments.js";
 import { aiRoutes } from "./routes/ai.js";
 import { areaRoutes } from "./routes/areas.js";
 import { eventRoutes } from "./routes/events.js";
@@ -199,6 +200,7 @@ app.route("/api/insights", insightsRoutes);
 app.route("/api/reviews", reviewRoutes);
 app.route("/api/schedule", scheduleRoutes);
 app.route("/api/priorities", priorityRoutes);
+app.route("/api/accomplishments", accomplishmentRoutes);
 
 // ─── Startup ──────────────────────────────────────────────────────
 const port = Number(process.env.PORT) || 3001;

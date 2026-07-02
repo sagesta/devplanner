@@ -236,6 +236,30 @@ export async function runMigrations(pool: pg.Pool): Promise<void> {
       );
     `);
 
+    // ── accomplishments log (what I did / impact / proof / skills) ─
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS accomplishments (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        task_id    UUID REFERENCES tasks(id) ON DELETE SET NULL,
+        date       DATE NOT NULL,
+        title      VARCHAR(500) NOT NULL,
+        impact     TEXT,
+        metric     VARCHAR(500),
+        skills     TEXT[],
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS accomplishments_user_idx
+        ON accomplishments (user_id);
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS accomplishments_user_date_idx
+        ON accomplishments (user_id, date);
+    `);
+
     await client.query("COMMIT");
     console.log("[migrate] Schema up-to-date ✓");
   } catch (err) {

@@ -318,6 +318,39 @@ export const goalHorizons = pgTable("goal_horizons", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/**
+ * Accomplishments log — a lightweight record of "what I did / the impact / the
+ * proof". Optional link back to the task it came from. Feeds CVs, performance
+ * reviews, and the weekly review. Independent of task soft-delete.
+ */
+export const accomplishments = pgTable(
+  "accomplishments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The task this came from, if it was logged from a completed task. */
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    /** The day the work happened (not necessarily when it was logged). */
+    date: date("date").notNull(),
+    /** "What you did" — the headline. */
+    title: varchar("title", { length: 500 }).notNull(),
+    /** "What changed because of it." */
+    impact: text("impact"),
+    /** "The proof" — a number, status, or verifiable outcome. */
+    metric: varchar("metric", { length: 500 }),
+    /** Skills exercised — useful for CVs and performance reviews. */
+    skills: text("skills").array(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("accomplishments_user_idx").on(t.userId),
+    index("accomplishments_user_date_idx").on(t.userId, t.date),
+  ]
+);
+
 export const caldavSyncLog = pgTable(
   "caldav_sync_log",
   {
