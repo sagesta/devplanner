@@ -7,6 +7,7 @@ import {
   Sparkles,
   Target,
   UserRound,
+  Wand2,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -64,6 +65,15 @@ const STARTER_GOALS: GoalMatrix = {
 
 function cellKey(horizon: HorizonKey, area: AreaKey): GoalCellKey {
   return `${horizon}:${area}`;
+}
+
+/** Hand a goal cell to the AI assistant to turn into concrete tasks. */
+function breakGoalIntoTasks(horizonLabel: string, areaLabel: string, text: string) {
+  const clean = text.trim();
+  if (!clean) return;
+  const prompt = `Break this goal into concrete weekly and daily tasks I can actually act on.\n\nGoal — ${horizonLabel}, ${areaLabel}:\n${clean}\n\nGive me a short, ordered list of tasks with rough time estimates (and subtasks if useful). If I have "Can edit" turned on, add them to my backlog; otherwise just propose them and I'll switch it on.`;
+  window.dispatchEvent(new CustomEvent("devplanner:ai-prompt", { detail: { prompt } }));
+  toast.info("Sent to the AI assistant — review it and press send.");
 }
 
 function goalCount(goals: GoalMatrix): number {
@@ -300,15 +310,25 @@ export function GoalHorizonsMatrix({
   }
 
   function loadStarterGoals() {
-    if (!goalsAreEmpty(goals) && !window.confirm("Replace the current goals with starter examples?")) {
-      return;
-    }
+    const prev = goals;
     setGoals(STARTER_GOALS);
+    if (!goalsAreEmpty(prev)) {
+      toast("Loaded template goals", {
+        description: "Your previous goals were replaced.",
+        action: { label: "Undo", onClick: () => setGoals(prev) },
+        duration: 6000,
+      });
+    }
   }
 
   function resetGoals() {
-    if (!window.confirm("Clear every goal in the matrix?")) return;
+    if (goalsAreEmpty(goals)) return;
+    const prev = goals;
     setGoals(EMPTY_GOALS);
+    toast("Cleared all goals", {
+      action: { label: "Undo", onClick: () => setGoals(prev) },
+      duration: 6000,
+    });
   }
 
   return (
@@ -317,7 +337,7 @@ export function GoalHorizonsMatrix({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              <Target size={14} className="text-primary" />
+              <Target size={14} className="text-primary-text" />
               Goal horizons
             </div>
             <h2 className="mt-2 font-display text-3xl text-foreground sm:text-4xl">
@@ -341,7 +361,7 @@ export function GoalHorizonsMatrix({
                 <input
                   value={ownerDraft}
                   onChange={(event) => setOwnerDraft(event.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-sm font-normal text-foreground placeholder:text-muted/40"
+                  className="min-w-0 flex-1 bg-transparent text-sm font-normal text-foreground placeholder:text-muted/60"
                   placeholder="Name"
                 />
               </div>
@@ -378,8 +398,8 @@ export function GoalHorizonsMatrix({
               <button
                 type="button"
                 onClick={resetGoals}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-muted transition-colors hover:bg-white/5 hover:text-foreground"
-                title="Caution: clears every goal in the matrix"
+                className="ml-1 inline-flex items-center justify-center gap-2 rounded-lg border border-danger/25 px-3 py-2 text-xs font-semibold text-danger/70 transition-colors hover:bg-danger/10 hover:text-danger"
+                title="Clears every goal in the matrix (undoable for 6 seconds)"
               >
                 <RefreshCw size={14} />
                 Reset
@@ -422,14 +442,30 @@ export function GoalHorizonsMatrix({
                     </span>
                     <span className="mb-2 flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
                       <span>{lineCount(goals[key]) || "No"} goal(s)</span>
-                      <span className="opacity-0 transition-opacity group-focus-within:opacity-100">Editing</span>
+                      {goals[key].trim() ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            breakGoalIntoTasks(horizon.label, area.label, goals[key]);
+                          }}
+                          title="Send this goal to the AI assistant to break into tasks"
+                          className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold normal-case tracking-normal text-primary-text transition-colors hover:bg-primary/20"
+                        >
+                          <Wand2 size={11} />
+                          Break into tasks
+                        </button>
+                      ) : (
+                        <span className="opacity-0 transition-opacity group-focus-within:opacity-100">Editing</span>
+                      )}
                     </span>
                     <textarea
                       value={goals[key]}
                       onChange={(event) => setGoals((current) => ({ ...current, [key]: event.target.value }))}
                       placeholder={area.prompt}
                       rows={7}
-                      className="min-h-0 flex-1 resize-none rounded-md border border-transparent bg-transparent px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-muted/35 transition-colors focus:border-primary/40 focus:bg-background/50"
+                      className="min-h-0 flex-1 resize-none rounded-md border border-transparent bg-transparent px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-muted/60 transition-colors focus:border-primary/40 focus:bg-background/50"
                     />
                   </label>
                 );
@@ -460,8 +496,21 @@ export function GoalHorizonsMatrix({
                       onChange={(event) => setGoals((current) => ({ ...current, [key]: event.target.value }))}
                       placeholder={area.prompt}
                       rows={4}
-                      className="mt-2 w-full resize-none rounded-md border border-white/10 bg-surface px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-muted/35 focus:border-primary/40"
+                      className="mt-2 w-full resize-none rounded-md border border-white/10 bg-surface px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-muted/60 focus:border-primary/40"
                     />
+                    {goals[key].trim() && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          breakGoalIntoTasks(horizon.label, area.label, goals[key]);
+                        }}
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary-text transition-colors hover:bg-primary/20"
+                      >
+                        <Wand2 size={12} />
+                        Break into tasks
+                      </button>
+                    )}
                   </label>
                 );
               })}

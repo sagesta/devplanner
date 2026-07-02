@@ -59,7 +59,7 @@ export function TimeWeekPanel({
   return (
     <div className={cn("rounded-xl border border-white/10 bg-surface p-4", className)}>
       <div className="flex items-center gap-2 mb-3">
-        <Clock size={14} className="text-primary" />
+        <Clock size={14} className="text-primary-text" />
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
           Time this week
         </h3>
@@ -77,9 +77,9 @@ export function TimeWeekPanel({
 
       {!q.isLoading && areaSummaries.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-surface/50 py-10 text-center">
-          <Clock size={28} className="mb-3 text-primary/30" />
+          <Clock size={28} className="mb-3 text-primary-text/30" />
           <p className="text-sm font-medium text-foreground">No time logged</p>
-          <p className="mt-1 text-xs text-muted/80 max-w-[200px]">
+          <p className="mt-1 text-xs text-muted/85 max-w-[200px]">
             Start a timer on any task to begin tracking your effort.
           </p>
         </div>
@@ -104,7 +104,7 @@ export function TimeWeekPanel({
                   <span className="font-mono text-muted tabular-nums">
                     {formatDuration(area.totalSeconds)}
                     {targetSeconds && (
-                      <span className="text-muted/60">
+                      <span className="text-muted/85">
                         {" "}/ {area.weeklyHourTarget}h
                       </span>
                     )}

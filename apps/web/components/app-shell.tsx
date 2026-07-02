@@ -109,7 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ) : (
               <>
                 <p className="text-lg font-semibold text-foreground">DevPlanner</p>
-                <p className="mt-0.5 text-[11px] text-muted">Execute. Ship. Sell.</p>
+                <p className="mt-0.5 text-[11px] text-muted">Plan less. Finish more.</p>
               </>
             )}
           </div>
@@ -133,7 +133,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     size={16}
                     className={cn(
                       "shrink-0 transition-colors",
-                      active ? "text-primary" : "text-muted group-hover:text-foreground"
+                      active ? "text-primary-text" : "text-muted group-hover:text-foreground"
                     )}
                   />
                   {!collapsed && label}
@@ -158,7 +158,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "shrink-0 transition-colors",
                   isNavActive(pathname, SETTINGS_NAV.matches)
-                    ? "text-primary"
+                    ? "text-primary-text"
                     : "text-muted group-hover:text-foreground"
                 )}
               />
@@ -174,7 +174,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {theme === "dark" ? <Sun size={12} /> : <Moon size={12} />}
                   {theme === "dark" ? "Light" : "Dark"}
                 </button>
-                <span className="text-[10px] text-muted/60 truncate max-w-[120px]" title={session?.user?.email ?? ""}>
+                <span className="text-[11px] text-muted/85 truncate max-w-[120px]" title={session?.user?.email ?? ""}>
                   {session?.user?.email ?? (userId ? "✓ signed in" : "…")}
                 </span>
               </div>

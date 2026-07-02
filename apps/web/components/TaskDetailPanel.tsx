@@ -301,7 +301,7 @@ export function TaskDetailPanel({
                         id={`subtask-${s.id}-name`}
                         name={`subtask-${s.id}-name`}
                         className={cn(
-                          "flex-1 bg-transparent px-1 min-w-0 text-sm outline-none placeholder:text-muted/50",
+                          "flex-1 bg-transparent px-1 min-w-0 text-sm outline-none placeholder:text-muted/60",
                           s.completed && "line-through text-muted"
                         )}
                         defaultValue={s.title}
@@ -316,7 +316,7 @@ export function TaskDetailPanel({
                       <button
                         type="button"
                         onClick={() => { if (confirm("Delete subtask?")) deleteSub.mutate(s.id); }}
-                        className="shrink-0 p-1 rounded text-muted opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-red-400 hover:bg-white/5 transition-all"
+                        className="shrink-0 p-1 rounded text-muted hover-actions opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-red-400 hover:bg-white/5 transition-all"
                         title="Delete subtask"
                       >
                         <Trash2 size={12} />
@@ -327,7 +327,7 @@ export function TaskDetailPanel({
 
                 <div className="mt-2 flex gap-2">
                   <input
-                    className="flex-1 rounded-lg border border-white/10 bg-background px-3 py-2 text-sm placeholder:text-muted/50 focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="flex-1 rounded-lg border border-white/10 bg-background px-3 py-2 text-sm placeholder:text-muted/60 focus:border-primary focus:ring-1 focus:ring-primary"
                     placeholder="+ Add executable step"
                     value={newSubtaskTitle}
                     onChange={(e) => setNewSubtaskTitle(e.target.value)}

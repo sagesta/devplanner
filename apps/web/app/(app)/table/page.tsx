@@ -149,7 +149,7 @@ export default function TablePage() {
       <div className="mt-4 flex items-center min-h-[36px]">
         {selCount > 0 && (
           <div className="flex flex-wrap items-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-3 py-1.5 animate-fadeIn">
-            <span className="text-xs font-semibold text-primary">{selCount} selected</span>
+            <span className="text-xs font-semibold text-primary-text">{selCount} selected</span>
             <div className="h-4 w-[1px] bg-primary/20 mx-1" />
             <button
               type="button"
@@ -230,7 +230,7 @@ export default function TablePage() {
       </div>
       <div className="mt-4 overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full min-w-[880px] text-left text-sm">
-          <thead className="border-b border-white/10 bg-surface text-[10px] uppercase tracking-wider text-muted">
+          <thead className="border-b border-white/10 bg-surface text-[11px] uppercase tracking-wider text-muted">
             <tr>
               <th className="w-8 p-2">
                 <input
@@ -262,10 +262,10 @@ export default function TablePage() {
                 </span>
               </th>
               <SortHeader field="dueDate" label="Due" />
-              <th className="p-2 text-[10px] uppercase text-muted">Scheduled (next sub)</th>
-              <th className="p-2 text-[10px] uppercase text-muted">Tags</th>
-              <th className="p-2 text-[10px] uppercase text-muted">Timer</th>
-              <th className="w-10 p-2 text-right text-[10px] uppercase text-muted"> </th>
+              <th className="p-2 text-[11px] uppercase text-muted">Scheduled (next sub)</th>
+              <th className="p-2 text-[11px] uppercase text-muted">Tags</th>
+              <th className="p-2 text-[11px] uppercase text-muted">Timer</th>
+              <th className="w-10 p-2 text-right text-[11px] uppercase text-muted"> </th>
             </tr>
           </thead>
           <tbody>
@@ -295,7 +295,7 @@ export default function TablePage() {
       {!q.isLoading && roots.length === 0 && (
         <p className="mt-6 text-center text-sm text-muted">
           No tasks yet. Add some from the{" "}
-          <a href="/plan?view=board" className="text-primary hover:underline">
+          <a href="/plan?view=board" className="text-primary-text hover:underline">
             Plan board
           </a>{" "}
           or Brain dump.

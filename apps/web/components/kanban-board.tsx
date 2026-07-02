@@ -266,7 +266,7 @@ export function KanbanBoard() {
   if (!activeSprint) {
     return (
       <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-surface/50 py-16 px-6 text-center">
-        <Sparkles size={32} className="mb-4 text-primary/40" />
+        <Sparkles size={32} className="mb-4 text-primary-text/40" />
         <p className="text-foreground font-medium text-lg">No active sprint</p>
         <p className="mt-1 text-sm text-muted max-w-md">
           Create a new sprint to start adding tasks from your backlog and tracking your progress!
@@ -300,7 +300,7 @@ export function KanbanBoard() {
           />
           <div className="flex gap-3 w-full">
              <div className="flex-1">
-               <label className="block text-left text-[10px] uppercase font-semibold text-muted mb-1 px-1">Start date</label>
+               <label className="block text-left text-[11px] uppercase font-semibold text-muted mb-1 px-1">Start date</label>
                <input
                  type="date"
                  name="startDate"
@@ -311,7 +311,7 @@ export function KanbanBoard() {
                />
              </div>
              <div className="flex-1">
-               <label className="block text-left text-[10px] uppercase font-semibold text-muted mb-1 px-1">End date</label>
+               <label className="block text-left text-[11px] uppercase font-semibold text-muted mb-1 px-1">End date</label>
                <input
                  type="date"
                  name="endDate"
@@ -368,19 +368,19 @@ export function KanbanBoard() {
       )}
       <div className="mb-4 flex flex-col gap-3 rounded-xl border border-white/10 bg-surface/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Active sprint board</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Active sprint board</p>
           <h1 className="mt-1 truncate font-display text-xl text-foreground">{activeSprint.name}</h1>
           <div className="mt-0.5 flex items-center gap-2">
             <p className="text-xs text-muted">{activeSprint.startDate} to {activeSprint.endDate}</p>
             {activeSprint.endDate < todayYmd && (
-              <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-semibold text-red-300">
+              <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[11px] font-semibold text-red-300">
                 Sprint expired
               </span>
             )}
           </div>
         </div>
         {activeSprints.length > 1 && (
-          <label className="flex shrink-0 flex-col gap-1 text-[10px] font-medium uppercase tracking-wide text-muted">
+          <label className="flex shrink-0 flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-muted">
             Sprint
             <select
               className="min-w-[220px] rounded-lg border border-white/10 bg-background px-3 py-2 text-sm normal-case text-foreground"
@@ -405,7 +405,7 @@ export function KanbanBoard() {
             className={cn(
               "flex items-center gap-1.5 rounded-lg border bg-surface px-3 py-1.5 text-sm transition-colors",
               selectedTags.length > 0
-                ? "border-primary text-primary bg-primary/10"
+                ? "border-primary text-primary-text bg-primary/10"
                 : "border-white/10 text-muted hover:bg-white/5 hover:text-foreground"
             )}
           >
@@ -414,7 +414,7 @@ export function KanbanBoard() {
           </button>
           
           <div className="absolute right-0 top-full mt-1 hidden w-56 flex-col overflow-hidden rounded-xl border border-white/10 bg-surface shadow-xl group-hover/filter:flex z-[40]">
-            <div className="border-b border-white/5 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted">
+            <div className="border-b border-white/5 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
               Filter by Tag
             </div>
             <div className="max-h-60 overflow-y-auto p-1">
@@ -436,7 +436,7 @@ export function KanbanBoard() {
                       <input
                         type="checkbox"
                         checked={active}
-                        className="rounded border-white/20 bg-background text-primary focus:ring-primary/50"
+                        className="rounded border-white/20 bg-background text-primary-text focus:ring-primary/50"
                         onChange={(e) => {
                           if (e.target.checked) setSelectedTags((prev) => [...prev, tag.id]);
                           else setSelectedTags((prev) => prev.filter((id) => id !== tag.id));
@@ -514,7 +514,7 @@ export function KanbanBoard() {
                       <div className="flex items-center gap-2 pl-1">
                         <button
                           type="button"
-                          className="text-[10px] text-primary/70 hover:text-primary hover:underline transition-colors"
+                          className="text-[11px] text-primary-text/70 hover:text-primary-text hover:underline transition-colors"
                           onClick={() => setOpenTaskId(t.id)}
                         >
                           Details / subtasks
@@ -814,10 +814,7 @@ function TaskDrawer({
                   className="rounded-lg p-1.5 text-muted hover:bg-red-500/15 hover:text-red-300"
                   title="Delete task"
                   disabled={delTask.isPending}
-                  onClick={() => {
-                    if (!confirm(`Delete “${q.data!.task.title}”?`)) return;
-                    delTask.mutate();
-                  }}
+                  onClick={() => delTask.mutate()}
                 >
                   <Trash2 size={16} />
                 </button>
@@ -847,7 +844,7 @@ function TaskDrawer({
             </div>
 
             <div className="mt-4 space-y-3 rounded-xl border border-white/10 bg-background/30 p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Fields &amp; Deadline</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Fields &amp; Deadline</p>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block text-[11px] text-muted">
                   Priority
@@ -974,7 +971,7 @@ function TaskDrawer({
 
             <div className="mt-6 flex items-center justify-between">
               <h3 className="font-display text-sm tracking-wide text-foreground">Subtasks</h3>
-              <button onClick={() => setShowSpread(!showSpread)} className="text-xs text-primary hover:text-primary-hover flex items-center gap-1">
+              <button onClick={() => setShowSpread(!showSpread)} className="text-xs text-primary-text hover:text-primary-text/80 flex items-center gap-1">
                 <Sparkles size={12}/> Spread across days
               </button>
             </div>
@@ -984,11 +981,11 @@ function TaskDrawer({
                  <p className="text-xs text-muted">Distribute unscheduled subtasks across a date range.</p>
                  <div className="flex gap-2">
                    <div className="flex-1">
-                     <label className="block text-[10px] uppercase tracking-wider text-muted mb-1">Start</label>
+                     <label className="block text-[11px] uppercase tracking-wider text-muted mb-1">Start</label>
                      <input type="date" defaultValue={spreadStart} onChange={e => setSpreadStart(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-white/10" />
                    </div>
                    <div className="flex-1">
-                     <label className="block text-[10px] uppercase tracking-wider text-muted mb-1">End</label>
+                     <label className="block text-[11px] uppercase tracking-wider text-muted mb-1">End</label>
                      <input type="date" defaultValue={spreadEnd} onChange={e => setSpreadEnd(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-white/10" />
                    </div>
                  </div>
@@ -1029,7 +1026,7 @@ function TaskDrawer({
                     id={`subtask-${s.id}-name`}
                     name={`subtask-${s.id}-name`}
                     className={cn(
-                      "flex-1 bg-transparent px-1 min-w-0 text-sm outline-none placeholder:text-muted/50",
+                      "flex-1 bg-transparent px-1 min-w-0 text-sm outline-none placeholder:text-muted/60",
                       s.completed && "line-through text-muted"
                     )}
                     defaultValue={s.title}
@@ -1090,7 +1087,7 @@ function TaskDrawer({
                   <button
                     type="button"
                     onClick={() => { if (confirm("Delete subtask?")) deleteSub.mutate(s.id); }}
-                    className="shrink-0 p-1 rounded text-muted opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-red-400 hover:bg-white/5 transition-all"
+                    className="shrink-0 p-1 rounded text-muted hover-actions opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-red-400 hover:bg-white/5 transition-all"
                     title="Delete subtask"
                   >
                     <Trash2 size={12} />
@@ -1100,7 +1097,7 @@ function TaskDrawer({
             </ul>
             <div className="mt-4 flex gap-2">
               <input
-                className="flex-1 rounded-lg border border-white/10 bg-background px-3 py-2 text-sm placeholder:text-muted/50 focus:border-primary focus:ring-1 focus:ring-primary"
+                className="flex-1 rounded-lg border border-white/10 bg-background px-3 py-2 text-sm placeholder:text-muted/60 focus:border-primary focus:ring-1 focus:ring-primary"
                 placeholder="+ Add executable step"
                 value={newSubtaskTitle}
                 onChange={(e) => setNewSubtaskTitle(e.target.value)}

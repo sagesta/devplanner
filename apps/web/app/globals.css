@@ -12,6 +12,8 @@
   --surface: #1c1b19;
   --primary: #01696f;
   --primary-hover: #018a91;
+  /* Teal for TEXT/icons on dark — the fill teal is only 2.8:1 as text. */
+  --primary-text: #2dd4bf;
   --foreground: #f7f6f2;
   --muted: #9c9890;
   --accent: #6366f1;
@@ -19,6 +21,18 @@
   --warning: #f59e0b;
   --danger: #ef4444;
   --color-error: var(--danger);
+  /* RGB channel triplets — consumed by tailwind.config as rgb(var() / <alpha-value>) */
+  --bg-rgb: 23 22 20;
+  --surface-rgb: 28 27 25;
+  --primary-rgb: 1 105 111;
+  --primary-hover-rgb: 1 138 145;
+  --primary-text-rgb: 45 212 191;
+  --foreground-rgb: 247 246 242;
+  --muted-rgb: 156 152 144;
+  --accent-rgb: 99 102 241;
+  --success-rgb: 16 185 129;
+  --warning-rgb: 245 158 11;
+  --danger-rgb: 239 68 68;
   --glass: rgba(28, 27, 25, 0.85);
   /* Utility-level aliases used by inline opacity helpers */
   --border-alpha: rgba(255, 255, 255, 0.1);
@@ -192,6 +206,8 @@ html[data-theme="light"] {
   /* Desaturated primary — vivid teal is eye-searing on white */
   --primary: #0a6e74;
   --primary-hover: #0d8a91;
+  /* On light, the deep teal IS the readable text tier (5.7:1 on --bg). */
+  --primary-text: #0a6e74;
   /* Text */
   --foreground: #18170f;
   --muted: #6b6860;
@@ -202,6 +218,18 @@ html[data-theme="light"] {
   --danger: #cc3333;
   /* Glass / overlay */
   --glass: rgba(255, 255, 255, 0.9);
+  /* RGB channel triplets (light) */
+  --bg-rgb: 244 243 239;
+  --surface-rgb: 255 255 255;
+  --primary-rgb: 10 110 116;
+  --primary-hover-rgb: 13 138 145;
+  --primary-text-rgb: 10 110 116;
+  --foreground-rgb: 24 23 15;
+  --muted-rgb: 107 104 96;
+  --accent-rgb: 79 82 200;
+  --success-rgb: 13 158 107;
+  --warning-rgb: 196 125 5;
+  --danger-rgb: 204 51 51;
   /* Opacity utility aliases (flipped for light) */
   --border-alpha: rgba(0, 0, 0, 0.1);
   --border-alpha-faint: rgba(0, 0, 0, 0.05);
@@ -215,13 +243,10 @@ html[data-theme="light"] body {
   color: var(--foreground);
 }
 
-/* ── Tailwind bg/text/border utilities that embed literal white/black alphas ── */
-/* These don't pick up CSS variables so we override them directly.             */
-
-html[data-theme="light"] .bg-background { background-color: var(--bg) !important; }
-html[data-theme="light"] .bg-surface    { background-color: var(--surface) !important; }
-html[data-theme="light"] .text-foreground { color: var(--foreground) !important; }
-html[data-theme="light"] .text-muted    { color: var(--muted) !important; }
+/* ── Tailwind utilities that embed literal white/black alphas ──────────────── */
+/* Token colors (bg-background, text-muted, bg-primary/10, …) are var-driven   */
+/* via tailwind.config and flip automatically. Only literal white/black        */
+/* utilities still need manual light-theme equivalents below.                  */
 
 /* white opacity → dark opacity equivalents */
 html[data-theme="light"] .bg-white\/5  { background-color: rgba(0,0,0,0.04) !important; }
@@ -242,13 +267,7 @@ html[data-theme="light"] .hover\:bg-white\/5:hover  { background-color: rgba(0,0
 html[data-theme="light"] .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.08) !important; }
 html[data-theme="light"] .hover\:border-white\/15:hover { border-color: rgba(0,0,0,0.12) !important; }
 
-/* Surface/bg opacity variants used in header/backdrop */
-html[data-theme="light"] .bg-surface\/40 { background-color: rgba(255,255,255,0.7) !important; }
-html[data-theme="light"] .bg-surface\/80 { background-color: rgba(255,255,255,0.9) !important; }
-
-/* text opacity variants */
-html[data-theme="light"] .text-muted\/60  { color: rgba(107,104,96,0.70) !important; }
-html[data-theme="light"] .text-muted\/80  { color: rgba(107,104,96,0.85) !important; }
+/* text opacity variants (literal white only — muted/surface flip via vars) */
 html[data-theme="light"] .text-white\/70  { color: rgba(24,23,15,0.70)  !important; }
 html[data-theme="light"] .text-white\/50  { color: rgba(24,23,15,0.50)  !important; }
 
@@ -282,12 +301,6 @@ html[data-theme="light"] .glass {
   background: var(--glass);
   border-color: rgba(0, 0, 0, 0.08);
 }
-
-/* Primary chip / badge opacity variants */
-html[data-theme="light"] .bg-primary\/10 { background-color: rgba(10,110,116,0.10) !important; }
-html[data-theme="light"] .bg-primary\/15 { background-color: rgba(10,110,116,0.14) !important; }
-html[data-theme="light"] .bg-primary\/20 { background-color: rgba(10,110,116,0.18) !important; }
-html[data-theme="light"] .bg-primary\/80 { background-color: rgba(10,110,116,0.85) !important; }
 
 /* ── Task card & component fixes for light ─────────────────────────── */
 
@@ -341,11 +354,45 @@ html[data-theme="light"] .bg-amber-500\/10     { background-color: rgba(245,158,
 html[data-theme="light"] .text-amber-100\/95   { color: #92400e !important; }
 html[data-theme="light"] .text-amber-50        { color: #78350f !important; }
 
-/* bg-background/80, bg-background/90, bg-background/50 */
-html[data-theme="light"] .bg-background\/50 { background-color: rgba(244,243,239,0.6) !important; }
-html[data-theme="light"] .bg-background\/80 { background-color: rgba(244,243,239,0.85) !important; }
-html[data-theme="light"] .bg-background\/90 { background-color: rgba(244,243,239,0.95) !important; }
-
 /* SubtaskBar progress track */
 html[data-theme="light"] .bg-white\/10 { background-color: rgba(0,0,0,0.07) !important; }
+
+/* ─── Touch devices: keep hover-revealed row actions reachable ─────── */
+/* Cards hide edit/delete behind hover; there is no hover on touch.     */
+@media (pointer: coarse) {
+  .hover-actions {
+    opacity: 0.65;
+  }
+}
+
+/* ─── Reduced motion ───────────────────────────────────────────────── */
+/* The app self-describes as ADHD-optimized — motion must be optional.  */
+@media (prefers-reduced-motion: reduce) {
+  .animate-slideIn,
+  .animate-slideInRight,
+  .animate-fadeIn,
+  .animate-scaleIn,
+  .animate-aiPanel,
+  .animate-slideDown,
+  .animate-done-flash,
+  .stagger-list > * {
+    animation: none !important;
+  }
+  .animate-shimmer {
+    animation: none !important;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .timer-pulse-ring,
+  .animate-ambient-ring {
+    animation: none !important;
+    box-shadow: none !important;
+  }
+  .card-hover:hover {
+    transform: none;
+  }
+  * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 

@@ -105,7 +105,7 @@ export function TagSelector({
     <div ref={containerRef} className={cn("relative", className)}>
       <button
         type="button"
-        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-muted hover:bg-white/10 hover:text-foreground transition-colors"
+        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted hover:bg-white/10 hover:text-foreground transition-colors"
         onClick={(e) => {
           e.stopPropagation();
           setOpen(!open);
@@ -125,7 +125,7 @@ export function TagSelector({
             <Search size={12} className="text-muted" />
             <input
               ref={inputRef}
-              className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted/50 outline-none"
+              className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted/60 outline-none"
               placeholder="Search or create…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -160,12 +160,12 @@ export function TagSelector({
                 />
                 <span className="flex-1 text-left text-foreground">{tag.name}</span>
                 {currentIds.has(tag.id) && (
-                  <Check size={12} className="text-primary" />
+                  <Check size={12} className="text-primary-text" />
                 )}
               </button>
             ))}
             {filtered.length === 0 && !search.trim() && (
-              <p className="px-2.5 py-3 text-center text-[10px] text-muted">No tags yet</p>
+              <p className="px-2.5 py-3 text-center text-[11px] text-muted">No tags yet</p>
             )}
           </div>
 
@@ -188,7 +188,7 @@ export function TagSelector({
               </div>
               <button
                 type="button"
-                className="flex w-full items-center justify-center gap-1 rounded-md bg-primary/15 px-2 py-1.5 text-[10px] font-medium text-primary hover:bg-primary/25 transition-colors disabled:opacity-40"
+                className="flex w-full items-center justify-center gap-1 rounded-md bg-primary/15 px-2 py-1.5 text-[11px] font-medium text-primary-text hover:bg-primary/25 transition-colors disabled:opacity-40"
                 disabled={createMut.isPending}
                 onClick={() => createMut.mutate({ name: search.trim(), color: newColor })}
               >

@@ -89,7 +89,7 @@ function DroppableDay({
         isOver && "bg-primary/25 ring-1 ring-primary/40 ring-inset"
       )}
     >
-      <span className="block text-[9px] font-medium uppercase tracking-wide text-muted">
+      <span className="block text-[11px] font-medium uppercase tracking-wide text-muted">
         {shortWeekday(ymd)}
       </span>
       <span className="block text-[11px] tabular-nums text-foreground">{ymd.slice(8)}</span>
@@ -224,7 +224,7 @@ function SubtaskDot({
           <button
             type="button"
             onClick={() => setExpanded(false)}
-            className="mt-1 w-full text-center text-[10px] text-muted hover:text-foreground"
+            className="mt-1 w-full text-center text-[11px] text-muted hover:text-foreground"
           >
             close
           </button>
@@ -296,7 +296,7 @@ function TaskBandRow({
           <span className="block truncate text-xs font-medium text-foreground" title={band.task.title}>
             {band.task.title}
           </span>
-          <span className="text-[10px] text-muted capitalize">
+          <span className="text-[11px] text-muted capitalize">
             {band.task.status.replace("_", " ")}
             {band.task.dueDate && ` · due ${band.task.dueDate}`}
           </span>
@@ -322,7 +322,7 @@ function TaskBandRow({
           {hasBar && (
             <div
               className={cn(
-                "pointer-events-auto absolute top-1 flex h-5 items-center overflow-hidden rounded-md px-1.5 text-left text-[9px] font-medium text-white/90 opacity-60 cursor-grab active:cursor-grabbing",
+                "pointer-events-auto absolute top-1 flex h-5 items-center overflow-hidden rounded-md px-1.5 text-left text-[11px] font-medium text-white/90 opacity-60 cursor-grab active:cursor-grabbing",
                 barClass,
                 dragging && "opacity-90 z-20"
               )}
@@ -427,7 +427,7 @@ function UnscheduledDraggable({
         </span>
       </div>
       {extra && (
-        <span className="pl-4 text-[9px] font-mono text-amber-200/80">{extra}</span>
+        <span className="pl-4 text-[11px] font-mono text-amber-200/80">{extra}</span>
       )}
     </div>
   );
@@ -645,7 +645,7 @@ export function TimelineBoard() {
         <div className="flex items-center gap-3">
           <ZoomControl value={zoom} onChange={setZoom} />
           <div className="flex items-center gap-2">
-            <label htmlFor="timeline-sprint" className="text-[10px] uppercase tracking-wide text-muted">
+            <label htmlFor="timeline-sprint" className="text-[11px] uppercase tracking-wide text-muted">
               Sprint
             </label>
             <select
@@ -666,7 +666,7 @@ export function TimelineBoard() {
       </div>
 
       {/* ── Legend ───────────────────────────────────────────────── */}
-      <div className="flex items-center gap-4 text-[10px] text-muted px-1">
+      <div className="flex items-center gap-4 text-[11px] text-muted px-1">
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-8 rounded-sm bg-primary/50 opacity-60" /> Task span
         </span>
@@ -676,7 +676,7 @@ export function TimelineBoard() {
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full border-2 border-success/80 bg-success/50" /> Done subtask
         </span>
-        <span className="text-muted/60">Click a dot to expand · Drag to reschedule</span>
+        <span className="text-muted/85">Click a dot to expand · Drag to reschedule</span>
       </div>
 
       <DndContext
@@ -690,7 +690,7 @@ export function TimelineBoard() {
           <div className="flex flex-col">
             {/* Header row */}
             <div className="flex border-b border-white/10">
-              <div className="flex w-[200px] shrink-0 items-end border-r border-white/10 px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted md:w-[240px]">
+              <div className="flex w-[200px] shrink-0 items-end border-r border-white/10 px-2 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted md:w-[240px]">
                 Task
               </div>
               <div className="flex min-w-0 flex-1 overflow-x-auto">
@@ -729,7 +729,7 @@ export function TimelineBoard() {
             {/* Empty */}
             {!tasksQ.isLoading && bands.length === 0 && (
               <div className="flex flex-col items-center justify-center p-12 text-center bg-white/[0.01]">
-                <CalendarOff size={28} className="mb-3 text-primary/30" />
+                <CalendarOff size={28} className="mb-3 text-primary-text/30" />
                 <p className="max-w-md text-sm text-muted">
                   {unscheduled.length > 0
                     ? "Nothing dated in this range. Drag chips from below onto a date, or navigate to a different period."
@@ -743,7 +743,7 @@ export function TimelineBoard() {
         {/* Unscheduled chips */}
         {unscheduled.length > 0 && (
           <div className="rounded-xl border border-dashed border-white/15 bg-surface/50 p-4">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
               No dates or outside this window — drag onto a date above
             </p>
             <div className="flex flex-wrap gap-2">

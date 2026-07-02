@@ -103,7 +103,7 @@ export default function SprintsPage() {
     <div>
       <div className="mb-6">
         <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-          <Target size={14} className="text-primary" />
+          <Target size={14} className="text-primary-text" />
           Weekly focus
         </div>
         <p className="mb-2 text-xs text-muted">Your north-star anchor — linked to your active sprint.</p>
@@ -129,7 +129,7 @@ export default function SprintsPage() {
           <h2 className="text-sm font-semibold text-foreground mb-3">Create sprint</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-muted">Name</label>
+              <label className="text-[11px] uppercase tracking-wider text-muted">Name</label>
               <input
                 className="mt-1 w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm"
                 value={name}
@@ -138,7 +138,7 @@ export default function SprintsPage() {
               />
             </div>
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-muted">Goal</label>
+              <label className="text-[11px] uppercase tracking-wider text-muted">Goal</label>
               <input
                 className="mt-1 w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm"
                 value={goal}
@@ -147,7 +147,7 @@ export default function SprintsPage() {
               />
             </div>
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-muted">Start date</label>
+              <label className="text-[11px] uppercase tracking-wider text-muted">Start date</label>
               <input
                 ref={startDateRef}
                 type="date"
@@ -166,7 +166,7 @@ export default function SprintsPage() {
               )}
             </div>
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-muted">End date</label>
+              <label className="text-[11px] uppercase tracking-wider text-muted">End date</label>
               <input
                 ref={endDateRef}
                 type="date"
@@ -250,7 +250,7 @@ export default function SprintsPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <CalendarCheck size={14} className={cn(
-                    s.status === "active" ? "text-primary" : "text-muted"
+                    s.status === "active" ? "text-primary-text" : "text-muted"
                   )} />
 
                   {/* Inline rename */}
@@ -290,7 +290,7 @@ export default function SprintsPage() {
                     <>
                       <h3 className="text-sm font-medium text-foreground">{s.name}</h3>
                       <span className={cn(
-                        "rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider",
+                        "rounded-full px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider",
                         s.status === "active" && s.endDate && s.endDate < new Date().toISOString().slice(0, 10)
                           ? "bg-red-500/20 text-red-300"
                           : STATUS_COLORS[s.status] ?? STATUS_COLORS.planned
@@ -310,7 +310,7 @@ export default function SprintsPage() {
                 <p className="text-xs text-muted">
                   {s.startDate} → {s.endDate}
                 </p>
-                <p className="mt-0.5 text-[10px] text-muted/60">
+                <p className="mt-0.5 text-[11px] text-muted/85">
                   {s.taskCount ?? 0} tasks
                 </p>
               </div>
@@ -319,7 +319,7 @@ export default function SprintsPage() {
               {s.status !== "completed" && (
                 <button
                   type="button"
-                  className="rounded-md bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white hover:bg-white/20 transition-colors"
+                  className="rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-white/20 transition-colors"
                   onClick={() => setPlanningSprintId(s.id)}
                 >
                   View tasks
@@ -329,7 +329,7 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={patchMut.isPending}
-                  className="rounded-md bg-primary/80 px-2.5 py-1 text-[10px] font-medium text-white hover:bg-primary disabled:opacity-40 transition-colors"
+                  className="rounded-md bg-primary/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-primary disabled:opacity-40 transition-colors"
                   onClick={() => patchMut.mutate({ id: s.id, body: { status: "active" } })}
                 >
                   Set active
@@ -339,7 +339,7 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={patchMut.isPending}
-                  className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-foreground hover:bg-white/5 disabled:opacity-40 transition-colors"
+                  className="rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-foreground hover:bg-white/5 disabled:opacity-40 transition-colors"
                   onClick={() => patchMut.mutate({ id: s.id, body: { status: "planned" } })}
                 >
                   Deactivate
@@ -349,7 +349,7 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={patchMut.isPending}
-                  className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-muted hover:bg-white/5 disabled:opacity-40 transition-colors"
+                  className="rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-muted hover:bg-white/5 disabled:opacity-40 transition-colors"
                   onClick={() => patchMut.mutate({ id: s.id, body: { status: "completed" } })}
                 >
                   Mark completed
@@ -359,7 +359,7 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={patchMut.isPending}
-                  className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-muted hover:bg-white/5 disabled:opacity-40 transition-colors"
+                  className="rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-muted hover:bg-white/5 disabled:opacity-40 transition-colors"
                   onClick={() => patchMut.mutate({ id: s.id, body: { status: "planned" } })}
                 >
                   Reopen
@@ -370,7 +370,7 @@ export default function SprintsPage() {
               {editingId !== s.id && (
                 <button
                   type="button"
-                  className="rounded-md border border-white/10 px-2.5 py-1 text-[10px] text-muted hover:bg-white/5 hover:text-foreground transition-colors flex items-center gap-1"
+                  className="rounded-md border border-white/10 px-2.5 py-1 text-[11px] text-muted hover:bg-white/5 hover:text-foreground transition-colors flex items-center gap-1"
                   onClick={() => {
                     setEditingId(s.id);
                     setEditName(s.name);
@@ -387,7 +387,7 @@ export default function SprintsPage() {
                   <button
                     type="button"
                     disabled={deleteMut.isPending}
-                    className="rounded-md bg-danger px-2.5 py-1 text-[10px] font-bold text-white hover:bg-red-600 disabled:opacity-40 transition-colors flex items-center gap-1"
+                    className="rounded-md bg-danger px-2.5 py-1 text-[11px] font-bold text-white hover:bg-red-600 disabled:opacity-40 transition-colors flex items-center gap-1"
                     onClick={() => {
                       setDeletingId(null);
                       deleteMut.mutate(s.id);
@@ -398,7 +398,7 @@ export default function SprintsPage() {
                   </button>
                   <button
                     type="button"
-                    className="rounded-md border border-white/15 px-2.5 py-1 text-[10px] text-muted hover:bg-white/5 transition-colors"
+                    className="rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-muted hover:bg-white/5 transition-colors"
                     onClick={() => setDeletingId(null)}
                   >
                     Cancel
@@ -408,7 +408,7 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={deleteMut.isPending}
-                  className="rounded-md border border-red-500/20 px-2.5 py-1 text-[10px] text-red-400/70 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40 transition-colors flex items-center gap-1 ml-auto"
+                  className="rounded-md border border-red-500/20 px-2.5 py-1 text-[11px] text-red-400/70 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40 transition-colors flex items-center gap-1 ml-auto"
                   onClick={() => setDeletingId(s.id)}
                 >
                   <Trash2 size={10} />
@@ -484,7 +484,7 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack:
         <div className="flex-1 flex flex-col rounded-xl border border-white/10 bg-surface min-h-[300px]">
           <div className="p-3 border-b border-white/5 flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Backlog</h2>
-            <span className="text-[10px] text-muted">{backlogTasks.length}</span>
+            <span className="text-[11px] text-muted">{backlogTasks.length}</span>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {backlogTasks.map(t => (
@@ -493,7 +493,7 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack:
                 <button
                   disabled={patchMut.isPending}
                   onClick={() => patchMut.mutate({ taskId: t.id, sprintId: sprint.id })}
-                  className="shrink-0 text-[10px] bg-primary/20 text-primary px-2 py-1 rounded hover:bg-primary/30 transition-colors"
+                  className="shrink-0 text-[11px] bg-primary/20 text-primary-text px-2 py-1 rounded hover:bg-primary/30 transition-colors"
                 >
                   Add to sprint
                 </button>
@@ -508,8 +508,8 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack:
         {/* Sprint Pane */}
         <div className="flex-1 flex flex-col rounded-xl border border-primary/30 bg-surface min-h-[300px] shadow-sm shadow-primary/5">
           <div className="p-3 border-b border-white/5 flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-primary">Sprint Tasks</h2>
-            <span className="text-[10px] text-muted">{sprintTasks.length}</span>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-primary-text">Sprint Tasks</h2>
+            <span className="text-[11px] text-muted">{sprintTasks.length}</span>
           </div>
           <form
             className="px-3 pt-3"
@@ -546,7 +546,7 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack:
                 <button
                   disabled={patchMut.isPending}
                   onClick={() => patchMut.mutate({ taskId: t.id, sprintId: null })}
-                  className="shrink-0 text-[10px] text-muted hover:text-red-400 px-2 py-1 rounded hover:bg-white/5 transition-colors"
+                  className="shrink-0 text-[11px] text-muted hover:text-red-400 px-2 py-1 rounded hover:bg-white/5 transition-colors"
                 >
                   Remove
                 </button>

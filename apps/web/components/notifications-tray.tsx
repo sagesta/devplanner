@@ -101,7 +101,7 @@ export function NotificationsTray({ open, onClose }: { open: boolean; onClose: (
       >
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Bell size={16} className="text-primary" />
+            <Bell size={16} className="text-primary-text" />
             Notifications
           </div>
           <button
@@ -117,9 +117,9 @@ export function NotificationsTray({ open, onClose }: { open: boolean; onClose: (
           {tasksQ.isLoading && <p className="text-xs text-muted">Loading…</p>}
           {!tasksQ.isLoading && actionable.length === 0 && (
             <div className="mt-8 flex flex-col items-center text-center text-sm text-muted">
-              <Sparkles className="mb-2 h-8 w-8 text-primary/40" />
+              <Sparkles className="mb-2 h-8 w-8 text-primary-text/40" />
               <p>You&apos;re all caught up ✓</p>
-              <p className="mt-3 max-w-[240px] text-[11px] text-muted/70">
+              <p className="mt-3 max-w-[240px] text-[11px] text-muted/85">
                 Open the AI dock for suggestions. Use Brain Dump (Ctrl/Cmd+Shift+D) for quick capture.
               </p>
             </div>
@@ -147,7 +147,7 @@ export function NotificationsTray({ open, onClose }: { open: boolean; onClose: (
             </ul>
           )}
           {googleDetail && (
-            <p className="mt-4 border-t border-white/10 pt-3 text-[10px] text-muted">{googleDetail}</p>
+            <p className="mt-4 border-t border-white/10 pt-3 text-[11px] text-muted">{googleDetail}</p>
           )}
         </div>
       </aside>

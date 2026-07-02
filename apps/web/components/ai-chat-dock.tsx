@@ -33,16 +33,16 @@ type TaskSuggestion = {
 const LS_TOOLS = "devplanner.aiToolsEnabled";
 const LS_WRITES = "devplanner.aiWritesEnabled";
 
-/** Map pathname segments to view names the backend recognises */
+/** Map pathname segments to view names the backend's `current_view` enum accepts. */
 const VIEW_NAMES: Record<string, string> = {
-  board: "Plan",
-  goals: "Plan",
+  board: "Board",
+  goals: "Goals",
   plan: "Plan",
   now: "Now",
-  timeline: "Plan",
-  table: "Plan",
+  timeline: "Timeline",
+  table: "Table",
   backlog: "Backlog",
-  sprints: "Plan",
+  sprints: "Sprints",
   review: "Review",
   insights: "Review",
 };
@@ -119,7 +119,7 @@ function TaskSelectorPanel({
   return (
     <div className="absolute bottom-full mb-2 left-0 right-0 z-50 rounded-xl border border-white/10 bg-surface shadow-xl">
       <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
-        <AtSign size={13} className="text-primary shrink-0" />
+        <AtSign size={13} className="text-primary-text shrink-0" />
         <input
           ref={inputRef}
           className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted/60 outline-none"
@@ -181,11 +181,11 @@ function TaskSelectorPanel({
                 )}
               />
               <span className="flex-1 truncate text-foreground">{t.title}</span>
-              <span className="shrink-0 text-[10px] text-muted capitalize">
+              <span className="shrink-0 text-[11px] text-muted capitalize">
                 {t.priority}
               </span>
               {selected && (
-                <span className="shrink-0 text-[10px] text-primary">
+                <span className="shrink-0 text-[11px] text-primary-text">
                   added
                 </span>
               )}
@@ -212,6 +212,7 @@ export function AiChatDock() {
   const [model, setModel] = useState("");
   const [toolsEnabled, setToolsEnabled] = useState(true);
   const [writesEnabled, setWritesEnabled] = useState(false);
+  const [showModelPick, setShowModelPick] = useState(false);
 
   // Task selector
   const [showSelector, setShowSelector] = useState(false);
@@ -263,6 +264,20 @@ export function AiChatDock() {
       .then(setConfig)
       .catch(() => setConfig(null));
   }, [open]);
+
+  // Let other views open the dock with a ready-made prompt (e.g. "break this
+  // goal into tasks"). We prefill but never auto-send — the user stays in control.
+  useEffect(() => {
+    function onPrompt(e: Event) {
+      const detail = (e as CustomEvent<{ prompt?: string }>).detail;
+      if (!detail?.prompt) return;
+      setOpen(true);
+      setMsg(detail.prompt);
+      setTimeout(() => inputRef.current?.focus(), 140);
+    }
+    window.addEventListener("devplanner:ai-prompt", onPrompt as EventListener);
+    return () => window.removeEventListener("devplanner:ai-prompt", onPrompt as EventListener);
+  }, []);
 
   // Close selector on outside click
   useEffect(() => {
@@ -465,12 +480,12 @@ export function AiChatDock() {
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
             <div className="flex items-center gap-2 min-w-0">
-              <Bot size={16} className="text-primary shrink-0" />
+              <Bot size={16} className="text-primary-text shrink-0" />
               <span className="text-sm font-medium text-foreground truncate">
                 AI Assistant
               </span>
               {selectedTasks.length > 0 && (
-                <span className="ml-1 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                <span className="ml-1 rounded-full bg-primary/20 px-1.5 py-0.5 text-[11px] font-medium text-primary-text">
                   {selectedTasks.length} task
                   {selectedTasks.length !== 1 ? "s" : ""} pinned
                 </span>
@@ -501,7 +516,7 @@ export function AiChatDock() {
               {selectedTasks.map((t) => (
                 <span
                   key={t.id}
-                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 pl-2 pr-1 py-0.5 text-[10px] text-primary max-w-[160px]"
+                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 pl-2 pr-1 py-0.5 text-[11px] text-primary-text max-w-[160px]"
                 >
                   <span className="truncate">{t.title}</span>
                   <button
@@ -533,7 +548,7 @@ export function AiChatDock() {
                   to let the assistant create and organize tasks for you.
                 </p>
                 <div>
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-muted/70 mb-2">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted/85 mb-2">
                     Suggested prompts
                   </p>
                   <div className="flex flex-wrap gap-1.5">
@@ -585,24 +600,7 @@ export function AiChatDock() {
           {/* Controls + input */}
           <div className="border-t border-white/10 px-3 py-2 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <label className="flex items-center gap-1.5 text-[10px] text-muted">
-                <Wrench size={11} className="text-primary/80" />
-                Model
-                <select
-                  className="rounded-md border border-white/10 bg-background/80 px-1.5 py-1 text-[11px] text-foreground max-w-[140px]"
-                  value={effectiveModel}
-                  onChange={(e) => persistModel(e.target.value)}
-                >
-                  {(
-                    config?.allowedChatModels ?? ["gpt-5-nano"]
-                  ).map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex items-center gap-1.5 text-[10px] text-muted cursor-pointer select-none">
+              <label className="flex items-center gap-1.5 text-[11px] text-muted cursor-pointer select-none">
                 <input
                   type="checkbox"
                   className="rounded border-white/20"
@@ -613,8 +611,8 @@ export function AiChatDock() {
               </label>
               <label
                 className={cn(
-                  "flex items-center gap-1.5 text-[10px] select-none",
-                  toolsEnabled ? "text-muted cursor-pointer" : "text-muted/40 cursor-not-allowed"
+                  "flex items-center gap-1.5 text-[11px] select-none",
+                  toolsEnabled ? "text-muted cursor-pointer" : "text-muted/60 cursor-not-allowed"
                 )}
                 title="When on, the assistant can create, edit, and organize tasks for you"
               >
@@ -627,11 +625,41 @@ export function AiChatDock() {
                 />
                 Can edit
                 {toolsEnabled && writesEnabled && (
-                  <span className="rounded-full bg-amber-500/15 px-1.5 py-px text-[9px] font-medium text-amber-300">
+                  <span className="rounded-full bg-amber-500/15 px-1.5 py-px text-[11px] font-medium text-amber-300">
                     on
                   </span>
                 )}
               </label>
+              {/* Model picker is a power-user setting — demoted behind the gear. */}
+              <button
+                type="button"
+                onClick={() => setShowModelPick((s) => !s)}
+                className={cn(
+                  "ml-auto rounded-md p-1.5 transition-colors",
+                  showModelPick ? "bg-white/10 text-foreground" : "text-muted hover:bg-white/5 hover:text-foreground"
+                )}
+                title={`Model: ${effectiveModel}`}
+                aria-label="Choose AI model"
+                aria-expanded={showModelPick}
+              >
+                <Wrench size={12} />
+              </button>
+              {showModelPick && (
+                <label className="flex w-full items-center gap-1.5 text-[11px] text-muted">
+                  Model
+                  <select
+                    className="rounded-md border border-white/10 bg-background/80 px-1.5 py-1 text-[11px] text-foreground max-w-[160px]"
+                    value={effectiveModel}
+                    onChange={(e) => persistModel(e.target.value)}
+                  >
+                    {(config?.allowedChatModels ?? ["gpt-5-nano"]).map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
 
             {/* Input row with @ button */}
@@ -658,7 +686,7 @@ export function AiChatDock() {
                 className={cn(
                   "self-end shrink-0 rounded-xl p-2.5 transition-colors",
                   showSelector
-                    ? "bg-primary/20 text-primary"
+                    ? "bg-primary/20 text-primary-text"
                     : "text-muted hover:bg-white/10 hover:text-foreground"
                 )}
               >
@@ -668,7 +696,7 @@ export function AiChatDock() {
               <textarea
                 ref={inputRef}
                 id="ai-chat-input"
-                className="flex-1 resize-none rounded-xl border border-white/10 bg-background/50 px-3 py-2 text-sm text-foreground placeholder:text-muted/50"
+                className="flex-1 resize-none rounded-xl border border-white/10 bg-background/50 px-3 py-2 text-sm text-foreground placeholder:text-muted/60"
                 rows={2}
                 value={msg}
                 onChange={(e) => setMsg(e.target.value)}

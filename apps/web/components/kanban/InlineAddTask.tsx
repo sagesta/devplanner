@@ -66,7 +66,7 @@ export function InlineAddTask({
         <input
           ref={inputRef}
           autoFocus
-          className="flex-1 rounded-md border border-white/10 bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted/50"
+          className="flex-1 rounded-md border border-white/10 bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted/60"
           placeholder="Task title…"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -90,7 +90,7 @@ export function InlineAddTask({
       </div>
       <button
         type="button"
-        className="flex w-full items-center justify-center gap-1 text-[10px] text-muted hover:text-foreground"
+        className="flex w-full items-center justify-center gap-1 text-[11px] text-muted hover:text-foreground"
         onClick={() =>
           setMore((v) => {
             const next = !v;
@@ -103,7 +103,7 @@ export function InlineAddTask({
         Date &amp; time (optional)
       </button>
       {more && (
-        <div className="grid gap-2 text-[10px]">
+        <div className="grid gap-2 text-[11px]">
           <label className="text-muted">
             Day
             <input

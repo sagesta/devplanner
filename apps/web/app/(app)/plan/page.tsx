@@ -98,7 +98,7 @@ export default function PlanPage() {
               )}
             >
               <span className="flex items-center gap-2 text-sm font-semibold">
-                <Icon size={15} className={selected ? "text-primary" : "text-muted"} />
+                <Icon size={15} className={selected ? "text-primary-text" : "text-muted"} />
                 {label}
               </span>
               <span className="mt-1 block text-xs leading-snug text-muted">{description}</span>

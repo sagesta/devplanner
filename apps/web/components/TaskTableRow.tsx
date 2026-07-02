@@ -176,7 +176,7 @@ export function TaskTableRow({
         <td className="p-2 text-right action-button">
           <button
             type="button"
-            className={cn("rounded p-1 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity", confirmIndDelete ? "text-red-500 bg-red-500/10" : "text-muted hover:bg-red-500/15 hover:text-red-300")}
+            className={cn("rounded p-1 hover-actions opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity", confirmIndDelete ? "text-red-500 bg-red-500/10" : "text-muted hover:bg-red-500/15 hover:text-red-300")}
             title={confirmIndDelete ? "Are you sure?" : "Delete task"}
             disabled={del.isPending}
             onClick={() => {

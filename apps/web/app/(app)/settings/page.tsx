@@ -284,7 +284,7 @@ export default function SettingsPage() {
               Your daily capacity is derived from the weekly hour targets you set in{" "}
               <button
                 type="button"
-                className="text-primary hover:underline font-medium"
+                className="text-primary-text hover:underline font-medium"
                 onClick={() => setTab("areas")}
               >
                 Settings → Areas
@@ -348,7 +348,7 @@ export default function SettingsPage() {
                             : "— (run Pull from Google)"}
                         </span>
                       </p>
-                      <p className="text-[10px] text-muted/80">
+                      <p className="text-[11px] text-muted/85">
                         Link updated:{" "}
                         {googleQ.data.linkUpdatedAt
                           ? new Date(googleQ.data.linkUpdatedAt).toLocaleString()
@@ -672,7 +672,7 @@ export default function SettingsPage() {
             {logsQ.data && logsQ.data.logs.length > 0 && (
               <div className="mt-3 overflow-x-auto rounded-lg border border-white/5">
                 <table className="w-full text-left text-xs">
-                  <thead className="border-b border-white/10 bg-background/50 text-[9px] uppercase tracking-wider text-muted">
+                  <thead className="border-b border-white/10 bg-background/50 text-[11px] uppercase tracking-wider text-muted">
                     <tr>
                       <th className="p-2">Time</th>
                       <th className="p-2">Job</th>
@@ -779,7 +779,7 @@ function AreasSection({ userId }: { userId: string | undefined }) {
                     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                   }}
                 />
-                <span className="text-[10px] text-muted">h/wk</span>
+                <span className="text-[11px] text-muted">h/wk</span>
               </div>
             </div>
           ))}

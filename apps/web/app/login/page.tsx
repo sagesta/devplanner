@@ -8,16 +8,16 @@ export default function LoginPage() {
   const error = searchParams.get("error");
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#141311] p-4 text-[#f7f6f2]">
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#1c1b19] p-8 shadow-xl">
-        <h1 className="font-[family-name:var(--font-instrument)] text-2xl tracking-tight text-[#f7f6f2]">
-          DevPlanner
-        </h1>
-        <p className="mt-2 text-sm text-white/60">Sign in to continue</p>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
+      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-surface p-8 shadow-xl">
+        <h1 className="font-display text-3xl tracking-tight text-foreground">DevPlanner</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          Turn big goals into months, weeks, and today&apos;s next step.
+        </p>
 
         {error === "AccessDenied" && (
           <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200/90">
-            You are not allowed to access this app.
+            This is a private instance. Ask the owner to add your email to the allowlist.
           </p>
         )}
 
@@ -28,6 +28,10 @@ export default function LoginPage() {
         >
           Sign in with Google
         </button>
+
+        <p className="mt-4 text-center text-[11px] text-muted/85">
+          Capture &rarr; plan &rarr; do &rarr; review. One calm loop.
+        </p>
       </div>
     </div>
   );

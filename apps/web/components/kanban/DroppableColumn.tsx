@@ -30,7 +30,7 @@ export function DroppableColumn({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{title}</h2>
-          <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-white/5 px-1 text-[10px] text-muted">
+          <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-white/5 px-1 text-[11px] text-muted">
             {count}
           </span>
         </div>
@@ -47,16 +47,16 @@ export function DroppableColumn({
         <div className="flex-1 space-y-2 stagger-list">{children}</div>
         {showColumnEmpty && (
           <div className="mt-2 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/12 bg-white/[0.02] px-4 py-10 text-center transition-colors hover:bg-white/[0.04] hover:border-white/20 group">
-            <Sparkles size={24} className="mb-3 text-primary/30 group-hover:text-primary/50 group-hover:scale-110 transition-all duration-300" />
+            <Sparkles size={24} className="mb-3 text-primary-text/30 group-hover:text-primary-text/50 group-hover:scale-110 transition-all duration-300" />
             <p className="text-[11px] text-muted">No tasks here yet</p>
             <button
               type="button"
-              className="mt-3 text-xs font-medium text-primary hover:underline hover:text-primary-hover"
+              className="mt-3 text-xs font-medium text-primary-text hover:underline hover:text-primary-text/80"
               onClick={onAdd}
             >
               + Add task
             </button>
-            <p className="mt-2 text-[10px] text-muted/50">Or drop a card from another column</p>
+            <p className="mt-2 text-[11px] text-muted/70">Or drop a card from another column</p>
           </div>
         )}
       </div>

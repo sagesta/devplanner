@@ -443,7 +443,7 @@ export function BrainDumpModal({
                 <ArrowLeft size={16} />
               </button>
             ) : (
-              <Lightbulb size={18} className="text-primary" />
+              <Lightbulb size={18} className="text-primary-text" />
             )}
             <h2 className="font-display text-xl text-foreground">
               {inPreview ? "Review parsed tasks" : "Brain dump"}
@@ -536,7 +536,7 @@ export function BrainDumpModal({
             </div>
             <textarea
               ref={textareaRef}
-              className="mt-2 min-h-[200px] w-full rounded-lg border border-white/10 bg-background p-3 text-sm text-foreground placeholder:text-muted/50 resize-none"
+              className="mt-2 min-h-[200px] w-full rounded-lg border border-white/10 bg-background p-3 text-sm text-foreground placeholder:text-muted/60 resize-none"
               placeholder="- Fix login bug&#10;- Call mum&#10;- Write blog post"
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -596,7 +596,7 @@ export function BrainDumpModal({
                 </label>
               </div>
             )}
-            <div className="mt-1 text-[10px] text-muted">
+            <div className="mt-1 text-[11px] text-muted">
               {lineCount > 0 ? `${lineCount} task${lineCount !== 1 ? "s" : ""}` : "Start typing…"}
             </div>
             <div className="mt-3 flex flex-wrap justify-end gap-2">
@@ -609,7 +609,7 @@ export function BrainDumpModal({
               </button>
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:opacity-40 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium text-primary-text hover:bg-primary/20 disabled:opacity-40 transition-colors"
                 disabled={!userId || !areaId || parseMut.isPending || lineCount === 0}
                 onClick={() => parseMut.mutate()}
                 title="Use AI to infer energy, priority, and time estimate per item"

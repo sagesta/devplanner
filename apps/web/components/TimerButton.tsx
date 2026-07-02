@@ -33,7 +33,7 @@ export function TimerButton({
         type="button"
         className={cn(
           "group relative inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-mono font-medium transition-colors",
-          "bg-primary/15 text-primary hover:bg-primary/25",
+          "bg-primary/15 text-primary-text hover:bg-primary/25",
           className
         )}
         title="Stop timer"
@@ -59,8 +59,8 @@ export function TimerButton({
       className={cn(
         "inline-flex items-center rounded-lg p-1 transition-colors",
         isOtherTask
-          ? "text-muted/50 hover:text-muted hover:bg-white/5"
-          : "text-muted hover:text-primary hover:bg-primary/10",
+          ? "text-muted/70 hover:text-muted hover:bg-white/5"
+          : "text-muted hover:text-primary-text hover:bg-primary/10",
         className
       )}
       title={isOtherTask ? "Start timer (stops current)" : "Start timer"}

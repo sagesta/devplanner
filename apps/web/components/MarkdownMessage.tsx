@@ -57,7 +57,7 @@ function renderInline(text: string): React.ReactNode[] {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="underline underline-offset-2 text-primary hover:text-primary-hover"
+          className="underline underline-offset-2 text-primary-text hover:text-primary-text/80"
         >
           {linkText}
         </a>

@@ -739,3 +739,56 @@ export async function saveReview(body: {
   });
 }
 
+// ─── Accomplishments ──────────────────────────────────────────────
+export type AccomplishmentRow = {
+  id: string;
+  userId: string;
+  taskId: string | null;
+  date: string; // YYYY-MM-DD
+  title: string;
+  impact: string | null;
+  metric: string | null;
+  skills: string[] | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AccomplishmentInput = {
+  date: string;
+  title: string;
+  impact?: string | null;
+  metric?: string | null;
+  skills?: string[] | string | null;
+  taskId?: string | null;
+};
+
+export async function fetchAccomplishments(): Promise<AccomplishmentRow[]> {
+  const data = await fetchJson<{ accomplishments: AccomplishmentRow[] }>(
+    apiUrl("/api/accomplishments")
+  );
+  return data.accomplishments;
+}
+
+export async function createAccomplishment(body: AccomplishmentInput) {
+  return fetchJson<{ accomplishment: AccomplishmentRow }>(apiUrl("/api/accomplishments"), {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateAccomplishment(
+  id: string,
+  body: Partial<Omit<AccomplishmentInput, "taskId">>
+) {
+  return fetchJson<{ accomplishment: AccomplishmentRow }>(apiUrl(`/api/accomplishments/${id}`), {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteAccomplishment(id: string) {
+  return fetchJson<{ ok: boolean }>(apiUrl(`/api/accomplishments/${id}`), {
+    method: "DELETE",
+  });
+}
+

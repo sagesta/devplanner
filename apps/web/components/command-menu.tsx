@@ -129,7 +129,7 @@ export function CommandMenu({
           value={query}
           onValueChange={setQuery}
           placeholder="Search…"
-          className="w-full border-b border-white/10 bg-transparent px-4 py-3.5 text-sm text-foreground outline-none placeholder:text-muted/50"
+          className="w-full border-b border-white/10 bg-transparent px-4 py-3.5 text-sm text-foreground outline-none placeholder:text-muted/60"
         />
         <Command.List className="max-h-72 overflow-auto p-2 text-sm">
           {nothingMatches ? (
@@ -140,7 +140,7 @@ export function CommandMenu({
               {navFiltered.length > 0 && (
                 <Command.Group
                   heading="Navigate"
-                  className="text-[10px] uppercase tracking-wider text-muted mb-1"
+                  className="text-[11px] uppercase tracking-wider text-muted mb-1"
                 >
                   {navFiltered.map(({ href, label, icon: Icon }) => (
                     <Command.Item
@@ -160,7 +160,7 @@ export function CommandMenu({
                   {navFiltered.length > 0 && <Command.Separator className="my-1 border-t border-white/5" />}
                   <Command.Group
                     heading="Tasks"
-                    className="text-[10px] uppercase tracking-wider text-muted mb-1"
+                    className="text-[11px] uppercase tracking-wider text-muted mb-1"
                   >
                     {tasksFiltered.map((task) => (
                       <Command.Item
@@ -182,7 +182,7 @@ export function CommandMenu({
               {brainMatches && (
                 <Command.Group
                   heading="Actions"
-                  className="text-[10px] uppercase tracking-wider text-muted mb-1"
+                  className="text-[11px] uppercase tracking-wider text-muted mb-1"
                 >
                   <Command.Item
                     value="brain dump"
@@ -194,7 +194,7 @@ export function CommandMenu({
                   >
                     <Lightbulb size={14} className="text-muted" />
                     Brain dump
-                    <span className="ml-auto text-[10px] text-muted/60">Ctrl/Cmd+Shift+D</span>
+                    <span className="ml-auto text-[11px] text-muted/85">Ctrl/Cmd+Shift+D</span>
                   </Command.Item>
                 </Command.Group>
               )}

@@ -20,6 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
@@ -65,6 +66,14 @@ type NowItem = {
   physicalEnergy: string;
 };
 
+type DoneVars = {
+  id: string;
+  type: "task" | "subtask";
+  title?: string;
+  priorityLabel?: string;
+  taskId?: string;
+};
+
 function isOpenTask(task: TaskRow): boolean {
   return task.status !== "done" && task.status !== "cancelled";
 }
@@ -103,7 +112,7 @@ function QuestionTile({
   value,
   meta,
   Icon,
-  tone = "text-primary",
+  tone = "text-primary-text",
   action,
   metaHref,
 }: {
@@ -125,7 +134,7 @@ function QuestionTile({
         {value}
       </p>
       {metaHref ? (
-        <Link href={metaHref} className="mt-2 block truncate text-xs text-primary hover:underline">
+        <Link href={metaHref} className="mt-2 block truncate text-xs text-primary-text hover:underline">
           {meta}
         </Link>
       ) : (
@@ -140,6 +149,7 @@ export default function NowPage() {
   const { status } = useSession();
   const userId = useAppUserId();
   const qc = useQueryClient();
+  const router = useRouter();
   const [energyFilter, setEnergyFilter] = useState<PhysicalEnergyLevel | "">("");
   const [rescueDismissed, setRescueDismissed] = useState(false);
   const [scheduleProposals, setScheduleProposals] = useState<ScheduleProposal[]>([]);
@@ -173,21 +183,36 @@ export default function NowPage() {
   });
 
   const doneMut = useMutation({
-    mutationFn: async ({ id, type }: { id: string; type: "task" | "subtask" }) => {
+    mutationFn: async ({ id, type }: DoneVars) => {
       if (type === "task") return patchTask(id, { status: "done" });
       return patchSubtask(id, { completed: true });
     },
-    onSuccess: (data) => {
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.9 },
-        colors: ["#2dd4bf", "#818cf8", "#f472b6"],
-      });
+    onSuccess: (data, vars) => {
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        confetti({
+          particleCount: 80,
+          spread: 60,
+          origin: { y: 0.9 },
+          colors: ["#2dd4bf", "#818cf8", "#f472b6"],
+        });
+      }
       const next = (data as { spawnedNext?: TaskRow | null }).spawnedNext;
       if (next) {
         const nextDate = next.scheduledDate ?? next.dueDate;
         toast.success(`Recurring task — next one ${nextDate ? `scheduled for ${nextDate}` : "created"}.`);
+      }
+      // Nudge: finishing a meaningful task is worth capturing as proof of progress.
+      if (vars.type === "task" && (vars.priorityLabel === "urgent" || vars.priorityLabel === "high") && vars.title) {
+        toast("Nice work — log this win?", {
+          description: "Save it to Accomplishments for reviews and CVs.",
+          action: {
+            label: "Log win",
+            onClick: () =>
+              router.push(
+                `/review?view=accomplishments&title=${encodeURIComponent(vars.title ?? "")}&taskId=${encodeURIComponent(vars.taskId ?? "")}`
+              ),
+          },
+        });
       }
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId, todayLocal] });
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
@@ -423,7 +448,9 @@ export default function NowPage() {
         </div>
       </header>
 
-      {!q.isLoading && !inboxQ.isLoading && !tasksForRescue.isLoading && (
+      {/* Only pitch onboarding when data actually loaded — an outage is not an empty planner. */}
+      {!q.isLoading && !inboxQ.isLoading && !tasksForRescue.isLoading &&
+        !q.isError && !inboxQ.isError && !tasksForRescue.isError && (
         <GettingStartedCard
           hasAnyTask={allRootTasks.length > 0 || (inboxQ.data?.length ?? 0) > 0}
           hasTodayPlan={hasScheduledItems}
@@ -437,7 +464,7 @@ export default function NowPage() {
           value={activeItem?.title ?? todayFocusItems[0]?.title ?? "Nothing locked yet"}
           meta={activeItem?.parentTitle ?? `${todayFocusItems.length} task(s) selected`}
           action={!activeItem && todayFocusItems.length === 0 ? (
-            <Link href="/backlog" className="inline-flex items-center gap-1.5 rounded-md bg-primary/15 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-primary/25 transition-colors">
+            <Link href="/backlog" className="inline-flex items-center gap-1.5 rounded-md bg-primary/15 px-2.5 py-1.5 text-xs font-medium text-primary-text hover:bg-primary/25 transition-colors">
               <CalendarPlus size={12} />
               Lock tasks
             </Link>
@@ -468,7 +495,7 @@ export default function NowPage() {
         <section className="rounded-lg border border-primary/25 bg-primary/5 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex gap-3">
-              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-primary" />
+              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-primary-text" />
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Review schedule changes</h2>
                 <p className="mt-1 text-xs text-muted">
@@ -518,7 +545,7 @@ export default function NowPage() {
                       <p className="mt-0.5 text-xs text-muted">
                         {proposal.fromDate} to {proposal.toDate} - {proposal.estimatedMinutes}m
                       </p>
-                      <p className="mt-1 text-xs text-muted/80">{proposal.reason}</p>
+                      <p className="mt-1 text-xs text-muted/85">{proposal.reason}</p>
                     </div>
                   </label>
                 </li>
@@ -569,7 +596,7 @@ export default function NowPage() {
             <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                  <Clock size={14} className="text-primary" />
+                  <Clock size={14} className="text-primary-text" />
                   Work block
                 </div>
                 <h2 className="mt-1 text-base font-semibold text-foreground">
@@ -583,7 +610,7 @@ export default function NowPage() {
                 <p
                   className={cn(
                     "font-mono text-2xl font-semibold tabular-nums",
-                    isTimerRunningForActive ? "text-primary" : "text-foreground/70"
+                    isTimerRunningForActive ? "text-primary-text" : "text-foreground/70"
                   )}
                 >
                   {isTimerRunningForActive ? formatElapsed(elapsed) : "00:00:00"}
@@ -631,7 +658,15 @@ export default function NowPage() {
                     </button>
                   )}
                   <button
-                    onClick={() => doneMut.mutate({ id: activeItem.id, type: activeItem.type })}
+                    onClick={() =>
+                      doneMut.mutate({
+                        id: activeItem.id,
+                        type: activeItem.type,
+                        title: activeItem.type === "task" ? activeItem.title : activeItem.parentTitle,
+                        priorityLabel: activeItem.priorityLabel,
+                        taskId: activeItem.taskId,
+                      })
+                    }
                     disabled={doneMut.isPending}
                     className="inline-flex min-w-[120px] items-center justify-center gap-2 rounded-lg border border-success/30 bg-success/10 px-4 py-2.5 text-sm font-semibold text-success transition-colors hover:bg-success/20 disabled:opacity-50"
                   >
@@ -673,7 +708,7 @@ export default function NowPage() {
             <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                  <ListChecks size={14} className="text-primary" />
+                  <ListChecks size={14} className="text-primary-text" />
                   Today tasks
                 </div>
                 <p className="mt-1 text-sm text-foreground">
@@ -700,14 +735,23 @@ export default function NowPage() {
                     <li
                       key={item.id}
                       className={cn(
-                        "grid gap-3 px-4 py-3 transition-colors sm:grid-cols-[auto_1fr_auto] sm:items-center",
+                        "grid grid-cols-[auto_1fr] items-start gap-3 px-4 py-3 transition-colors sm:grid-cols-[auto_1fr_auto] sm:items-center",
                         active ? "bg-primary/5" : "hover:bg-white/[0.03]"
                       )}
                     >
+                      {/* Done is the app's primary action — it must exist on touch too. */}
                       <button
                         type="button"
-                        onClick={() => doneMut.mutate({ id: item.id, type: item.type })}
-                        className="hidden text-muted transition-colors hover:text-success sm:block"
+                        onClick={() =>
+                          doneMut.mutate({
+                            id: item.id,
+                            type: item.type,
+                            title: item.type === "task" ? item.title : item.parentTitle,
+                            priorityLabel: item.priorityLabel,
+                            taskId: item.taskId,
+                          })
+                        }
+                        className="-m-2 p-2 text-muted transition-colors hover:text-success"
                         aria-label={`Complete ${item.title}`}
                       >
                         <Circle size={18} />
@@ -715,7 +759,7 @@ export default function NowPage() {
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           {active && (
-                            <span className="rounded border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                            <span className="rounded border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary-text">
                               Now
                             </span>
                           )}
@@ -729,7 +773,7 @@ export default function NowPage() {
                       </div>
                       <span
                         className={cn(
-                          "w-fit rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
+                          "col-start-2 w-fit rounded border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide sm:col-start-auto",
                           priorityClass(item.priorityLabel)
                         )}
                       >
@@ -739,10 +783,25 @@ export default function NowPage() {
                   );
                 })}
               </ul>
+            ) : q.isError ? (
+              <div className="p-4">
+                <div className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-8 text-center">
+                  <AlertTriangle size={28} className="mx-auto mb-3 text-danger/70" />
+                  <p className="font-semibold text-foreground">Couldn&apos;t load today&apos;s tasks.</p>
+                  <p className="mt-1 text-sm text-muted">Your plan is safe — check your connection and retry.</p>
+                  <button
+                    type="button"
+                    onClick={() => void q.refetch()}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/20"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="p-4">
                 <div className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center">
-                  <Inbox size={28} className="mx-auto mb-3 text-primary/50" />
+                  <Inbox size={28} className="mx-auto mb-3 text-primary-text/50" />
                   <p className="font-semibold text-foreground">Nothing scheduled for today.</p>
                   <p className="mt-1 text-sm text-muted">Move 3-7 tasks here before you start.</p>
                 </div>
@@ -755,7 +814,7 @@ export default function NowPage() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted">
                     Pull from Inbox
                   </p>
-                  <Link href="/backlog" className="text-xs font-medium text-primary hover:underline">
+                  <Link href="/backlog" className="text-xs font-medium text-primary-text hover:underline">
                     Open Inbox
                   </Link>
                 </div>
@@ -772,7 +831,7 @@ export default function NowPage() {
                       <button
                         type="button"
                         disabled={rescueMut.isPending}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-white/10 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-primary/20 hover:text-primary disabled:opacity-50"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-white/10 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-primary/20 hover:text-primary-text disabled:opacity-50"
                         onClick={() => rescueMut.mutate([task.id])}
                       >
                         <CalendarPlus size={12} />
@@ -818,7 +877,7 @@ export default function NowPage() {
 
           <section>
             <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              <Target size={14} className="text-primary" />
+              <Target size={14} className="text-primary-text" />
               Win condition
             </div>
             <PriorityAnchorsCard variant="week" />

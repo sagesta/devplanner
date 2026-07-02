@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, CheckCircle2, Circle, ClipboardCheck } from "lucide-react";
+import { Award, BarChart3, CheckCircle2, Circle, ClipboardCheck } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -11,6 +11,7 @@ import { TimeWeekPanel } from "@/components/TimeWeekPanel";
 import { startOfWeekMonday, addDaysYMD } from "@/lib/timeline-utils";
 import { createSprint, saveReview } from "@/lib/api";
 import { useAppUserId } from "@/hooks/use-app-user-id";
+import { AccomplishmentsPanel } from "@/components/accomplishments-panel";
 import InsightsPage from "../insights/page";
 
 const REVIEW_LS = "devplanner.weeklyReview.v1";
@@ -40,6 +41,7 @@ function WeeklyReviewContent() {
   const [notes, setNotes] = useState<string[]>(["", "", "", "", ""]);
   const [hydrated, setHydrated] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const _userId = useAppUserId();
   const qc = useQueryClient();
 
@@ -117,19 +119,43 @@ function WeeklyReviewContent() {
               Count wins, clear carryover, set the next sprint.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              if (!confirm("Start over? This will clear all your notes for the current review.")) return;
-              setStep(0);
-              setNotes(["", "", "", "", ""]);
-              setFinished(false);
-              localStorage.removeItem(REVIEW_LS);
-            }}
-            className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-muted hover:bg-white/5 hover:text-foreground transition-colors"
-          >
-            Reset / Start over
-          </button>
+          {confirmingReset ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const prev = notes;
+                  setStep(0);
+                  setNotes(["", "", "", "", ""]);
+                  setFinished(false);
+                  setConfirmingReset(false);
+                  localStorage.removeItem(REVIEW_LS);
+                  toast("Review notes cleared", {
+                    action: { label: "Undo", onClick: () => setNotes(prev) },
+                    duration: 6000,
+                  });
+                }}
+                className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger transition-colors hover:bg-danger/20"
+              >
+                Clear notes
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingReset(false)}
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-muted transition-colors hover:bg-white/5 hover:text-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingReset(true)}
+              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-muted hover:bg-white/5 hover:text-foreground transition-colors"
+            >
+              Reset / Start over
+            </button>
+          )}
         </div>
 
         {/* Progress dots */}
@@ -143,18 +169,18 @@ function WeeklyReviewContent() {
                   title={s.title}
                   className={cn(
                     "rounded-full transition-all",
-                    i <= step ? "text-primary" : "text-muted/30"
+                    i <= step ? "text-primary-text" : "text-muted/50"
                   )}
                 >
                   {i < step ? (
                     <CheckCircle2 size={20} />
                   ) : (
-                    <Circle size={20} className={cn(i === step && "text-primary fill-primary/20")} />
+                    <Circle size={20} className={cn(i === step && "text-primary-text fill-primary/20")} />
                   )}
                 </button>
                 <span className={cn(
-                  "text-[9px] max-w-[60px] text-center leading-tight",
-                  i <= step ? "text-foreground/70" : "text-muted/40"
+                  "text-[11px] max-w-[60px] text-center leading-tight",
+                  i <= step ? "text-foreground/70" : "text-muted/60"
                 )}>
                   {s.title.split(" ").slice(0, 2).join(" ")}
                 </span>
@@ -173,11 +199,11 @@ function WeeklyReviewContent() {
 
         {finished ? (
           <div className="mt-6 rounded-2xl border border-primary/30 bg-primary/5 p-8 text-center animate-fadeIn">
-            <CheckCircle2 size={36} className="mx-auto mb-3 text-primary" />
+            <CheckCircle2 size={36} className="mx-auto mb-3 text-primary-text" />
             <h2 className="font-display text-xl text-foreground">Review complete!</h2>
             <p className="mt-2 text-sm text-muted">
               Your next sprint has been created. Head to{" "}
-              <Link href="/plan?view=sprints" className="text-primary hover:underline">Plan</Link>{" "}
+              <Link href="/plan?view=sprints" className="text-primary-text hover:underline">Plan</Link>{" "}
               to add tasks.
             </p>
             <button
@@ -193,13 +219,13 @@ function WeeklyReviewContent() {
           </div>
         ) : (
           <div className="mt-6 rounded-2xl border border-white/10 bg-surface p-5 animate-fadeIn" key={step}>
-            <p className="text-[10px] uppercase tracking-wider text-muted">
+            <p className="text-[11px] uppercase tracking-wider text-muted">
               Step {step + 1} of {STEPS.length}
             </p>
             <h2 className="mt-1.5 font-display text-lg text-foreground">{STEPS[step].title}</h2>
-            <p className="mt-1 text-xs text-muted/60">{STEPS[step].hint}</p>
+            <p className="mt-1 text-xs text-muted/85">{STEPS[step].hint}</p>
             <textarea
-              className="mt-4 min-h-[160px] w-full rounded-xl border border-white/10 bg-background p-4 text-sm text-foreground placeholder:text-muted/40 resize-none"
+              className="mt-4 min-h-[160px] w-full rounded-xl border border-white/10 bg-background p-4 text-sm text-foreground placeholder:text-muted/60 resize-none"
               value={notes[step] ?? ""}
               onChange={(e) => {
                 const v = [...notes];
@@ -273,12 +299,21 @@ const REVIEW_VIEWS = [
     Icon: BarChart3,
     description: "Read progress rings, capacity signals, and rollover proposals.",
   },
+  {
+    key: "accomplishments",
+    label: "Accomplishments",
+    href: "/review?view=accomplishments",
+    Icon: Award,
+    description: "Log what you did, the impact, and the proof — for reviews and CVs.",
+  },
 ] as const;
 
 type ReviewView = (typeof REVIEW_VIEWS)[number]["key"];
 
 function normalizeReviewView(value: string | null): ReviewView {
-  return value === "progress" ? "progress" : "weekly";
+  if (value === "progress") return "progress";
+  if (value === "accomplishments") return "accomplishments";
+  return "weekly";
 }
 
 export default function ReviewPage() {
@@ -297,7 +332,7 @@ export default function ReviewPage() {
         </div>
       </header>
 
-      <nav className="grid gap-2 md:grid-cols-2" aria-label="Review views">
+      <nav className="grid gap-2 md:grid-cols-3" aria-label="Review views">
         {REVIEW_VIEWS.map(({ key, href, label, Icon, description }) => {
           const selected = activeView === key;
           return (
@@ -312,7 +347,7 @@ export default function ReviewPage() {
               )}
             >
               <span className="flex items-center gap-2 text-sm font-semibold">
-                <Icon size={15} className={selected ? "text-primary" : "text-muted"} />
+                <Icon size={15} className={selected ? "text-primary-text" : "text-muted"} />
                 {label}
               </span>
               <span className="mt-1 block text-xs leading-snug text-muted">{description}</span>
@@ -322,7 +357,13 @@ export default function ReviewPage() {
       </nav>
 
       <section className="rounded-lg border border-white/10 bg-background/20 p-4">
-        {activeView === "weekly" ? <WeeklyReviewContent /> : <InsightsPage />}
+        {activeView === "weekly" ? (
+          <WeeklyReviewContent />
+        ) : activeView === "accomplishments" ? (
+          <AccomplishmentsPanel />
+        ) : (
+          <InsightsPage />
+        )}
       </section>
     </div>
   );

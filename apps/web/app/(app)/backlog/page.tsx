@@ -161,22 +161,22 @@ export default function BacklogPage() {
       </p>
       <div className="mt-4 grid gap-2 rounded-lg border border-white/10 bg-surface p-3 text-xs text-muted lg:grid-cols-4">
         <div className="flex items-center gap-2">
-          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-white/5 text-[10px] font-semibold text-foreground">1</span>
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-white/5 text-[11px] font-semibold text-foreground">1</span>
           Capture via Brain dump or quick add.
         </div>
         <div className="flex items-center gap-2">
-          <ArrowRight size={13} className="hidden shrink-0 text-muted/50 lg:block" />
-          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-white/5 text-[10px] font-semibold text-foreground">2</span>
+          <ArrowRight size={13} className="hidden shrink-0 text-muted/70 lg:block" />
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-white/5 text-[11px] font-semibold text-foreground">2</span>
           Clarify priority, area, energy, and subtasks.
         </div>
         <div className="flex items-center gap-2">
-          <ArrowRight size={13} className="hidden shrink-0 text-muted/50 lg:block" />
-          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-white/5 text-[10px] font-semibold text-foreground">3</span>
+          <ArrowRight size={13} className="hidden shrink-0 text-muted/70 lg:block" />
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-white/5 text-[11px] font-semibold text-foreground">3</span>
           Add the few that matter to a sprint.
         </div>
         <div className="flex items-center gap-2">
-          <ArrowRight size={13} className="hidden shrink-0 text-muted/50 lg:block" />
-          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-primary/15 text-[10px] font-semibold text-primary">4</span>
+          <ArrowRight size={13} className="hidden shrink-0 text-muted/70 lg:block" />
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-primary/15 text-[11px] font-semibold text-primary-text">4</span>
           Execute from Today, Board, or Timeline.
         </div>
       </div>
@@ -218,7 +218,7 @@ export default function BacklogPage() {
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
                   {displayAreaName(area)}
                 </h2>
-                <span className="text-[10px] text-muted/60">{tasks.length}</span>
+                <span className="text-[11px] text-muted/85">{tasks.length}</span>
               </div>
               <ul className="space-y-1.5 stagger-list">
                 {tasks.map((t) => {
@@ -244,7 +244,7 @@ export default function BacklogPage() {
                         )}
                         <span className="min-w-0 flex-1">{t.title}</span>
                         {t._subtasksTotal !== undefined && t._subtasksTotal > 0 && (
-                          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-muted">
+                          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-muted">
                             {t._subtasksDone}/{t._subtasksTotal}
                           </span>
                         )}
@@ -253,7 +253,7 @@ export default function BacklogPage() {
                         ))}
                         <TimerButton taskId={t.id} compact />
                         <select
-                          className="max-w-[140px] rounded-md border border-white/10 bg-primary/10 text-primary px-2 py-1 text-[11px] font-medium transition-colors hover:bg-primary/20"
+                          className="max-w-[140px] rounded-md border border-white/10 bg-primary/10 text-primary-text px-2 py-1 text-[11px] font-medium transition-colors hover:bg-primary/20"
                           value={t.sprintId ?? ""}
                           disabled={patchMeta.isPending}
                           onChange={(e) => {
@@ -296,7 +296,7 @@ export default function BacklogPage() {
                         </select>
                         <span
                           className={cn(
-                            "inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider",
+                            "inline-block rounded-full px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider",
                             PRIORITY_COLORS[t.priority] ?? PRIORITY_COLORS.normal
                           )}
                         >
@@ -452,7 +452,7 @@ export default function BacklogPage() {
 
                                   <button
                                     onClick={() => deleteSubtaskM.mutate(sub.id)}
-                                    className="opacity-0 group-hover:opacity-100 p-0.5 text-muted hover:bg-danger/20 hover:text-danger rounded sm-transition"
+                                    className="hover-actions opacity-0 group-hover:opacity-100 p-0.5 text-muted hover:bg-danger/20 hover:text-danger rounded sm-transition"
                                     title="Delete subtask"
                                   >
                                     <Trash2 size={12} />
@@ -460,7 +460,7 @@ export default function BacklogPage() {
                                 </li>
                               ))}
                               {(t._subtasks ?? []).length === 0 && (
-                                <p className="text-[10px] text-muted/60 italic px-1">No subtasks yet</p>
+                                <p className="text-[11px] text-muted/85 italic px-1">No subtasks yet</p>
                               )}
                             </ul>
                             <div className="flex items-center gap-2">
@@ -481,7 +481,7 @@ export default function BacklogPage() {
                             </div>
                           </div>
 
-                          <p className="mt-3 text-[10px] text-muted/70">
+                          <p className="mt-3 text-[11px] text-muted/85">
                             Blur date fields to save. Other fields save on change.
                           </p>
                         </div>
@@ -501,11 +501,11 @@ export default function BacklogPage() {
 
       {!q.isLoading && (q.data?.length ?? 0) === 0 && (
         <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-surface/50 py-16 text-center">
-          <CheckCircle2 size={32} className="mb-4 text-primary/40" />
+          <CheckCircle2 size={32} className="mb-4 text-primary-text/40" />
           <p className="text-foreground font-medium text-sm">Your backlog is clean!</p>
           <p className="mt-1 text-xs text-muted max-w-sm">
             All caught up. Use the Brain Dump (Ctrl/Cmd+Shift+D) to capture new tasks, or head to the{" "}
-            <Link href="/plan?view=board" className="text-primary hover:underline font-medium">
+            <Link href="/plan?view=board" className="text-primary-text hover:underline font-medium">
               Plan board
             </Link>.
           </p>

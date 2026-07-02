@@ -113,7 +113,7 @@ export function SubtaskBar({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-[10px] text-muted">
+      <span className="text-[11px] text-muted">
         {done}/{total}
       </span>
     </div>
@@ -242,7 +242,7 @@ export const TaskCard = memo(function TaskCard({
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {overdue && (
-              <span className="rounded-full bg-red-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-red-200">
+              <span className="rounded-full bg-red-500/20 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-200">
                 Overdue
               </span>
             )}
@@ -251,7 +251,7 @@ export const TaskCard = memo(function TaskCard({
                 value={status}
                 title="Status"
                 aria-label="Change status"
-                className="max-w-[104px] shrink-0 rounded border border-white/10 bg-background/80 px-1 py-0.5 text-[9px] capitalize text-foreground"
+                className="max-w-[104px] shrink-0 rounded border border-white/10 bg-background/80 px-1 py-0.5 text-[11px] capitalize text-foreground"
                 onClick={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onChange={(e) => onBoardStatusSelect(e.target.value)}
@@ -269,7 +269,7 @@ export const TaskCard = memo(function TaskCard({
                   <button
                     type="button"
                     className={cn(
-                      "inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider hover:ring-1 hover:ring-white/20",
+                      "inline-block rounded-full px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider hover:ring-1 hover:ring-white/20",
                       PRIORITY_COLORS[priority] ?? PRIORITY_COLORS.normal
                     )}
                     onClick={openPriorityDropdown}
@@ -303,7 +303,7 @@ export const TaskCard = memo(function TaskCard({
               ) : (
                 <span
                   className={cn(
-                    "inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider",
+                    "inline-block rounded-full px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider",
                     PRIORITY_COLORS[priority] ?? PRIORITY_COLORS.normal
                   )}
                 >
@@ -312,19 +312,19 @@ export const TaskCard = memo(function TaskCard({
               )}
             </div>
             <span 
-              className="text-[10px] text-muted cursor-help border-b border-dashed border-white/20 hover:border-white/50 hover:bg-white/5 transition-colors px-0.5 rounded" 
+              className="text-[11px] text-muted cursor-help border-b border-dashed border-white/20 hover:border-white/50 hover:bg-white/5 transition-colors px-0.5 rounded" 
               title="Work depth (focus load). Click in Table view to edit."
             >
               D:{depth}
             </span>
             <span 
-              className="text-[10px] text-muted cursor-help border-b border-dashed border-white/20 hover:border-white/50 hover:bg-white/5 transition-colors px-0.5 rounded" 
+              className="text-[11px] text-muted cursor-help border-b border-dashed border-white/20 hover:border-white/50 hover:bg-white/5 transition-colors px-0.5 rounded" 
               title="Physical energy. Click in Table view to edit."
             >
               E:{energy}
             </span>
             {dueDate && (
-              <span className="text-[10px] text-muted tooltip-hover" title="Due Date">Due: {dueDate}</span>
+              <span className="text-[11px] text-muted tooltip-hover" title="Due Date">Due: {dueDate}</span>
             )}
           </div>
           {hasSubtasks && (

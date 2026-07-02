@@ -33,7 +33,7 @@ function StepRow({
       {done ? (
         <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-success" />
       ) : (
-        <Circle size={18} className="mt-0.5 shrink-0 text-muted/50" />
+        <Circle size={18} className="mt-0.5 shrink-0 text-muted/70" />
       )}
       <div className="min-w-0 flex-1">
         <p className={cn("text-sm font-medium", done ? "text-muted line-through" : "text-foreground")}>
@@ -86,7 +86,7 @@ export function GettingStartedCard({
     <section className="rounded-lg border border-primary/25 bg-primary/5">
       <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div className="flex items-center gap-2">
-          <Rocket size={16} className="text-primary" />
+          <Rocket size={16} className="text-primary-text" />
           <h2 className="text-sm font-semibold text-foreground">Get set up in 2 minutes</h2>
         </div>
         <button
@@ -143,7 +143,7 @@ export function GettingStartedCard({
         />
       </ul>
       <p className="flex items-center gap-1.5 border-t border-white/10 px-4 py-2.5 text-xs text-muted">
-        <Sparkles size={12} className="text-primary/70" />
+        <Sparkles size={12} className="text-primary-text/70" />
         Tip: the AI button (bottom right) can plan your week and break tasks into steps.
       </p>
     </section>

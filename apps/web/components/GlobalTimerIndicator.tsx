@@ -35,12 +35,12 @@ export function GlobalTimerIndicator({ className }: { className?: string }) {
       <span className="text-foreground font-medium truncate max-w-[140px]" title={activeLog.taskTitle}>
         {title}
       </span>
-      <span className="font-mono tabular-nums text-primary">
+      <span className="font-mono tabular-nums text-primary-text">
         {formatElapsed(elapsed)}
       </span>
       <button
         type="button"
-        className="rounded p-0.5 text-primary hover:bg-primary/20 transition-colors disabled:opacity-40"
+        className="rounded p-0.5 text-primary-text hover:bg-primary/20 transition-colors disabled:opacity-40"
         title="Stop timer"
         disabled={isStopping}
         onClick={stopActiveTimer}

@@ -173,15 +173,15 @@ export function PriorityAnchorsCard({
           >
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Compass size={14} className="text-primary" />
+                <Compass size={14} className="text-primary-text" />
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
                   {PERIOD_LABEL[period]}
                 </h3>
-                <span className="text-[10px] text-muted/70">
+                <span className="text-[11px] text-muted/85">
                   {new Date(periodStart + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                 </span>
                 {filledCount === 0 && !isEditing && (
-                  <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+                  <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-300">
                     Not set
                   </span>
                 )}
@@ -200,7 +200,7 @@ export function PriorityAnchorsCard({
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
+                    className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary-text hover:bg-primary/20 transition-colors disabled:opacity-50"
                     onClick={() => suggestMut.mutate(period)}
                     disabled={suggestMut.isPending}
                     title="AI suggestions from your recent task history"
@@ -241,7 +241,7 @@ export function PriorityAnchorsCard({
                     >
                       <div className="flex items-center gap-1.5">
                         <meta.Icon size={11} className={meta.accent} />
-                        <span className="text-[10px] uppercase tracking-wider text-muted">
+                        <span className="text-[11px] uppercase tracking-wider text-muted">
                           {meta.label}
                         </span>
                       </div>
@@ -253,7 +253,7 @@ export function PriorityAnchorsCard({
                           setDraft((d) => ({ ...d, [category]: e.target.value }))
                         }
                         placeholder={placeholderFor(category)}
-                        className="mt-1 w-full resize-none rounded-md border border-white/5 bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted/50 focus:border-primary/40 focus:outline-none"
+                        className="mt-1 w-full resize-none rounded-md border border-white/5 bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted/60 focus:border-primary/40 focus:outline-none"
                       />
                     </label>
                   );
@@ -271,7 +271,7 @@ export function PriorityAnchorsCard({
                   >
                     <div className="flex items-center gap-1.5">
                       <meta.Icon size={11} className={meta.accent} />
-                      <span className="text-[10px] uppercase tracking-wider text-muted">
+                      <span className="text-[11px] uppercase tracking-wider text-muted">
                         {meta.label}
                       </span>
                     </div>
@@ -280,7 +280,7 @@ export function PriorityAnchorsCard({
                         {statement}
                       </p>
                     ) : (
-                      <p className="mt-1 text-xs text-muted/60 italic">
+                      <p className="mt-1 text-xs text-muted/85 italic">
                         {placeholderFor(category)}
                       </p>
                     )}

@@ -104,9 +104,9 @@ function DayCell({
       )}
       title={`${formatDayLabel(day.date)}: ${day.completedUnits}/${day.plannedUnits} complete`}
     >
-      <div className="flex w-full items-center justify-between gap-1 text-[10px] text-muted">
+      <div className="flex w-full items-center justify-between gap-1 text-[11px] text-muted">
         <span>{date.toLocaleDateString(undefined, { weekday: "short" })}</span>
-        {isToday && <span className="rounded bg-primary/15 px-1 text-primary">Today</span>}
+        {isToday && <span className="rounded bg-primary/15 px-1 text-primary-text">Today</span>}
       </div>
       <div className="relative grid place-items-center">
         <ProgressRing value={day.percent} status={day.status} />
@@ -160,7 +160,7 @@ function ProposalList({
                   <p className="truncate text-sm font-medium text-foreground">{proposal.title}</p>
                   <span
                     className={cn(
-                      "rounded px-1.5 py-0.5 text-[10px] uppercase",
+                      "rounded px-1.5 py-0.5 text-[11px] uppercase",
                       proposal.risk === "high"
                         ? "bg-danger/15 text-danger"
                         : proposal.risk === "medium"
@@ -174,7 +174,7 @@ function ProposalList({
                 <p className="mt-1 text-xs text-muted">
                   {proposal.fromDate} to {proposal.toDate} - {proposal.estimatedMinutes}m
                 </p>
-                <p className="mt-1 text-xs text-muted/80">{proposal.reason}</p>
+                <p className="mt-1 text-xs text-muted/85">{proposal.reason}</p>
               </div>
             </label>
           </li>
@@ -274,7 +274,7 @@ export default function InsightsPage() {
       <section className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-white/10 bg-surface p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Clock size={15} className="text-primary" />
+            <Clock size={15} className="text-primary-text" />
             Peak work window
           </div>
           <p className="mt-3 text-2xl font-semibold text-foreground">{activity?.peakHourLabel ?? "--:--"}</p>
@@ -282,7 +282,7 @@ export default function InsightsPage() {
         </div>
         <div className="rounded-lg border border-white/10 bg-surface p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Brain size={15} className="text-primary" />
+            <Brain size={15} className="text-primary-text" />
             Learned signals
           </div>
           <p className="mt-3 text-2xl font-semibold text-foreground">
@@ -292,7 +292,7 @@ export default function InsightsPage() {
         </div>
         <div className="rounded-lg border border-white/10 bg-surface p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Activity size={15} className="text-primary" />
+            <Activity size={15} className="text-primary-text" />
             Daily capacity
           </div>
           <p className="mt-3 text-2xl font-semibold text-foreground">
@@ -308,7 +308,7 @@ export default function InsightsPage() {
 
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <CalendarDays size={16} className="text-primary" />
+          <CalendarDays size={16} className="text-primary-text" />
           <h2 className="text-sm font-semibold text-foreground">This week</h2>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">

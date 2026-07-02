@@ -23,7 +23,7 @@ export function TagChip({
       className={cn(
         "inline-flex items-center gap-1 rounded-full border font-medium",
         size === "sm"
-          ? "px-2 py-0.5 text-[10px]"
+          ? "px-2 py-0.5 text-[11px]"
           : "px-1.5 py-px text-[8px]",
         className
       )}
