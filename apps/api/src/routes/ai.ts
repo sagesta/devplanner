@@ -31,7 +31,7 @@ const chatBody = z.object({
   currentPhysicalEnergy: z.enum(["low", "medium", "high"]).optional(),
   /** Which app view the user is currently on */
   current_view: z
-    .enum(["Backlog", "Sprints", "Board", "Now", "Timeline", "Table", "Review"])
+    .enum(["Backlog", "Sprints", "Board", "Now", "Timeline", "Table", "Review", "Plan", "Goals"])
     .optional(),
   /** Task IDs the user has selected or is focused on */
   selected_task_ids: z.array(z.string()).optional(),
@@ -155,7 +155,9 @@ async function runPlannerToolLoop(
       `- Table → bulk operations: normalize, add fields, generate subtasks for many tasks.\n` +
       `- Now → trim to 3–5 items; suggest moving excess out of Now.\n` +
       `- Timeline → sanity-check due dates; spread tasks realistically over days.\n` +
-      `- Review → summarize completed/slipped; suggest carry-forward tasks.`
+      `- Review → summarize completed/slipped; suggest carry-forward tasks.\n` +
+      `- Plan → help organize the sprint/board: priorities, grouping, scheduling.\n` +
+      `- Goals → help break high-level goals into concrete weekly/daily tasks.`
     : "";
 
   const selectionHint =
@@ -207,7 +209,9 @@ async function runPlannerToolLoop(
             (allowWrites && WRITE_TOOL_NAMES.has(tool.function.name))
         ),
         tool_choice: "auto",
-        max_completion_tokens: 2000,
+        // Reasoning models (gpt-5 family) spend this budget on hidden reasoning
+        // BEFORE visible text — 2000 left complex prompts with empty output.
+        max_completion_tokens: 6000,
         stream: true,
       });
 
@@ -261,17 +265,22 @@ async function runPlannerToolLoop(
         continue;
       }
 
-      if (!content.trim() && messages.some(m => m.role === "tool")) {
+      if (!content.trim()) {
+        // Empty final text: either the model spent its budget on tool calls, or
+        // (reasoning models) on hidden reasoning. One rescue round, plain text.
+        const usedTools = messages.some(m => m.role === "tool");
         messages.push({
           role: "user",
-          content: allowWrites
-            ? "Briefly summarize what you did in 1-2 conversational sentences, stating exactly which tasks were created or changed based on the tool results."
-            : "Briefly summarize what you found in 1-2 conversational sentences. Do not claim any changes were made.",
+          content: usedTools
+            ? allowWrites
+              ? "Briefly summarize what you did in 1-2 conversational sentences, stating exactly which tasks were created or changed based on the tool results."
+              : "Briefly summarize what you found in 1-2 conversational sentences. Do not claim any changes were made."
+            : "Answer the request above directly and concisely in plain text now, without calling any tools.",
         });
         const summaryStream = await client.chat.completions.create({
           model,
           messages,
-          max_completion_tokens: 300,
+          max_completion_tokens: usedTools ? 800 : 4000,
           stream: true,
         });
         for await (const sChunk of summaryStream) {
