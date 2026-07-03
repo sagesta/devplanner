@@ -1,7 +1,6 @@
-import { getServerSession } from "next-auth";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/authOptions";
-import { getAppSql } from "@/lib/ensureUser";
+import { getAppSql, upsertUserByEmail } from "@/lib/ensureUser";
 
 const CELL_KEYS = [
   "short:personal",
@@ -40,13 +39,28 @@ function normalizeGoals(input: unknown): GoalMatrix {
   return next;
 }
 
+/**
+ * Resolve the INTERNAL users.id UUID for the signed-in Clerk user.
+ * Mapping is by email so accounts created under NextAuth keep all their data.
+ */
 async function requireUserId(): Promise<string | NextResponse> {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.id;
-  if (!userId) {
+  const { userId: clerkId } = await auth();
+  if (!clerkId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return userId;
+  const user = await currentUser();
+  const email = user?.primaryEmailAddress?.emailAddress?.trim().toLowerCase();
+  if (!email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const allowed = (process.env.ALLOWED_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  if (allowed.length > 0 && !allowed.includes(email)) {
+    return NextResponse.json({ error: "This account is not allowed on this instance." }, { status: 403 });
+  }
+  return upsertUserByEmail(email, user?.fullName ?? null);
 }
 
 async function ensureGoalTable() {

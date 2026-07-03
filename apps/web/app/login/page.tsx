@@ -1,38 +1,37 @@
 "use client";
 
-import { signIn } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
+import { SignIn } from "@clerk/nextjs";
 
 export default function LoginPage() {
-  const searchParams = useSearchParams();
-  const error = searchParams.get("error");
-
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-surface p-8 shadow-xl">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background p-4 text-foreground">
+      <div className="text-center">
         <h1 className="font-display text-3xl tracking-tight text-foreground">DevPlanner</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted">
+        <p className="mt-2 max-w-xs text-sm leading-relaxed text-muted">
           Turn big goals into months, weeks, and today&apos;s next step.
         </p>
-
-        {error === "AccessDenied" && (
-          <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200/90">
-            This is a private instance. Ask the owner to add your email to the allowlist.
-          </p>
-        )}
-
-        <button
-          type="button"
-          onClick={() => signIn("google", { callbackUrl: "/now" })}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-medium text-[#141311] transition hover:bg-white/90"
-        >
-          Sign in with Google
-        </button>
-
-        <p className="mt-4 text-center text-[11px] text-muted/85">
-          Capture &rarr; plan &rarr; do &rarr; review. One calm loop.
-        </p>
       </div>
+
+      <SignIn
+        routing="hash"
+        fallbackRedirectUrl="/now"
+        appearance={{
+          variables: {
+            colorBackground: "#1c1b19",
+            colorText: "#f7f6f2",
+            colorTextSecondary: "#9c9890",
+            colorPrimary: "#01696f",
+            colorInputBackground: "#171614",
+            colorInputText: "#f7f6f2",
+            borderRadius: "0.75rem",
+          },
+        }}
+      />
+
+      <p className="max-w-xs text-center text-[11px] leading-relaxed text-muted/85">
+        This is a private instance — if your email isn&apos;t allowed in yet, ask the owner to
+        add it. Capture &rarr; plan &rarr; do &rarr; review. One calm loop.
+      </p>
     </div>
   );
 }

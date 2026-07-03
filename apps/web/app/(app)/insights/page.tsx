@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
+import { useAuthStatus } from "@/hooks/use-auth-status";
 import { Activity, Brain, CalendarDays, Check, Clock, RefreshCw, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -185,7 +185,7 @@ function ProposalList({
 }
 
 export default function InsightsPage() {
-  const { status } = useSession();
+  const { status } = useAuthStatus();
   const qc = useQueryClient();
   const today = useMemo(() => toYMD(new Date()), []);
   const weekStart = useMemo(() => startOfWeekMonday(new Date()), []);

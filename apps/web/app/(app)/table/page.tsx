@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
+import { useAuthStatus } from "@/hooks/use-auth-status";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -34,7 +34,7 @@ function localISODate(d = new Date()) {
 }
 
 export default function TablePage() {
-  const { status } = useSession();
+  const { status } = useAuthStatus();
   const userId = useAppUserId();
   const qc = useQueryClient();
   const todayYmd = localISODate();

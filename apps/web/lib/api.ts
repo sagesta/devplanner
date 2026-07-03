@@ -1,12 +1,16 @@
+import { authHeaders } from "./auth-token";
 import { getApiBase } from "./env";
 
 // ─── Centralized fetch wrapper ────────────────────────────────────
+// The Hono API is a separate origin in prod, so Clerk's session cookie never
+// reaches it — every call carries a short-lived Bearer token instead.
 async function fetchJson<T>(url: string | URL, init?: RequestInit): Promise<T> {
   const res = await fetch(url.toString(), {
     credentials: "include",
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(await authHeaders()),
       ...(init?.headers ?? {}),
     },
     cache: "no-store" as RequestCache,
@@ -460,6 +464,7 @@ export async function transcribeAudio(audio: Blob, opts?: { language?: string })
   const res = await fetch(apiUrl("/api/ai/transcribe"), {
     method: "POST",
     credentials: "include",
+    headers: await authHeaders(),
     body: form,
     cache: "no-store" as RequestCache,
   });

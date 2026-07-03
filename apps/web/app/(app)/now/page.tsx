@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
+import { useAuthStatus } from "@/hooks/use-auth-status";
 import confetti from "canvas-confetti";
 import {
   AlertTriangle,
@@ -146,7 +146,7 @@ function QuestionTile({
 }
 
 export default function NowPage() {
-  const { status } = useSession();
+  const { status } = useAuthStatus();
   const userId = useAppUserId();
   const qc = useQueryClient();
   const router = useRouter();

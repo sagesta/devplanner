@@ -12,7 +12,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
+import { useAuthStatus } from "@/hooks/use-auth-status";
 import { useAppUserId } from "@/hooks/use-app-user-id";
 import { ChevronLeft, ChevronRight, CalendarOff, CheckCircle2, Circle } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -436,7 +436,7 @@ function UnscheduledDraggable({
 // ─── Main TimelineBoard ───────────────────────────────────────────────────────
 
 export function TimelineBoard() {
-  const { status } = useSession();
+  const { status } = useAuthStatus();
   const userId = useAppUserId();
   const qc = useQueryClient();
   const [anchorDate, setAnchorDate] = useState(() => startOfWeekMonday(new Date()));

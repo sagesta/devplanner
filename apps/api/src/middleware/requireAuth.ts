@@ -1,6 +1,10 @@
 import type { Context, Next } from "hono";
-import { getToken } from "next-auth/jwt";
-import { cookiesRecordFromHeader } from "../lib/parseCookieHeader.js";
+import {
+  clerkUserIdFromRequest,
+  clerkUserIdFromToken,
+  NotAllowedError,
+  resolveInternalUserId,
+} from "../lib/clerkAuth.js";
 
 function isPublicPath(path: string, method: string): boolean {
   if (method === "OPTIONS") return true;
@@ -10,7 +14,13 @@ function isPublicPath(path: string, method: string): boolean {
   return false;
 }
 
-/** Verify NextAuth JWT from session cookie; set c.set('userId', sub). */
+/**
+ * Verify the Clerk session and set c.set('userId', <internal users.id UUID>).
+ *
+ * Accepts the session token from the Authorization header / cookie, or — for
+ * EventSource connections only, which cannot set headers — from an
+ * `auth_token` query parameter on /api/events/*.
+ */
 export async function requireAuth(c: Context, next: Next) {
   const path = c.req.path;
   const method = c.req.method;
@@ -18,26 +28,26 @@ export async function requireAuth(c: Context, next: Next) {
     return next();
   }
 
-  const secret = process.env.NEXTAUTH_SECRET?.trim();
-  if (!secret) {
-    return c.json({ error: "Server misconfiguration" }, 500);
+  let clerkUserId = await clerkUserIdFromRequest(c.req.raw);
+
+  if (!clerkUserId && method === "GET" && path.startsWith("/api/events")) {
+    const token = c.req.query("auth_token");
+    if (token) clerkUserId = await clerkUserIdFromToken(token);
   }
 
-  const cookie = c.req.header("cookie") ?? "";
-  const secureCookie = process.env.NEXTAUTH_URL?.trim().startsWith("https://") ?? false;
-  const token = await getToken({
-    req: {
-      headers: { cookie },
-      cookies: cookiesRecordFromHeader(cookie),
-    } as Parameters<typeof getToken>[0]["req"],
-    secret,
-    secureCookie,
-  });
-
-  if (!token?.sub) {
+  if (!clerkUserId) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  c.set("userId", token.sub);
+  try {
+    const userId = await resolveInternalUserId(clerkUserId);
+    c.set("userId", userId);
+  } catch (err) {
+    if (err instanceof NotAllowedError) {
+      return c.json({ error: "This account is not allowed on this instance." }, 403);
+    }
+    throw err;
+  }
+
   return next();
 }

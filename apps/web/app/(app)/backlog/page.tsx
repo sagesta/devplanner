@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
+import { useAuthStatus } from "@/hooks/use-auth-status";
 import { useAppUserId } from "@/hooks/use-app-user-id";
 import { ArrowRight, ChevronDown, ChevronRight, Inbox, CheckCircle2, Trash2, Plus, Circle } from "lucide-react";
 import Link from "next/link";
@@ -53,7 +53,7 @@ function displayAreaName(area?: AreaRow): string {
 }
 
 export default function BacklogPage() {
-  const { status } = useSession();
+  const { status } = useAuthStatus();
   const userId = useAppUserId();
   const qc = useQueryClient();
   const [areaFilter, setAreaFilter] = useState<AreaFilter>("all");

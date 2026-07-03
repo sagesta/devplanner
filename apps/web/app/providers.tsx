@@ -1,9 +1,19 @@
 "use client";
 
+import { ClerkProvider, useAuth } from "@clerk/nextjs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { SessionProvider } from "next-auth/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
+import { registerAuthTokenGetter } from "@/lib/auth-token";
+
+/** Expose Clerk's getToken to plain fetch helpers (lib/api.ts) outside React. */
+function AuthTokenBridge() {
+  const { getToken } = useAuth();
+  useEffect(() => {
+    registerAuthTokenGetter(() => getToken());
+  }, [getToken]);
+  return null;
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(
@@ -20,7 +30,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       })
   );
   return (
-    <SessionProvider>
+    <ClerkProvider>
+      <AuthTokenBridge />
       <QueryClientProvider client={client}>
         {children}
         <Toaster
@@ -35,6 +46,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
         }}
         />
       </QueryClientProvider>
-    </SessionProvider>
+    </ClerkProvider>
   );
 }

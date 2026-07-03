@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, CalendarCheck, Target } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { GoalHorizonsMatrix } from "@/components/goal-horizons-matrix";
 
@@ -12,8 +12,8 @@ function displayNameFromSession(name?: string | null, email?: string | null) {
 }
 
 export default function GoalsPage() {
-  const { data: session } = useSession();
-  const ownerName = displayNameFromSession(session?.user?.name, session?.user?.email);
+  const { user } = useUser();
+  const ownerName = displayNameFromSession(user?.fullName, user?.primaryEmailAddress?.emailAddress);
 
   return (
     <div className="mx-auto flex max-w-[1440px] flex-col gap-5 pb-10">

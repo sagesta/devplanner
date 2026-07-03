@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
+import { useAuthStatus } from "@/hooks/use-auth-status";
 import { CalendarCheck, Plus, ArrowLeft, Pencil, Trash2, Check, X, Target } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -18,7 +18,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function SprintsPage() {
-  const { status } = useSession();
+  const { status } = useAuthStatus();
   const userId = useAppUserId();
   const qc = useQueryClient();
   const [planningSprintId, setPlanningSprintId] = useState<string | null>(null);

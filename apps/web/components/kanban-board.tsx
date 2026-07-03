@@ -12,7 +12,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
+import { useAuthStatus } from "@/hooks/use-auth-status";
 import { ChevronDown, ChevronUp, Plus, Trash2, X, Filter, Sparkles } from "lucide-react";
 import confetti from "canvas-confetti";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -72,7 +72,7 @@ function resolveDropStatus(overId: string | undefined, rootsList: TaskRow[]): st
 
 
 export function KanbanBoard() {
-  const { status } = useSession();
+  const { status } = useAuthStatus();
   const userId = useAppUserId();
   const qc = useQueryClient();
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);

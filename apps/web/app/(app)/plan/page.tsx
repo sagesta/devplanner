@@ -3,7 +3,7 @@
 import { CalendarCheck, ChartGantt, KanbanSquare, LayoutList, Target } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useUser } from "@clerk/nextjs";
 import { KanbanBoard } from "@/components/kanban-board";
 import { GoalHorizonsMatrix } from "@/components/goal-horizons-matrix";
 import { TimelineBoard } from "@/components/timeline-board";
@@ -68,8 +68,8 @@ export default function PlanPage() {
   const searchParams = useSearchParams();
   const activeView = normalizePlanView(searchParams.get("view"));
   const active = PLAN_VIEWS.find((view) => view.key === activeView) ?? PLAN_VIEWS[0];
-  const { data: session } = useSession();
-  const ownerName = displayNameFromSession(session?.user?.name, session?.user?.email);
+  const { user } = useUser();
+  const ownerName = displayNameFromSession(user?.fullName, user?.primaryEmailAddress?.emailAddress);
 
   return (
     <div className="mx-auto flex max-w-[1440px] flex-col gap-5 pb-10">

@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
 import { fetchAiConfig, type AiConfigResponse } from "@/lib/api";
+import { authHeaders } from "@/lib/auth-token";
 import { getApiBase } from "@/lib/env";
 import {
   LS_AI_BUDGET,
@@ -86,6 +87,7 @@ function TaskSelectorPanel({
       try {
         const res = await fetch(`${getApiBase()}/api/tasks`, {
           credentials: "include",
+          headers: await authHeaders(),
         });
         if (!res.ok) {
           setResults([]);
@@ -374,7 +376,7 @@ export function AiChatDock() {
       const res = await fetch(`${getApiBase()}/api/ai/chat`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeaders()) },
         body: JSON.stringify({
           message: apiMessage,
           model: effectiveModel,

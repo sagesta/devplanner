@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useAuth } from "@clerk/nextjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiBase } from "@/lib/env";
 
@@ -10,20 +10,29 @@ export function useTaskSse(onIdle: (payload: IdlePayload) => void) {
   const onIdleRef = useRef(onIdle);
   onIdleRef.current = onIdle;
   const [connected, setConnected] = useState(false);
-  const { data: session, status } = useSession();
-  const userId = session?.user?.id;
+  const { isLoaded, isSignedIn, userId, getToken } = useAuth();
 
   useEffect(() => {
-    if (status !== "authenticated" || !userId) return;
+    if (!isLoaded || !isSignedIn || !userId) return;
 
     let es: EventSource | null = null;
     let retryCount = 0;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let disposed = false;
 
-    function connect() {
+    async function connect() {
       if (disposed) return;
-      const url = `${getApiBase()}/api/events/user`;
+      // EventSource can't send headers, and the API is a different origin in
+      // prod (Clerk's cookie won't travel) — pass a fresh short-lived session
+      // token in the query string instead. Each reconnect mints a new one.
+      let token: string | null = null;
+      try {
+        token = await getToken();
+      } catch {
+        token = null;
+      }
+      if (disposed) return;
+      const url = `${getApiBase()}/api/events/user${token ? `?auth_token=${encodeURIComponent(token)}` : ""}`;
       es = new EventSource(url, { withCredentials: true });
 
       es.addEventListener("open", () => {
@@ -59,12 +68,12 @@ export function useTaskSse(onIdle: (payload: IdlePayload) => void) {
           // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
           const delay = Math.min(1000 * Math.pow(2, retryCount), 30_000);
           retryCount++;
-          retryTimer = setTimeout(connect, delay);
+          retryTimer = setTimeout(() => void connect(), delay);
         }
       });
     }
 
-    connect();
+    void connect();
 
     return () => {
       disposed = true;
@@ -72,7 +81,7 @@ export function useTaskSse(onIdle: (payload: IdlePayload) => void) {
       es?.close();
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [status, userId]);
+  }, [isLoaded, isSignedIn, userId, getToken]);
 
   return { connected };
 }

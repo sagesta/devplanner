@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
+import { UserButton, useClerk, useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { AiChatDock } from "@/components/ai-chat-dock";
 import { BrainDumpModal } from "@/components/brain-dump-modal";
@@ -89,8 +89,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("devplanner:open-brain-dump", onOpenBrainDump);
   }, []);
 
-  const { data: session } = useSession();
+  const { user } = useUser();
+  const { signOut } = useClerk();
   const userId = useAppUserId();
+  const userEmail = user?.primaryEmailAddress?.emailAddress ?? "";
 
   return (
     <div className="min-h-screen">
@@ -174,8 +176,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {theme === "dark" ? <Sun size={12} /> : <Moon size={12} />}
                   {theme === "dark" ? "Light" : "Dark"}
                 </button>
-                <span className="text-[11px] text-muted/85 truncate max-w-[120px]" title={session?.user?.email ?? ""}>
-                  {session?.user?.email ?? (userId ? "✓ signed in" : "…")}
+                <UserButton afterSignOutUrl="/login" />
+                <span className="text-[11px] text-muted/85 truncate max-w-[104px]" title={userEmail}>
+                  {userEmail || (userId ? "✓ signed in" : "…")}
                 </span>
               </div>
             )}
@@ -194,7 +197,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2 text-[11px] text-muted hover:bg-white/5 hover:text-foreground transition-colors"
-                  onClick={() => void signOut({ callbackUrl: "/login" })}
+                  onClick={() => void signOut({ redirectUrl: "/login" })}
                 >
                   Sign out
                 </button>

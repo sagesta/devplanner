@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Calendar, Download, Layers, RefreshCw, Settings as SettingsIcon, Cpu, FolderPlus, LogOut, Zap } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { useUser } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { toast } from "sonner";
@@ -44,7 +44,7 @@ const TABS = [
 ] as const;
 
 export default function SettingsPage() {
-  const { data: session } = useSession();
+  const { user } = useUser();
   const userId = useAppUserId();
   const qc = useQueryClient();
   const searchParams = useSearchParams();
@@ -297,7 +297,7 @@ export default function SettingsPage() {
             <div className="mt-4 rounded-lg bg-background/50 p-3 text-xs text-muted space-y-1">
               <p>
                 Signed in as{" "}
-                <span className="text-foreground">{session?.user?.email ?? "—"}</span>
+                <span className="text-foreground">{user?.primaryEmailAddress?.emailAddress ?? "—"}</span>
               </p>
             </div>
           </section>
