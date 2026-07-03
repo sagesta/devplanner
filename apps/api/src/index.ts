@@ -59,7 +59,9 @@ app.use(
       return list.includes(origin) ? origin : null;
     },
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Cookie"],
+    // Authorization carries the Clerk Bearer token on every request —
+    // omitting it here fails the preflight and blocks ALL browser calls.
+    allowHeaders: ["Content-Type", "Cookie", "Authorization"],
     credentials: true,
   })
 );
