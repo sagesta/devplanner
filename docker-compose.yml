@@ -72,14 +72,19 @@ services:
       start_period: 120s
     restart: unless-stopped
 
-  # If NEXT_PUBLIC_API_URL is another subdomain, set NEXTAUTH_COOKIE_DOMAIN=.parentdomain in .env
-  # so the session cookie is sent to the API (see README "401 Unauthorized").
+  # Auth is Clerk — API requests carry a Bearer token, so no cross-subdomain
+  # cookie config is needed. NEXT_PUBLIC_* values are baked at image build.
   web:
     build:
       context: .
       dockerfile: docker/Dockerfile.web
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+        NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_SIGN_IN_URL:-/login}
+        NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL:-/login}
+        NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: ${NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL:-/now}
+        NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL:-/now}
     ports:
       - "${WEB_PORT:-3000}:3000"
     env_file:
