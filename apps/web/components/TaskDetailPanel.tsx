@@ -455,6 +455,33 @@ export function TaskDetailPanel({
                   </select>
                 </label>
                 <label className="block text-xs text-muted">
+                  Repeat
+                  <select
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-2 text-sm text-foreground"
+                    value={recurrence}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setRecurrence(v);
+                      let recurrenceRule: string | null;
+                      if (v === "") recurrenceRule = null;
+                      else if (v === "__custom") recurrenceRule = q.data?.task.recurrenceRule ?? null;
+                      else recurrenceRule = v;
+                      updateTaskDetails.mutate({ recurrenceRule });
+                    }}
+                  >
+                    {RECURRENCE_PRESETS.map((p) => (
+                      <option key={p.label} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                    {((q.data.task.recurrenceRule &&
+                      !RECURRENCE_PRESETS.some((p) => p.value === (q.data.task.recurrenceRule ?? ""))) ||
+                      recurrence === "__custom") && (
+                      <option value="__custom">Custom (keep current)</option>
+                    )}
+                  </select>
+                </label>
+                <label className="block text-xs text-muted">
                   Schedule Date
                   <input
                     key={scheduledDate || "empty-sched"}
