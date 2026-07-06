@@ -38,7 +38,7 @@ export async function openaiJsonCompletion(input: {
       const started = Date.now();
       const resp = await client.chat.completions.create({
         model: input.model,
-        temperature: 0.2,
+        // No temperature: gpt-5-family models reject any non-default value.
         max_completion_tokens: maxOut,
         response_format: { type: "json_object" },
         messages: [
