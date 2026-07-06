@@ -95,7 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const userEmail = user?.primaryEmailAddress?.emailAddress ?? "";
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen [overflow-x:clip]">
       <IdleBanner />
       <div className="flex min-h-screen">
         {/* ─── Desktop sidebar ──────────────────────────────────── */}

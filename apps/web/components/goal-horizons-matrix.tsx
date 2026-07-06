@@ -414,8 +414,8 @@ export function GoalHorizonsMatrix({
       </div>
 
       <div className="hidden overflow-x-auto p-4 lg:block">
-        <div className="min-w-[980px] overflow-hidden rounded-md border border-white/15 bg-background/25">
-          <div className="grid grid-cols-[190px_repeat(3,minmax(0,1fr))] border-b border-white/15 text-sm font-semibold text-foreground">
+        <div className="overflow-hidden rounded-md border border-white/15 bg-background/25">
+          <div className="grid grid-cols-[minmax(110px,170px)_repeat(3,minmax(0,1fr))] border-b border-white/15 text-sm font-semibold text-foreground">
             <div className="border-r border-white/15 bg-white/5 px-4 py-4 text-muted" />
             {AREAS.map((area) => (
               <div key={area.key} className="border-r border-white/15 px-4 py-4 text-center last:border-r-0">
@@ -427,7 +427,7 @@ export function GoalHorizonsMatrix({
           {HORIZONS.map((horizon) => (
             <div
               key={horizon.key}
-              className="grid min-h-[190px] grid-cols-[190px_repeat(3,minmax(0,1fr))] border-b border-white/15 last:border-b-0"
+              className="grid min-h-[190px] grid-cols-[minmax(110px,170px)_repeat(3,minmax(0,1fr))] border-b border-white/15 last:border-b-0"
             >
               <div className="border-r border-white/15 bg-white/5 px-4 py-5 text-center">
                 <p className="text-base font-semibold text-foreground">{horizon.label}</p>
