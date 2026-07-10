@@ -1,22 +1,20 @@
 import { KanbanBoard } from "@/components/kanban-board";
+import { PlanHeader } from "@/components/plan-header";
 import { HelpCircle } from "lucide-react";
 
 export default function BoardPage() {
   return (
-    <div>
-      <div className="flex items-center gap-2">
-        <h1 className="font-display text-2xl text-foreground">Sprint board</h1>
+    <div className="mx-auto flex max-w-[1160px] flex-col gap-6 pb-10">
+      <PlanHeader activeView="board" />
+      <div className="-mt-3 flex justify-end">
         <span
-          className="rounded-full border border-white/10 p-1 text-muted hover:bg-white/5 hover:text-foreground transition-colors cursor-help"
+          className="cursor-help rounded-full border border-[var(--hairline)] p-1 text-muted transition-colors hover:bg-[var(--teal-a08)] hover:text-[var(--teal)]"
           title="Ctrl/Cmd+K command palette · Ctrl/Cmd+Shift+D brain dump"
         >
           <HelpCircle size={14} />
         </span>
       </div>
-      <p className="mt-1 text-sm text-muted">Visualize sprint progress. Drag cards between columns to update status.</p>
-      <div className="mt-6">
-        <KanbanBoard />
-      </div>
+      <KanbanBoard />
     </div>
   );
 }

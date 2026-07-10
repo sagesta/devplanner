@@ -12,9 +12,9 @@ import { Skeleton } from "@/lib/skeleton";
 import { cn } from "@/lib/utils";
 
 const STATUS_COLORS: Record<string, string> = {
-  planned: "bg-blue-500/20 text-blue-300",
-  active: "bg-emerald-500/20 text-emerald-300",
-  completed: "bg-zinc-500/20 text-zinc-400",
+  planned: "border border-[var(--hairline)] text-muted",
+  active: "border border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success-text)]",
+  completed: "border border-[var(--hairline-soft)] text-[var(--muted-soft)]",
 };
 
 export default function SprintsPage() {
@@ -102,21 +102,21 @@ export default function SprintsPage() {
   return (
     <div>
       <div className="mb-6">
-        <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-          <Target size={14} className="text-primary-text" />
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--teal)]">
+          <Target size={14} className="text-[var(--teal)]" />
           Weekly focus
         </div>
         <p className="mb-2 text-xs text-muted">Your north-star anchor — linked to your active sprint.</p>
         <PriorityAnchorsCard variant="week" />
       </div>
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-2xl text-foreground">Sprints</h1>
-          <p className="mt-1 text-sm text-muted">{q.data?.sprints.length ?? 0} sprints</p>
+        <div className="flex items-baseline gap-2">
+          <h1 className="font-display text-[26px] italic text-[var(--ink)]">Sprints</h1>
+          <p className="text-xs text-[var(--muted-soft)]">{q.data?.sprints.length ?? 0}</p>
         </div>
         <button
           type="button"
-          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors"
+          className="flex items-center gap-1.5 rounded-full bg-[var(--ink-btn-bg)] px-4 py-2 text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85"
           onClick={() => setShowForm(!showForm)}
         >
           <Plus size={14} />
@@ -125,35 +125,35 @@ export default function SprintsPage() {
       </div>
 
       {showForm && (
-        <div className="mt-4 rounded-xl border border-white/10 bg-surface p-4 animate-slideIn">
-          <h2 className="text-sm font-semibold text-foreground mb-3">Create sprint</h2>
+        <div className="mt-4 rounded-2xl border border-[var(--hairline)] bg-[var(--card)] p-4 shadow-[var(--card-shadow)] animate-slideIn">
+          <h2 className="text-sm font-semibold text-[var(--ink)] mb-3">Create sprint</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-[11px] uppercase tracking-wider text-muted">Name</label>
+              <label className="text-[11px] uppercase tracking-[0.08em] text-muted">Name</label>
               <input
-                className="mt-1 w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-background px-3 py-2 text-sm focus:border-[var(--teal)]"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Week of April 7"
               />
             </div>
             <div>
-              <label className="text-[11px] uppercase tracking-wider text-muted">Goal</label>
+              <label className="text-[11px] uppercase tracking-[0.08em] text-muted">Goal</label>
               <input
-                className="mt-1 w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-background px-3 py-2 text-sm focus:border-[var(--teal)]"
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
                 placeholder="Ship onboarding v2"
               />
             </div>
             <div>
-              <label className="text-[11px] uppercase tracking-wider text-muted">Start date</label>
+              <label className="text-[11px] uppercase tracking-[0.08em] text-muted">Start date</label>
               <input
                 ref={startDateRef}
                 type="date"
                 className={cn(
-                  "mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm",
-                  startErr ? "border-red-500/70" : "border-white/10"
+                  "mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:border-[var(--teal)]",
+                  startErr ? "border-red-500/70" : "border-[var(--hairline)]"
                 )}
                 value={startDate}
                 onChange={(e) => {
@@ -166,14 +166,14 @@ export default function SprintsPage() {
               )}
             </div>
             <div>
-              <label className="text-[11px] uppercase tracking-wider text-muted">End date</label>
+              <label className="text-[11px] uppercase tracking-[0.08em] text-muted">End date</label>
               <input
                 ref={endDateRef}
                 type="date"
                 min={startDate || undefined}
                 className={cn(
-                  "mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm",
-                  endErr || rangeErr ? "border-red-500/70" : "border-white/10"
+                  "mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:border-[var(--teal)]",
+                  endErr || rangeErr ? "border-red-500/70" : "border-[var(--hairline)]"
                 )}
                 value={endDate}
                 onChange={(e) => {
@@ -191,14 +191,14 @@ export default function SprintsPage() {
           <div className="mt-4 flex justify-end gap-2">
             <button
               type="button"
-              className="rounded-lg px-3 py-2 text-sm text-muted hover:bg-white/5"
+              className="rounded-full border border-[var(--hairline)] px-3.5 py-2 text-[13px] text-muted transition-colors hover:bg-[var(--teal-a08)]"
               onClick={() => setShowForm(false)}
             >
               Cancel
             </button>
             <button
               type="button"
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-40 hover:bg-primary-hover transition-colors"
+              className="rounded-full bg-[var(--ink-btn-bg)] px-4 py-2 text-[13px] font-semibold text-[var(--ink-btn-fg)] disabled:opacity-40 transition-opacity hover:opacity-85"
               disabled={!name.trim() || createMut.isPending}
               onClick={() => {
                 const missStart = !startDate;
@@ -240,17 +240,15 @@ export default function SprintsPage() {
           <div
             key={s.id}
             className={cn(
-              "rounded-xl border bg-surface p-4 card-hover",
-              s.status === "active"
-                ? "border-primary/30 shadow-sm shadow-primary/5"
-                : "border-white/10"
+              "rounded-2xl border bg-[var(--card)] p-4 shadow-[var(--card-shadow)] card-hover",
+              s.status === "active" ? "border-[var(--teal-a30)]" : "border-[var(--hairline)]"
             )}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <CalendarCheck size={14} className={cn(
-                    s.status === "active" ? "text-primary-text" : "text-muted"
+                    s.status === "active" ? "text-[var(--teal)]" : "text-muted"
                   )} />
 
                   {/* Inline rename */}
@@ -258,7 +256,7 @@ export default function SprintsPage() {
                     <div className="flex items-center gap-1.5 flex-1">
                       <input
                         autoFocus
-                        className="flex-1 min-w-0 rounded-md border border-primary/50 bg-background px-2 py-0.5 text-sm text-foreground focus:outline-none"
+                        className="flex-1 min-w-0 rounded-md border border-[var(--teal-a30)] bg-background px-2 py-0.5 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         onKeyDown={(e) => {
@@ -271,7 +269,7 @@ export default function SprintsPage() {
                       />
                       <button
                         type="button"
-                        className="p-1 text-success hover:bg-success/10 rounded"
+                        className="p-1 text-[var(--success-text)] hover:bg-[var(--success-bg)] rounded"
                         onClick={() => {
                           if (editName.trim()) patchMut.mutate({ id: s.id, body: { name: editName.trim() } });
                         }}
@@ -280,7 +278,7 @@ export default function SprintsPage() {
                       </button>
                       <button
                         type="button"
-                        className="p-1 text-muted hover:bg-white/10 rounded"
+                        className="p-1 text-muted hover:bg-[var(--teal-a08)] rounded"
                         onClick={() => setEditingId(null)}
                       >
                         <X size={13} />
@@ -288,11 +286,11 @@ export default function SprintsPage() {
                     </div>
                   ) : (
                     <>
-                      <h3 className="text-sm font-medium text-foreground">{s.name}</h3>
+                      <h3 className="text-sm font-medium text-[var(--ink)]">{s.name}</h3>
                       <span className={cn(
-                        "rounded-full px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider",
+                        "rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em]",
                         s.status === "active" && s.endDate && s.endDate < new Date().toISOString().slice(0, 10)
-                          ? "bg-red-500/20 text-red-300"
+                          ? "border border-[var(--high)] text-[var(--high)]"
                           : STATUS_COLORS[s.status] ?? STATUS_COLORS.planned
                       )}>
                         {s.status === "active" && s.endDate && s.endDate < new Date().toISOString().slice(0, 10)
@@ -315,11 +313,11 @@ export default function SprintsPage() {
                 </p>
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap gap-1.5 border-t border-white/5 pt-3">
+            <div className="mt-3 flex flex-wrap gap-1.5 border-t border-[var(--hairline-soft)] pt-3">
               {s.status !== "completed" && (
                 <button
                   type="button"
-                  className="rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-white/20 transition-colors"
+                  className="rounded-full bg-[var(--ink-btn-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85"
                   onClick={() => setPlanningSprintId(s.id)}
                 >
                   View tasks
@@ -329,7 +327,7 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={patchMut.isPending}
-                  className="rounded-md bg-primary/80 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-primary disabled:opacity-40 transition-colors"
+                  className="rounded-full border border-[var(--teal)] px-3 py-1 text-[11px] font-semibold text-[var(--teal)] hover:bg-[var(--teal-a08)] disabled:opacity-40 transition-colors"
                   onClick={() => patchMut.mutate({ id: s.id, body: { status: "active" } })}
                 >
                   Set active
@@ -339,7 +337,7 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={patchMut.isPending}
-                  className="rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-foreground hover:bg-white/5 disabled:opacity-40 transition-colors"
+                  className="rounded-full border border-[var(--hairline)] px-3 py-1 text-[11px] text-muted hover:bg-[var(--teal-a08)] hover:text-[var(--teal)] disabled:opacity-40 transition-colors"
                   onClick={() => patchMut.mutate({ id: s.id, body: { status: "planned" } })}
                 >
                   Deactivate
@@ -349,7 +347,7 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={patchMut.isPending}
-                  className="rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-muted hover:bg-white/5 disabled:opacity-40 transition-colors"
+                  className="rounded-full border border-[var(--hairline)] px-3 py-1 text-[11px] text-muted hover:bg-[var(--teal-a08)] hover:text-[var(--teal)] disabled:opacity-40 transition-colors"
                   onClick={() => patchMut.mutate({ id: s.id, body: { status: "completed" } })}
                 >
                   Mark completed
@@ -359,7 +357,7 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={patchMut.isPending}
-                  className="rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-muted hover:bg-white/5 disabled:opacity-40 transition-colors"
+                  className="rounded-full border border-[var(--hairline)] px-3 py-1 text-[11px] text-muted hover:bg-[var(--teal-a08)] hover:text-[var(--teal)] disabled:opacity-40 transition-colors"
                   onClick={() => patchMut.mutate({ id: s.id, body: { status: "planned" } })}
                 >
                   Reopen
@@ -370,7 +368,7 @@ export default function SprintsPage() {
               {editingId !== s.id && (
                 <button
                   type="button"
-                  className="rounded-md border border-white/10 px-2.5 py-1 text-[11px] text-muted hover:bg-white/5 hover:text-foreground transition-colors flex items-center gap-1"
+                  className="rounded-full border border-[var(--hairline)] px-3 py-1 text-[11px] text-muted hover:bg-[var(--teal-a08)] hover:text-[var(--teal)] transition-colors flex items-center gap-1"
                   onClick={() => {
                     setEditingId(s.id);
                     setEditName(s.name);
@@ -387,7 +385,7 @@ export default function SprintsPage() {
                   <button
                     type="button"
                     disabled={deleteMut.isPending}
-                    className="rounded-md bg-danger px-2.5 py-1 text-[11px] font-bold text-white hover:bg-red-600 disabled:opacity-40 transition-colors flex items-center gap-1"
+                    className="rounded-full bg-danger px-3 py-1 text-[11px] font-bold text-white hover:opacity-85 disabled:opacity-40 transition-opacity flex items-center gap-1"
                     onClick={() => {
                       setDeletingId(null);
                       deleteMut.mutate(s.id);
@@ -398,7 +396,7 @@ export default function SprintsPage() {
                   </button>
                   <button
                     type="button"
-                    className="rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-muted hover:bg-white/5 transition-colors"
+                    className="rounded-full border border-[var(--hairline)] px-3 py-1 text-[11px] text-muted hover:bg-[var(--teal-a08)] transition-colors"
                     onClick={() => setDeletingId(null)}
                   >
                     Cancel
@@ -408,7 +406,7 @@ export default function SprintsPage() {
                 <button
                   type="button"
                   disabled={deleteMut.isPending}
-                  className="rounded-md border border-red-500/20 px-2.5 py-1 text-[11px] text-red-400/70 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40 transition-colors flex items-center gap-1 ml-auto"
+                  className="rounded-full border border-[var(--hairline)] px-3 py-1 text-[11px] text-[var(--rose)] hover:border-[var(--rose)] disabled:opacity-40 transition-colors flex items-center gap-1 ml-auto"
                   onClick={() => setDeletingId(s.id)}
                 >
                   <Trash2 size={10} />
@@ -470,32 +468,32 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack:
   return (
     <div className="flex flex-col h-[calc(100vh-120px)] animate-slideIn">
       <div className="flex items-center gap-3 mb-4">
-        <button onClick={onBack} className="rounded p-1.5 hover:bg-white/10 text-muted hover:text-foreground transition-colors">
+        <button onClick={onBack} className="rounded-full p-1.5 hover:bg-[var(--teal-a08)] text-muted hover:text-[var(--teal)] transition-colors">
           <ArrowLeft size={16} />
         </button>
         <div>
-          <h1 className="font-display text-xl text-foreground">{sprint.name}</h1>
+          <h1 className="font-display text-[22px] text-[var(--ink)]">{sprint.name}</h1>
           <p className="text-xs text-muted">{sprint.startDate} → {sprint.endDate}</p>
         </div>
       </div>
 
       <div className="flex flex-1 min-h-0 gap-4 flex-col md:flex-row">
         {/* Backlog Pane */}
-        <div className="flex-1 flex flex-col rounded-xl border border-white/10 bg-surface min-h-[300px]">
-          <div className="p-3 border-b border-white/5 flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Backlog</h2>
-            <span className="text-[11px] text-muted">{backlogTasks.length}</span>
+        <div className="flex-1 flex flex-col rounded-2xl border border-[var(--hairline)] bg-[var(--card)] shadow-[var(--card-shadow)] min-h-[300px]">
+          <div className="p-3 border-b border-[var(--hairline-soft)] flex items-baseline justify-between">
+            <h2 className="font-display text-[19px] italic text-[var(--ink)]">Backlog</h2>
+            <span className="text-xs text-[var(--muted-soft)]">{backlogTasks.length}</span>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {backlogTasks.map(t => (
-              <div key={t.id} className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-white/5 bg-background text-sm card-hover">
+              <div key={t.id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-[var(--hairline-soft)] bg-background text-sm card-hover">
                 <span className="truncate flex-1">{t.title}</span>
                 <button
                   disabled={patchMut.isPending}
                   onClick={() => patchMut.mutate({ taskId: t.id, sprintId: sprint.id })}
-                  className="shrink-0 text-[11px] bg-primary/20 text-primary-text px-2 py-1 rounded hover:bg-primary/30 transition-colors"
+                  className="shrink-0 text-[13px] text-[var(--teal)] px-1 py-1 hover:underline transition-colors"
                 >
-                  Add to sprint
+                  Add to sprint →
                 </button>
               </div>
             ))}
@@ -506,10 +504,10 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack:
         </div>
 
         {/* Sprint Pane */}
-        <div className="flex-1 flex flex-col rounded-xl border border-primary/30 bg-surface min-h-[300px] shadow-sm shadow-primary/5">
-          <div className="p-3 border-b border-white/5 flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-primary-text">Sprint Tasks</h2>
-            <span className="text-[11px] text-muted">{sprintTasks.length}</span>
+        <div className="flex-1 flex flex-col rounded-2xl border border-[var(--teal-a30)] bg-[var(--card)] shadow-[var(--card-shadow)] min-h-[300px]">
+          <div className="p-3 border-b border-[var(--hairline-soft)] flex items-baseline justify-between">
+            <h2 className="font-display text-[19px] italic text-[var(--ink)]">Sprint tasks</h2>
+            <span className="text-xs text-[var(--muted-soft)]">{sprintTasks.length}</span>
           </div>
           <form
             className="px-3 pt-3"
@@ -526,13 +524,13 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack:
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="Add task to this sprint…"
-                className="flex-1 rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted/60 focus:border-primary focus:outline-none"
+                className="flex-1 rounded-lg border border-[var(--hairline)] bg-background px-3 py-2 text-sm text-foreground placeholder:text-[var(--muted-soft)] focus:border-[var(--teal)] focus:outline-none"
                 disabled={createMut.isPending}
               />
               <button
                 type="submit"
                 disabled={createMut.isPending || !newTitle.trim()}
-                className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40 transition-colors"
+                className="inline-flex items-center gap-1 rounded-full bg-[var(--ink-btn-bg)] px-3.5 py-2 text-xs font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-40"
               >
                 <Plus size={14} />
                 {createMut.isPending ? "Adding…" : "Add"}
@@ -541,12 +539,12 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack:
           </form>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {sprintTasks.map(t => (
-              <div key={t.id} className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-white/5 bg-background text-sm card-hover">
+              <div key={t.id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-[var(--hairline-soft)] bg-background text-sm card-hover">
                 <span className="truncate flex-1">{t.title}</span>
                 <button
                   disabled={patchMut.isPending}
                   onClick={() => patchMut.mutate({ taskId: t.id, sprintId: null })}
-                  className="shrink-0 text-[11px] text-muted hover:text-red-400 px-2 py-1 rounded hover:bg-white/5 transition-colors"
+                  className="shrink-0 text-[11px] text-muted hover:text-[var(--rose)] px-2 py-1 rounded transition-colors"
                 >
                   Remove
                 </button>

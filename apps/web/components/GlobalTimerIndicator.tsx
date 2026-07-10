@@ -22,30 +22,30 @@ export function GlobalTimerIndicator({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-2.5 py-1.5 text-xs transition-all",
+        "flex items-center gap-2 rounded-full border border-[var(--teal-a20)] bg-[var(--teal-a08)] px-3 py-1.5 text-xs transition-all",
         className
       )}
     >
       {/* Pulsing dot */}
-      <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+      <span className="relative flex h-[7px] w-[7px]">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--teal)] opacity-75" />
+        <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-[var(--teal)]" />
       </span>
 
-      <span className="text-foreground font-medium truncate max-w-[140px]" title={activeLog.taskTitle}>
+      <span className="max-w-[130px] truncate text-muted" title={activeLog.taskTitle}>
         {title}
       </span>
-      <span className="font-mono tabular-nums text-primary-text">
+      <span className="font-mono font-semibold tabular-nums text-[var(--teal)]">
         {formatElapsed(elapsed)}
       </span>
       <button
         type="button"
-        className="rounded p-0.5 text-primary-text hover:bg-primary/20 transition-colors disabled:opacity-40"
+        className="rounded-full p-0.5 text-[var(--teal)] transition-colors hover:bg-[var(--teal-a12)] disabled:opacity-40"
         title="Stop timer"
         disabled={isStopping}
         onClick={stopActiveTimer}
       >
-        <Square size={12} className="fill-current" />
+        <Square size={11} className="fill-current" />
       </button>
     </div>
   );

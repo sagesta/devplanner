@@ -55,9 +55,10 @@ export function PriorityAnchorsCard({
 }: {
   /**
    * full   — week + month side by side (Insights "North Star" card)
-   * week   — just this week, compact (Today / Sprints)
+   * week   — just this week, compact (Sprints)
+   * margin — quiet "margin notes" rendering, no card chrome (Daybook Today rail)
    */
-  variant?: "full" | "week";
+  variant?: "full" | "week" | "margin";
   className?: string;
 }) {
   const userId = useAppUserId();
@@ -129,6 +130,91 @@ export function PriorityAnchorsCard({
   });
 
   if (!userId) return null;
+
+  // Quiet margin-notes rendering (Daybook Today rail) — no card chrome.
+  if (variant === "margin") {
+    if (q.isLoading) {
+      return (
+        <div className={cn("space-y-3 animate-pulse", className)}>
+          {CATEGORIES.map((c) => (
+            <div key={c} className="h-9 rounded bg-[var(--hairline-soft)]" />
+          ))}
+        </div>
+      );
+    }
+    if (q.isError || !q.data) return null;
+    const anchors = q.data.week_anchors;
+    const isEditing = editing === "week";
+    return (
+      <div className={className}>
+        <div className="flex flex-col gap-3.5">
+          {CATEGORIES.map((category) => {
+            const meta = CATEGORY_META[category];
+            const statement = anchors.find((a) => a.category === category)?.statement.trim();
+            return (
+              <div key={category}>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  {meta.label}
+                </p>
+                {isEditing ? (
+                  <textarea
+                    rows={2}
+                    maxLength={280}
+                    value={draft[category]}
+                    onChange={(e) => setDraft((d) => ({ ...d, [category]: e.target.value }))}
+                    placeholder={placeholderFor(category)}
+                    className="mt-1 w-full resize-none rounded-lg border border-[var(--hairline)] bg-background px-2.5 py-1.5 text-sm leading-[1.45] text-[var(--ink)] placeholder:text-[var(--muted-soft)] focus:border-[var(--teal-a30)] focus:outline-none"
+                  />
+                ) : statement ? (
+                  <p className="mt-1 text-sm leading-[1.45] text-[var(--ink)]">{statement}</p>
+                ) : (
+                  <p className="mt-1 text-[13px] italic leading-[1.45] text-[var(--muted-soft)]">
+                    {placeholderFor(category)}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {isEditing ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-[13px]">
+            <button
+              type="button"
+              className="font-medium text-[var(--teal)] hover:underline disabled:opacity-50"
+              onClick={() => saveMut.mutate("week")}
+              disabled={saveMut.isPending}
+            >
+              {saveMut.isPending ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              className="text-[var(--teal)] hover:underline disabled:opacity-50"
+              onClick={() => suggestMut.mutate("week")}
+              disabled={suggestMut.isPending}
+              title="AI suggestions from your recent task history"
+            >
+              {suggestMut.isPending ? "Thinking…" : "Suggest"}
+            </button>
+            <button
+              type="button"
+              className="text-muted hover:text-[var(--ink)]"
+              onClick={() => setEditing(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="mt-3 inline-block text-[13px] text-[var(--teal)] hover:underline"
+            onClick={() => setEditing("week")}
+          >
+            Edit anchors
+          </button>
+        )}
+      </div>
+    );
+  }
 
   // Loading shimmer.
   if (q.isLoading) {

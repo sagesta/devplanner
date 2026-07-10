@@ -3,22 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStatus } from "@/hooks/use-auth-status";
 import confetti from "canvas-confetti";
-import {
-  AlertTriangle,
-  ArrowRight,
-  CalendarPlus,
-  CheckCircle2,
-  Circle,
-  Clock,
-  Inbox,
-  ListChecks,
-  PackageCheck,
-  Play,
-  Square,
-  Target,
-  Trophy,
-  type LucideIcon,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, Play, Square } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -41,7 +26,8 @@ import { SkeletonListItem } from "@/lib/skeleton";
 import { cn, isTaskOverdue } from "@/lib/utils";
 import { PriorityAnchorsCard } from "@/components/priority-anchors-card";
 import { GettingStartedCard } from "@/components/getting-started-card";
-import { useActiveTimer, formatElapsed } from "@/hooks/use-active-timer";
+import { GlobalTimerIndicator } from "@/components/GlobalTimerIndicator";
+import { useActiveTimer } from "@/hooks/use-active-timer";
 
 function localISODate(d = new Date()) {
   const y = d.getFullYear();
@@ -86,62 +72,26 @@ function compareTasksForExecution(a: TaskRow, b: TaskRow): number {
   return aDate.localeCompare(bDate);
 }
 
-function priorityClass(priority: string): string {
-  if (priority === "urgent") return "border-red-500/20 bg-red-500/10 text-red-300";
-  if (priority === "high") return "border-orange-500/20 bg-orange-500/10 text-orange-300";
-  if (priority === "low") return "border-white/10 bg-white/5 text-muted";
-  return "border-white/10 bg-white/5 text-foreground";
-}
-
-function taskDateLabel(task: TaskRow): string {
-  const due = task.dueDate?.slice(0, 10);
-  const scheduled = task.scheduledDate?.slice(0, 10);
-  if (due) return `Due ${due}`;
-  if (scheduled) return `Scheduled ${scheduled}`;
-  return "No date";
-}
-
 function itemSize(item: NowItem): "big" | "medium" | "small" {
   if ((item.estimatedMinutes ?? 0) >= 90 || item.priorityLabel === "urgent") return "big";
   if ((item.estimatedMinutes ?? 0) >= 30 || item.priorityLabel === "high") return "medium";
   return "small";
 }
 
-function QuestionTile({
-  label,
-  value,
-  meta,
-  Icon,
-  tone = "text-primary-text",
-  action,
-  metaHref,
-}: {
-  label: string;
-  value: string;
-  meta: string;
-  Icon: LucideIcon;
-  tone?: string;
-  action?: React.ReactNode;
-  metaHref?: string;
-}) {
+function itemTime(item: NowItem): string {
+  return item.scheduledTime ? item.scheduledTime.slice(0, 5) : "Anytime";
+}
+
+function isHighPriority(label: string): boolean {
+  return label === "high" || label === "urgent";
+}
+
+/** Inline HIGH marker used next to task titles (design: 11px uppercase, --high). */
+function HighLabel() {
   return (
-    <div className="rounded-lg border border-white/10 bg-surface px-4 py-3">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-        <Icon size={14} className={tone} />
-        {label}
-      </div>
-      <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-foreground">
-        {value}
-      </p>
-      {metaHref ? (
-        <Link href={metaHref} className="mt-2 block truncate text-xs text-primary-text hover:underline">
-          {meta}
-        </Link>
-      ) : (
-        <p className="mt-2 truncate text-xs text-muted">{meta}</p>
-      )}
-      {action && <div className="mt-2">{action}</div>}
-    </div>
+    <span className="ml-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--high)]">
+      High
+    </span>
   );
 }
 
@@ -152,6 +102,7 @@ export default function NowPage() {
   const router = useRouter();
   const [energyFilter, setEnergyFilter] = useState<PhysicalEnergyLevel | "">("");
   const [rescueDismissed, setRescueDismissed] = useState(false);
+  const [showFinished, setShowFinished] = useState(false);
   const [scheduleProposals, setScheduleProposals] = useState<ScheduleProposal[]>([]);
   const [selectedProposalIds, setSelectedProposalIds] = useState<string[]>([]);
   const todayLocal = useMemo(() => localISODate(), []);
@@ -336,6 +287,24 @@ export default function NowPage() {
     return todayFocusItems.filter((i) => i.id !== activeItem?.id);
   }, [todayFocusItems, activeItem]);
 
+  // "Finished earlier" agenda rows — done root tasks scheduled today + completed subtasks.
+  const finishedToday = useMemo(() => {
+    const rows: { id: string; title: string; time: string }[] = [];
+    for (const t of q.data?.tasks ?? []) {
+      const todaySubs = (t._subtasks ?? []).filter((s) => s.scheduledDate === todayLocal);
+      if (todaySubs.length > 0) {
+        for (const s of todaySubs) {
+          if (s.completed) {
+            rows.push({ id: s.id, title: s.title, time: s.scheduledTime?.slice(0, 5) ?? "—" });
+          }
+        }
+      } else if (t.status === "done") {
+        rows.push({ id: t.id, title: t.title, time: "—" });
+      }
+    }
+    return rows;
+  }, [q.data?.tasks, todayLocal]);
+
   const allRootTasks = useMemo(() => tasksForRescue.data ?? q.data?.tasks ?? [], [
     tasksForRescue.data,
     q.data?.tasks,
@@ -363,7 +332,7 @@ export default function NowPage() {
 
   if (status === "loading") {
     return (
-      <div className="space-y-4">
+      <div className="mx-auto max-w-[1160px] space-y-4">
         <SkeletonListItem />
         <SkeletonListItem />
       </div>
@@ -378,74 +347,72 @@ export default function NowPage() {
   const hasCapacityData = capacity > 0;
   const capacityPercent = hasCapacityData ? Math.min(100, Math.round((used / capacity) * 100)) : 0;
   const selectedProposals = scheduleProposals.filter((p) => selectedProposalIds.includes(p.id));
-  const winsToday = q.data?.doneTodayCount ?? allItems.filter((item) => item.completed).length;
-  const plannedTodayCount = todayFocusItems.length;
-  const nextVisibleTask = upNextItems[0] ?? null;
-  const nextInboxTask = unscheduledRoots[0] ?? null;
-  const attentionTask = overdueRoots[0] ?? null;
+  const winsToday = q.data?.doneTodayCount ?? finishedToday.length;
+  const totalToday = winsToday + todayFocusItems.length;
+  const weekday = new Date(todayLocal + "T12:00:00").toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+  const statusLine = `${winsToday} of ${totalToday} done · ${
+    overdueRoots.length > 0
+      ? `${overdueRoots.length} overdue`
+      : "nothing overdue"
+  }`;
+  const elapsedMins = Math.floor(elapsed / 60);
+  const heroMeta = activeItem
+    ? [
+        activeItem.parentTitle,
+        activeItem.estimatedMinutes ? `${activeItem.estimatedMinutes}m estimate` : null,
+        isHighPriority(activeItem.priorityLabel) ? `${activeItem.priorityLabel} priority` : null,
+        `${activeItem.physicalEnergy} energy`,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
+
+  const completeItem = (item: NowItem) =>
+    doneMut.mutate({
+      id: item.id,
+      type: item.type,
+      title: item.type === "task" ? item.title : item.parentTitle,
+      priorityLabel: item.priorityLabel,
+      taskId: item.taskId,
+    });
 
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-5 pb-10">
-      <header className="flex flex-col gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Execution today</p>
-          <h1 className="mt-1 text-2xl font-semibold text-foreground">Today</h1>
-          <p className="mt-1 text-sm text-muted">
-            <time dateTime={todayLocal}>
-              {new Date(todayLocal + "T12:00:00").toLocaleDateString(undefined, {
-                weekday: "long",
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
-            </time>
+    <div className="mx-auto flex max-w-[1160px] flex-col gap-7 pb-6">
+      {/* ─── Header ─────────────────────────────────────────────── */}
+      <header>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--teal)]">
+            <time dateTime={todayLocal}>{weekday}</time>
           </p>
+          {/* Mobile: the nav timer chip lives here, inline with the date eyebrow. */}
+          <GlobalTimerIndicator className="md:hidden" />
         </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          {hasCapacityData && (
-            <div className="min-w-[210px] rounded-lg border border-white/10 bg-surface px-3 py-2">
-              <div className="flex items-center justify-between gap-3 text-[11px] text-muted">
-                <span className="font-semibold uppercase tracking-wide">Capacity</span>
-                <span className={cn("font-medium", used > capacity ? "text-red-300" : "text-foreground")} title="Daily capacity in minutes">
-                  {used} / {capacity} min
-                </span>
-              </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/40">
-                <div
-                  className={cn("h-full rounded-full", used > capacity ? "bg-red-500" : "bg-primary")}
-                  style={{ width: `${capacityPercent}%` }}
-                />
-              </div>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+          <h1 className="mt-1.5 font-display text-[32px] leading-[1.05] text-[var(--ink)] md:text-[52px]">
+            A deep-work kind of day.
+          </h1>
+          <p className="shrink-0 text-sm text-muted">{statusLine}</p>
+        </div>
+        {hasCapacityData && (
+          <div className="mt-5 flex items-center gap-3">
+            <div className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--track)]">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-[width] duration-300",
+                  used > capacity ? "bg-[var(--high)]" : "bg-[var(--teal)]"
+                )}
+                style={{ width: `${capacityPercent}%` }}
+              />
             </div>
-          )}
-
-          <label className="min-w-[160px] text-[11px] font-semibold uppercase tracking-wide text-muted">
-            Filter by energy
-            <select
-              className="mt-1 w-full rounded-lg border border-white/10 bg-surface px-2 py-2 text-xs font-normal text-foreground"
-              value={energyFilter}
-              onChange={(e) =>
-                persistEnergy(e.target.value === "" ? "" : (e.target.value as PhysicalEnergyLevel))
-              }
-            >
-              <option value="">All tasks</option>
-              <option value="low">Low energy</option>
-              <option value="medium">Medium energy</option>
-              <option value="high">High energy</option>
-            </select>
-          </label>
-
-          <button
-            onClick={() => autoScheduleMut.mutate()}
-            disabled={autoScheduleMut.isPending}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-white/10 disabled:opacity-50"
-            title="Preview unfinished work that should roll forward"
-          >
-            <ArrowRight size={14} />
-            {autoScheduleMut.isPending ? "Reviewing" : "Preview rollover"}
-          </button>
-        </div>
+            <span className="text-xs text-muted">
+              Capacity {used} / {capacity} min
+            </span>
+          </div>
+        )}
       </header>
 
       {/* Only pitch onboarding when data actually loaded — an outage is not an empty planner. */}
@@ -457,56 +424,20 @@ export default function NowPage() {
         />
       )}
 
-      <section className="grid gap-3 lg:grid-cols-3">
-        <QuestionTile
-          Icon={Target}
-          label="What am I doing today?"
-          value={activeItem?.title ?? todayFocusItems[0]?.title ?? "Nothing locked yet"}
-          meta={activeItem?.parentTitle ?? `${todayFocusItems.length} task(s) selected`}
-          action={!activeItem && todayFocusItems.length === 0 ? (
-            <Link href="/backlog" className="inline-flex items-center gap-1.5 rounded-md bg-primary/15 px-2.5 py-1.5 text-xs font-medium text-primary-text hover:bg-primary/25 transition-colors">
-              <CalendarPlus size={12} />
-              Lock tasks
-            </Link>
-          ) : undefined}
-        />
-        <QuestionTile
-          Icon={PackageCheck}
-          label="What is next?"
-          value={nextVisibleTask?.title ?? nextInboxTask?.title ?? "No next task visible"}
-          meta={
-            nextVisibleTask?.parentTitle ??
-            (nextInboxTask ? `Available in Inbox · ${nextInboxTask.priority}` : "Pull one from Inbox →")
-          }
-          metaHref={nextVisibleTask || nextInboxTask ? undefined : "/backlog"}
-          tone="text-emerald-300"
-        />
-        <QuestionTile
-          Icon={AlertTriangle}
-          label="What needs attention?"
-          value={attentionTask?.title ?? "No overdue tasks"}
-          meta={attentionTask ? taskDateLabel(attentionTask) : "Clean for now"}
-          metaHref={attentionTask ? undefined : "/review?view=progress"}
-          tone="text-amber-300"
-        />
-      </section>
-
+      {/* ─── Rollover proposals ─────────────────────────────────── */}
       {scheduleProposals.length > 0 && (
-        <section className="rounded-lg border border-primary/25 bg-primary/5 p-4">
+        <section className="rounded-2xl border border-[var(--teal-a30)] bg-[var(--card)] p-5 shadow-[var(--card-shadow)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex gap-3">
-              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-primary-text" />
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Review schedule changes</h2>
-                <p className="mt-1 text-xs text-muted">
-                  Unfinished work can roll forward. Nothing changes until you approve it.
-                </p>
-              </div>
+            <div>
+              <h2 className="font-display text-[22px] text-[var(--ink)]">Review schedule changes</h2>
+              <p className="mt-1 text-[13px] text-muted">
+                Unfinished work can roll forward. Nothing changes until you approve it.
+              </p>
             </div>
             <div className="flex shrink-0 gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-muted hover:bg-white/5"
+                className="rounded-full border border-[var(--hairline)] px-[18px] py-[9px] text-[13px] text-muted transition-colors hover:text-[var(--ink)]"
                 onClick={() => {
                   setScheduleProposals([]);
                   setSelectedProposalIds([]);
@@ -516,7 +447,7 @@ export default function NowPage() {
               </button>
               <button
                 type="button"
-                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
+                className="rounded-full bg-[var(--ink-btn-bg)] px-5 py-[9px] text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-40"
                 disabled={selectedProposals.length === 0 || applyScheduleMut.isPending}
                 onClick={() => applyScheduleMut.mutate(selectedProposals)}
               >
@@ -524,15 +455,15 @@ export default function NowPage() {
               </button>
             </div>
           </div>
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-4">
             {scheduleProposals.map((proposal) => {
               const checked = selectedProposalIds.includes(proposal.id);
               return (
-                <li key={proposal.id} className="rounded-lg border border-white/10 bg-surface px-3 py-2">
+                <li key={proposal.id} className="border-b border-[var(--hairline-soft)] py-3 last:border-b-0">
                   <label className="flex cursor-pointer items-start gap-3">
                     <input
                       type="checkbox"
-                      className="mt-1 rounded border-white/20"
+                      className="mt-1 accent-[var(--teal)]"
                       checked={checked}
                       onChange={() =>
                         setSelectedProposalIds((prev) =>
@@ -541,11 +472,11 @@ export default function NowPage() {
                       }
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">{proposal.title}</p>
+                      <p className="truncate text-[15px] font-medium text-[var(--ink)]">{proposal.title}</p>
                       <p className="mt-0.5 text-xs text-muted">
-                        {proposal.fromDate} to {proposal.toDate} - {proposal.estimatedMinutes}m
+                        {proposal.fromDate} to {proposal.toDate} · {proposal.estimatedMinutes}m
                       </p>
-                      <p className="mt-1 text-xs text-muted/85">{proposal.reason}</p>
+                      <p className="mt-1 text-xs text-[var(--muted-soft)]">{proposal.reason}</p>
                     </div>
                   </label>
                 </li>
@@ -555,95 +486,106 @@ export default function NowPage() {
         </section>
       )}
 
+      {/* ─── Overdue rescue ─────────────────────────────────────── */}
       {overdueRoots.length >= 3 && !rescueDismissed && (
-        <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-foreground">
+        <section className="rounded-2xl border border-[var(--hairline)] bg-[var(--card)] p-5 shadow-[var(--card-shadow)]">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <span className="font-medium">{overdueRoots.length} overdue tasks. Move them into today?</span>
+            <p className="text-[15px] font-medium text-[var(--ink)]">
+              <span className="mr-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--high)]">
+                Overdue
+              </span>
+              {overdueRoots.length} tasks slipped. Move them into today?
+            </p>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => rescueMut.mutate(overdueRoots.map((t) => t.id))}
                 disabled={rescueMut.isPending}
-                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
+                className="rounded-full bg-[var(--ink-btn-bg)] px-[18px] py-[9px] text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-40"
               >
                 Reschedule all
               </button>
               <button
                 onClick={() => setRescueDismissed(true)}
-                className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-muted hover:bg-white/5"
+                className="rounded-full border border-[var(--hairline)] px-[18px] py-[9px] text-[13px] text-muted transition-colors hover:text-[var(--ink)]"
               >
                 Dismiss
               </button>
             </div>
           </div>
-          <ul className="mt-2 space-y-1">
+          <ul className="mt-3">
             {overdueRoots.slice(0, 5).map((t) => (
-              <li key={t.id} className="flex items-center gap-2 text-xs text-amber-200/80">
-                <AlertTriangle size={10} className="shrink-0 text-amber-400/60" />
-                <span className="truncate">{t.title}</span>
-                <span className="shrink-0 text-amber-400/50">{t.dueDate?.slice(0, 10) ?? t.scheduledDate?.slice(0, 10)}</span>
+              <li
+                key={t.id}
+                className="flex items-center gap-2 border-b border-[var(--hairline-soft)] py-2 text-[13px] text-muted last:border-b-0"
+              >
+                <AlertTriangle size={11} className="shrink-0 text-[var(--high)]" />
+                <span className="min-w-0 truncate">{t.title}</span>
+                <span className="shrink-0 text-[var(--muted-soft)]">
+                  {t.dueDate?.slice(0, 10) ?? t.scheduledDate?.slice(0, 10)}
+                </span>
               </li>
             ))}
             {overdueRoots.length > 5 && (
-              <li className="text-xs text-amber-400/50">…and {overdueRoots.length - 5} more</li>
+              <li className="py-2 text-xs text-[var(--muted-soft)]">…and {overdueRoots.length - 5} more</li>
             )}
           </ul>
-        </div>
+        </section>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
-        <div className="space-y-5">
-          <section className="rounded-lg border border-white/10 bg-surface">
-            <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                  <Clock size={14} className="text-primary-text" />
-                  Work block
-                </div>
-                <h2 className="mt-1 text-base font-semibold text-foreground">
-                  {activeItem?.title ?? "No active block"}
-                </h2>
-                {activeItem?.parentTitle && (
-                  <p className="mt-1 text-xs text-muted">{activeItem.parentTitle}</p>
-                )}
-              </div>
-              <div className="text-left sm:text-right">
-                <p
-                  className={cn(
-                    "font-mono text-2xl font-semibold tabular-nums",
-                    isTimerRunningForActive ? "text-primary-text" : "text-foreground/70"
-                  )}
-                >
-                  {isTimerRunningForActive ? formatElapsed(elapsed) : "00:00:00"}
-                </p>
-                <p className="text-xs text-muted">
-                  {activeItem?.scheduledTime ? activeItem.scheduledTime.slice(0, 5) : "Start when ready"}
-                </p>
-              </div>
+      {/* ─── Agenda + margin notes ──────────────────────────────── */}
+      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-12">
+        <div className="flex flex-col">
+          {q.isLoading ? (
+            <div className="space-y-2">
+              <SkeletonListItem />
+              <SkeletonListItem />
             </div>
-
-            {activeItem ? (
-              <div className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-center">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+          ) : q.isError ? (
+            <div className="rounded-2xl border border-[var(--hairline)] bg-[var(--card)] p-10 text-center shadow-[var(--card-shadow)]">
+              <h2 className="font-display text-[26px] italic text-[var(--ink)]">Couldn&apos;t load today.</h2>
+              <p className="mt-2 text-sm text-muted">Your plan is safe — check your connection and retry.</p>
+              <button
+                type="button"
+                onClick={() => void q.refetch()}
+                className="mt-5 rounded-full bg-[var(--ink-btn-bg)] px-5 py-[11px] text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85"
+              >
+                Retry
+              </button>
+            </div>
+          ) : activeItem ? (
+            <>
+              {/* Hero agenda card */}
+              <div className="grid items-center gap-4 rounded-2xl border border-[var(--teal-a30)] bg-[var(--card)] px-6 py-[22px] shadow-[var(--card-shadow)] md:grid-cols-[72px_minmax(0,1fr)_auto] md:gap-5">
+                <div className="hidden text-right md:block">
+                  <p className="text-[13px] font-semibold text-[var(--teal)]">{itemTime(activeItem)}</p>
                   {activeItem.estimatedMinutes && (
-                    <span className="rounded border border-white/10 bg-white/5 px-2 py-1">
-                      {activeItem.estimatedMinutes}m estimate
-                    </span>
+                    <p className="mt-0.5 text-[11px] text-muted">{activeItem.estimatedMinutes}m</p>
                   )}
-                  <span className={cn("rounded border px-2 py-1 capitalize", priorityClass(activeItem.priorityLabel))}>
-                    {activeItem.priorityLabel}
-                  </span>
-                  <span className="rounded border border-white/10 bg-white/5 px-2 py-1 capitalize">
-                    {activeItem.physicalEnergy} energy
-                  </span>
                 </div>
-                <div className="flex gap-2">
+                <div className="min-w-0 border-l-2 border-[var(--teal)] pl-5">
+                  <p
+                    className={cn(
+                      "text-[11px] font-semibold uppercase tracking-[0.08em]",
+                      isTimerRunningForActive ? "text-[var(--teal)]" : "text-muted"
+                    )}
+                  >
+                    {isTimerRunningForActive
+                      ? `In progress · ${elapsedMins} min`
+                      : "Up now · start when ready"}
+                  </p>
+                  <h2 className="mt-1 font-display text-[23px] leading-[1.2] text-[var(--ink)] md:text-[26px]">
+                    {activeItem.title}
+                  </h2>
+                  {heroMeta && <p className="mt-1 text-[13px] text-muted">{heroMeta}</p>}
+                </div>
+                <div className="flex gap-2 max-md:w-full">
                   {isTimerRunningForActive ? (
                     <button
                       onClick={() => stopActiveTimer()}
                       disabled={isStopping}
-                      className="inline-flex min-w-[120px] items-center justify-center gap-2 rounded-lg bg-danger px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--ink-btn-bg)] px-5 py-[11px] text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-50 max-md:flex-1"
                     >
-                      <Square size={16} className="fill-current" />
+                      <Square size={12} className="fill-current" />
                       Stop
                     </button>
                   ) : (
@@ -651,237 +593,208 @@ export default function NowPage() {
                       onClick={() => startTimer(activeItem.taskId)}
                       disabled={isStarting || isRunning}
                       title={isRunning ? "Stop the current active timer first" : "Start timer"}
-                      className="inline-flex min-w-[120px] items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--ink-btn-bg)] px-5 py-[11px] text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-50 max-md:flex-1"
                     >
-                      <Play size={16} className="fill-current" />
+                      <Play size={12} className="fill-current" />
                       Start
                     </button>
                   )}
                   <button
-                    onClick={() =>
-                      doneMut.mutate({
-                        id: activeItem.id,
-                        type: activeItem.type,
-                        title: activeItem.type === "task" ? activeItem.title : activeItem.parentTitle,
-                        priorityLabel: activeItem.priorityLabel,
-                        taskId: activeItem.taskId,
-                      })
-                    }
+                    onClick={() => completeItem(activeItem)}
                     disabled={doneMut.isPending}
-                    className="inline-flex min-w-[120px] items-center justify-center gap-2 rounded-lg border border-success/30 bg-success/10 px-4 py-2.5 text-sm font-semibold text-success transition-colors hover:bg-success/20 disabled:opacity-50"
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--success-border)] bg-[var(--success-bg)] px-5 py-[11px] text-[13px] font-semibold text-[var(--success-text)] transition-opacity hover:opacity-85 disabled:opacity-50 max-md:flex-1"
                   >
-                    <CheckCircle2 size={16} />
+                    <CheckCircle2 size={12} />
                     Done
                   </button>
                 </div>
               </div>
-            ) : (
-              <div className="p-4">
-                <p className="text-sm text-muted">Pick a task to start your work block.</p>
-                {unscheduledRoots.length > 0 ? (
-                  <select
-                    className="mt-2 w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground"
-                    defaultValue=""
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      if (id) rescueMut.mutate([id]);
-                    }}
-                  >
-                    <option value="" disabled>Select a task from Inbox…</option>
-                    {unscheduledRoots.slice(0, 10).map((task) => (
-                      <option key={task.id} value={task.id}>
-                        {task.title} ({task.priority})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <Link href="/backlog" className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-white/10 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/15 transition-colors">
-                    <Inbox size={14} />
-                    Go to Inbox
-                  </Link>
-                )}
-              </div>
-            )}
-          </section>
 
-          <section className="rounded-lg border border-white/10 bg-surface">
-            <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                  <ListChecks size={14} className="text-primary-text" />
-                  Today tasks
-                </div>
-                <p className="mt-1 text-sm text-foreground">
-                  {todayFocusItems.length} task{todayFocusItems.length !== 1 ? "s" : ""} added · Recommended: 3–7
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-1.5 text-[11px] text-muted">
-                <span className="rounded border border-white/10 bg-white/5 px-2 py-1">1 big: {taskMix.big}</span>
-                <span className="rounded border border-white/10 bg-white/5 px-2 py-1">3 medium: {taskMix.medium}</span>
-                <span className="rounded border border-white/10 bg-white/5 px-2 py-1">5 small: {taskMix.small}</span>
-              </div>
-            </div>
-
-            {q.isLoading ? (
-              <div className="space-y-2 p-4">
-                <SkeletonListItem />
-                <SkeletonListItem />
-              </div>
-            ) : todayFocusItems.length > 0 ? (
-              <ul className="divide-y divide-white/5">
-                {todayFocusItems.map((item) => {
-                  const active = item.id === activeItem?.id;
-                  return (
-                    <li
-                      key={item.id}
+              {/* Agenda rows */}
+              {upNextItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="grid items-center gap-5 border-b border-[var(--hairline-soft)] px-6 py-[18px] grid-cols-[56px_minmax(0,1fr)_auto] md:grid-cols-[72px_minmax(0,1fr)_auto]"
+                >
+                  <div className="text-right">
+                    <p
                       className={cn(
-                        "grid grid-cols-[auto_1fr] items-start gap-3 px-4 py-3 transition-colors sm:grid-cols-[auto_1fr_auto] sm:items-center",
-                        active ? "bg-primary/5" : "hover:bg-white/[0.03]"
+                        "text-[13px] font-medium",
+                        item.scheduledTime ? "text-[var(--ink)]" : "text-muted"
                       )}
                     >
-                      {/* Done is the app's primary action — it must exist on touch too. */}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          doneMut.mutate({
-                            id: item.id,
-                            type: item.type,
-                            title: item.type === "task" ? item.title : item.parentTitle,
-                            priorityLabel: item.priorityLabel,
-                            taskId: item.taskId,
-                          })
-                        }
-                        className="-m-2 p-2 text-muted transition-colors hover:text-success"
-                        aria-label={`Complete ${item.title}`}
-                      >
-                        <Circle size={18} />
-                      </button>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {active && (
-                            <span className="rounded border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary-text">
-                              Now
-                            </span>
-                          )}
-                          <p className="min-w-0 truncate text-sm font-medium text-foreground">{item.title}</p>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-                          {item.parentTitle && <span className="truncate">{item.parentTitle}</span>}
-                          {item.scheduledTime && <span>{item.scheduledTime.slice(0, 5)}</span>}
-                          {item.estimatedMinutes && <span>{item.estimatedMinutes}m</span>}
-                        </div>
-                      </div>
-                      <span
-                        className={cn(
-                          "col-start-2 w-fit rounded border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide sm:col-start-auto",
-                          priorityClass(item.priorityLabel)
-                        )}
-                      >
-                        {item.priorityLabel}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : q.isError ? (
-              <div className="p-4">
-                <div className="rounded-lg border border-danger/30 bg-danger/5 px-4 py-8 text-center">
-                  <AlertTriangle size={28} className="mx-auto mb-3 text-danger/70" />
-                  <p className="font-semibold text-foreground">Couldn&apos;t load today&apos;s tasks.</p>
-                  <p className="mt-1 text-sm text-muted">Your plan is safe — check your connection and retry.</p>
+                      {itemTime(item)}
+                    </p>
+                    {item.estimatedMinutes && (
+                      <p className="mt-0.5 text-[11px] text-muted">{item.estimatedMinutes}m</p>
+                    )}
+                  </div>
+                  <div className="min-w-0 border-l-2 border-[var(--hairline)] pl-5">
+                    <p className="text-[15px] font-medium text-[var(--ink)]">
+                      {item.title}
+                      {isHighPriority(item.priorityLabel) && <HighLabel />}
+                    </p>
+                    {item.parentTitle && (
+                      <p className="mt-0.5 text-xs text-muted">{item.parentTitle}</p>
+                    )}
+                  </div>
                   <button
                     type="button"
-                    onClick={() => void q.refetch()}
-                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/20"
-                  >
-                    Retry
-                  </button>
+                    onClick={() => completeItem(item)}
+                    disabled={doneMut.isPending}
+                    aria-label={`Complete ${item.title}`}
+                    title="Mark done"
+                    className="h-5 w-5 shrink-0 rounded-full border-2 border-[var(--rule)] bg-transparent p-0 transition-colors hover:border-[var(--success-text)] hover:bg-[var(--success-bg)] disabled:opacity-40"
+                  />
                 </div>
-              </div>
-            ) : (
-              <div className="p-4">
-                <div className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center">
-                  <Inbox size={28} className="mx-auto mb-3 text-primary-text/50" />
-                  <p className="font-semibold text-foreground">Nothing scheduled for today.</p>
-                  <p className="mt-1 text-sm text-muted">Move 3-7 tasks here before you start.</p>
-                </div>
-              </div>
-            )}
+              ))}
+            </>
+          ) : hasScheduledItems || winsToday > 0 ? (
+            /* Everything planned is finished */
+            <div className="rounded-2xl border border-[var(--hairline)] bg-[var(--card)] p-10 text-center shadow-[var(--card-shadow)]">
+              <h2 className="font-display text-[28px] italic text-[var(--ink)]">Day cleared.</h2>
+              <p className="mt-2 text-sm text-muted">
+                Everything planned for today is done. Log a win, or pull something from the{" "}
+                <Link href="/backlog" className="text-[var(--teal)] hover:underline">
+                  Inbox
+                </Link>
+                .
+              </p>
+            </div>
+          ) : (
+            /* Nothing scheduled yet */
+            <div className="rounded-2xl border border-[var(--hairline)] bg-[var(--card)] p-10 text-center shadow-[var(--card-shadow)]">
+              <h2 className="font-display text-[28px] italic text-[var(--ink)]">Nothing on the agenda.</h2>
+              <p className="mt-2 text-sm text-muted">
+                Move 3–7 tasks here before you start — capture fast with Brain dump, or pull from the{" "}
+                <Link href="/backlog" className="text-[var(--teal)] hover:underline">
+                  Inbox
+                </Link>
+                .
+              </p>
+            </div>
+          )}
 
-            {!q.isLoading && !hasScheduledItems && !inboxQ.isLoading && unscheduledRoots.length > 0 && (
-              <div className="border-t border-white/10 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                    Pull from Inbox
+          {/* Finished earlier */}
+          {finishedToday.length > 0 && (
+            <div className="mt-3 px-6">
+              <button
+                type="button"
+                className="text-[13px] text-[var(--teal)] hover:underline"
+                onClick={() => setShowFinished((s) => !s)}
+              >
+                {showFinished ? "Hide finished" : `${finishedToday.length} finished earlier — show`}
+              </button>
+            </div>
+          )}
+          {showFinished && (
+            <div className="mt-1">
+              {finishedToday.map((row) => (
+                <div
+                  key={row.id}
+                  className="grid items-center gap-5 border-b border-[var(--hairline-soft)] px-6 py-3.5 opacity-55 grid-cols-[56px_minmax(0,1fr)_auto] md:grid-cols-[72px_minmax(0,1fr)_auto]"
+                >
+                  <p className="text-right text-[13px] font-medium text-muted">{row.time}</p>
+                  <p className="min-w-0 border-l-2 border-[var(--hairline)] pl-5 text-[15px] font-medium text-[var(--ink)] line-through">
+                    {row.title}
                   </p>
-                  <Link href="/backlog" className="text-xs font-medium text-primary-text hover:underline">
-                    Open Inbox
-                  </Link>
+                  <CheckCircle2 size={20} className="shrink-0 text-[var(--success-text)]" />
                 </div>
-                <ul className="space-y-2">
-                  {unscheduledRoots.slice(0, 5).map((task) => (
-                    <li
-                      key={task.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-background/40 px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">{task.title}</p>
-                        <p className="mt-0.5 text-xs capitalize text-muted">{task.priority}</p>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={rescueMut.isPending}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-white/10 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-primary/20 hover:text-primary-text disabled:opacity-50"
-                        onClick={() => rescueMut.mutate([task.id])}
-                      >
-                        <CalendarPlus size={12} />
-                        Today
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+              ))}
+            </div>
+          )}
+
+          {/* Pull from Inbox when the agenda is empty */}
+          {!q.isLoading && !hasScheduledItems && !inboxQ.isLoading && unscheduledRoots.length > 0 && (
+            <div className="mt-6">
+              <div className="mb-2.5 flex items-baseline justify-between gap-3">
+                <h3 className="font-display text-[19px] italic text-[var(--ink)]">Pull from Inbox</h3>
+                <Link href="/backlog" className="text-[13px] text-[var(--teal)] hover:underline">
+                  Open Inbox →
+                </Link>
               </div>
-            )}
-          </section>
+              <div className="overflow-hidden rounded-[14px] border border-[var(--hairline)] bg-[var(--card)] shadow-[var(--card-shadow)]">
+                {unscheduledRoots.slice(0, 5).map((task) => (
+                  <div
+                    key={task.id}
+                    className="flex items-center gap-3.5 border-b border-[var(--hairline-soft)] px-5 py-[15px] last:border-b-0"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[15px] font-medium text-[var(--ink)]">
+                        {task.title}
+                        {isHighPriority(task.priority) && <HighLabel />}
+                      </p>
+                      <p className="mt-0.5 text-xs capitalize text-muted">{task.priority} priority</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={rescueMut.isPending}
+                      className="shrink-0 whitespace-nowrap text-[13px] text-[var(--teal)] hover:underline disabled:opacity-50"
+                      onClick={() => rescueMut.mutate([task.id])}
+                    >
+                      Add to today →
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        <aside className="space-y-5">
-          <section className="rounded-lg border border-white/10 bg-surface">
-            <div className="border-b border-white/10 px-4 py-3">
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                <Trophy size={14} className="text-emerald-300" />
-                Weekly review + wins
-              </div>
-              <p className="mt-1 text-sm text-foreground">Proof of progress</p>
-            </div>
-            <div className="grid grid-cols-2 divide-x divide-white/10 border-b border-white/10">
-              <div className="px-4 py-3">
-                <p className="text-2xl font-semibold text-foreground">{winsToday}</p>
-                <p className="text-xs text-muted">done today</p>
-              </div>
-              <div className="px-4 py-3">
-                <p className="text-2xl font-semibold text-foreground">{plannedTodayCount}</p>
-                <p className="text-xs text-muted">planned today</p>
-              </div>
-            </div>
-            <div className="p-4">
-              <Link
-                href="/review"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
-              >
-                Go to Weekly Review
-                <ArrowRight size={14} />
+        {/* ─── Margin notes ───────────────────────────────────────── */}
+        <aside className="flex flex-col gap-7 border-t border-[var(--hairline-soft)] pt-7 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+          <div>
+            <h3 className="font-display text-[19px] italic text-[var(--ink)]">Win condition</h3>
+            <PriorityAnchorsCard variant="margin" className="mt-3" />
+          </div>
+          <div>
+            <h3 className="font-display text-[19px] italic text-[var(--ink)]">Progress</h3>
+            <p className="mt-2.5 font-display text-[34px] text-[var(--ink)]">
+              {winsToday}
+              <span className="text-[20px] text-muted"> / {totalToday}</span>
+            </p>
+            <p className="mt-0.5 text-[13px] text-muted">tasks done today</p>
+            <div className="mt-2.5 flex flex-col items-start gap-1.5">
+              <Link href="/review" className="text-[13px] text-[var(--teal)] hover:underline">
+                Weekly review →
               </Link>
+              <button
+                type="button"
+                onClick={() => autoScheduleMut.mutate()}
+                disabled={autoScheduleMut.isPending}
+                className="text-[13px] text-[var(--teal)] hover:underline disabled:opacity-50"
+                title="Preview unfinished work that should roll forward"
+              >
+                {autoScheduleMut.isPending ? "Reviewing…" : "Preview rollover"}
+              </button>
             </div>
-          </section>
-
-          <section>
-            <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              <Target size={14} className="text-primary-text" />
-              Win condition
-            </div>
-            <PriorityAnchorsCard variant="week" />
-          </section>
+          </div>
+          <div>
+            <h3 className="font-display text-[19px] italic text-[var(--ink)]">Mix</h3>
+            <p className="mt-2.5 text-[13px] leading-[1.6] text-muted">
+              {taskMix.big} big · {taskMix.medium} medium · {taskMix.small} small
+            </p>
+            <label className="mt-1.5 flex items-center gap-2 text-[13px] text-muted">
+              {energyFilter ? (
+                <span className="capitalize">{energyFilter}-energy filter on ·</span>
+              ) : (
+                <span>Energy filter off ·</span>
+              )}
+              <select
+                className="cursor-pointer border-none bg-transparent p-0 text-[13px] text-[var(--teal)] focus:outline-none"
+                value={energyFilter}
+                onChange={(e) =>
+                  persistEnergy(e.target.value === "" ? "" : (e.target.value as PhysicalEnergyLevel))
+                }
+                aria-label="Filter agenda by energy"
+              >
+                <option value="">all tasks</option>
+                <option value="low">low energy</option>
+                <option value="medium">medium energy</option>
+                <option value="high">high energy</option>
+              </select>
+            </label>
+          </div>
         </aside>
       </div>
     </div>

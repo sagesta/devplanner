@@ -468,7 +468,7 @@ export function AiChatDock() {
   if (!userId) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+    <div className="fixed right-4 z-40 flex flex-col items-end gap-2 bottom-[140px] md:bottom-4">
       {open && (
         <div
           id="ai-chat-panel"
@@ -729,9 +729,9 @@ export function AiChatDock() {
         type="button"
         id="ai-chat-toggle"
         className={cn(
-          "rounded-full px-4 py-2.5 text-sm font-medium text-white shadow-lg transition-all duration-300",
-          "bg-primary hover:bg-primary-hover hover:shadow-xl hover:scale-105",
-          open && "ring-2 ring-primary/40 ring-offset-2 ring-offset-background scale-[0.97]"
+          "inline-flex items-center gap-2 rounded-full border border-[var(--hairline)] bg-[var(--card)] px-[18px] py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card-shadow)] transition-all duration-300",
+          "hover:border-[var(--teal-a30)]",
+          open && "border-[var(--teal-a30)] scale-[0.97]"
         )}
         aria-expanded={open}
         aria-controls="ai-chat-panel"
@@ -740,8 +740,8 @@ export function AiChatDock() {
           setTimeout(() => inputRef.current?.focus(), 120);
         }}
       >
-        <Bot size={16} className="inline mr-1" />
-        AI
+        <Bot size={15} className="text-[var(--teal)]" />
+        Ask AI
       </button>
     </div>
   );

@@ -61,12 +61,12 @@ export function InlineAddTask({
   });
 
   return (
-    <div className="inline-add-container animate-slideIn space-y-2 rounded-md border border-white/10 bg-background/40 p-2">
+    <div className="inline-add-container animate-slideIn space-y-2 rounded-xl border border-[var(--hairline)] bg-[var(--card)] p-2 shadow-[var(--card-shadow)]">
       <div className="flex gap-1.5">
         <input
           ref={inputRef}
           autoFocus
-          className="flex-1 rounded-md border border-white/10 bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted/60"
+          className="flex-1 rounded-lg border border-[var(--hairline)] bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-[var(--muted-soft)] focus:border-[var(--teal)]"
           placeholder="Task title…"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -90,7 +90,7 @@ export function InlineAddTask({
       </div>
       <button
         type="button"
-        className="flex w-full items-center justify-center gap-1 text-[11px] text-muted hover:text-foreground"
+        className="flex w-full items-center justify-center gap-1 text-[11px] text-muted transition-colors hover:text-[var(--teal)]"
         onClick={() =>
           setMore((v) => {
             const next = !v;
@@ -108,7 +108,7 @@ export function InlineAddTask({
             Day
             <input
               type="date"
-              className="mt-0.5 w-full rounded border border-white/10 bg-background px-1.5 py-1 text-foreground"
+              className="mt-0.5 w-full rounded-md border border-[var(--hairline)] bg-background px-1.5 py-1 text-foreground"
               defaultValue={scheduledDate}
               onChange={(e) => setScheduledDate(e.target.value)}
             />
@@ -118,7 +118,7 @@ export function InlineAddTask({
               Start
               <input
                 type="time"
-                className="mt-0.5 w-full rounded border border-white/10 bg-background px-1.5 py-1 text-foreground"
+                className="mt-0.5 w-full rounded-md border border-[var(--hairline)] bg-background px-1.5 py-1 text-foreground"
                 value={startT}
                 onChange={(e) => setStartT(e.target.value)}
               />
@@ -127,7 +127,7 @@ export function InlineAddTask({
               End
               <input
                 type="time"
-                className="mt-0.5 w-full rounded border border-white/10 bg-background px-1.5 py-1 text-foreground"
+                className="mt-0.5 w-full rounded-md border border-[var(--hairline)] bg-background px-1.5 py-1 text-foreground"
                 value={endT}
                 onChange={(e) => setEndT(e.target.value)}
               />
@@ -136,7 +136,7 @@ export function InlineAddTask({
           <label className="text-muted">
             Recurrence
             <select
-              className="mt-0.5 w-full rounded border border-white/10 bg-background px-1.5 py-1 text-foreground"
+              className="mt-0.5 w-full rounded-md border border-[var(--hairline)] bg-background px-1.5 py-1 text-foreground"
               value={recurrence}
               onChange={(e) => setRecurrence(e.target.value)}
             >

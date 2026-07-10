@@ -1,14 +1,5 @@
 "use client";
 
-import {
-  ClipboardCheck,
-  Download,
-  RefreshCw,
-  Sparkles,
-  Target,
-  UserRound,
-  Wand2,
-} from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -24,15 +15,33 @@ const STORAGE_KEY = "devplanner.goalHorizons.v1";
 const OWNER_STORAGE_KEY = "devplanner.goalHorizons.owner.v1";
 
 const HORIZONS = [
-  { key: "short", label: "Short-term", range: "< 1 month" },
-  { key: "mid", label: "Mid-term", range: "> 1 month and < 3 months" },
-  { key: "long", label: "Long-term", range: "> 3 months" },
+  { key: "short", label: "Short-term", range: "under a month" },
+  { key: "mid", label: "Mid-term", range: "1–3 months" },
+  { key: "long", label: "Long-term", range: "beyond 3 months" },
 ] as const;
 
 const AREAS = [
-  { key: "personal", label: "Personal", prompt: "Health, home, relationships, rhythm." },
-  { key: "professional", label: "Professional", prompt: "Skills, reputation, learning, career capital." },
-  { key: "work", label: "Work", prompt: "Shipping, stakeholders, obligations." },
+  {
+    key: "personal",
+    label: "Personal",
+    micro: "Health, home, rhythm",
+    prompt: "Health, home, relationships, rhythm.",
+    colorClass: "text-[var(--rose)]",
+  },
+  {
+    key: "professional",
+    label: "Professional",
+    micro: "Skills, career capital",
+    prompt: "Skills, reputation, learning, career capital.",
+    colorClass: "text-[var(--emerald)]",
+  },
+  {
+    key: "work",
+    label: "Work",
+    micro: "Shipping, obligations",
+    prompt: "Shipping, stakeholders, obligations.",
+    colorClass: "text-[var(--sky)]",
+  },
 ] as const;
 
 type HorizonKey = (typeof HORIZONS)[number]["key"];
@@ -78,13 +87,6 @@ function breakGoalIntoTasks(horizonLabel: string, areaLabel: string, text: strin
 
 function goalCount(goals: GoalMatrix): number {
   return Object.values(goals).filter((value) => value.trim()).length;
-}
-
-function lineCount(value: string): number {
-  return value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean).length;
 }
 
 function safeSlug(value: string): string {
@@ -158,9 +160,12 @@ function formatSavedTime(value?: string | null): string | null {
 export function GoalHorizonsMatrix({
   className,
   ownerName,
+  standalone = false,
 }: {
   className?: string;
   ownerName?: string | null;
+  /** True on the Goals room: renders the full Daybook page header (eyebrow + h1). */
+  standalone?: boolean;
 }) {
   const defaultOwnerName = ownerName?.trim() || "My Goals";
   const userId = useAppUserId();
@@ -174,7 +179,6 @@ export function GoalHorizonsMatrix({
   const loadedRef = useRef(false);
   const skipAutosaveRef = useRef(false);
   const filledCount = useMemo(() => goalCount(goals), [goals]);
-  const progressPercent = Math.round((filledCount / Object.keys(EMPTY_GOALS).length) * 100);
 
   const goalsQ = useQuery({
     queryKey: ["goal-horizons", userId],
@@ -277,16 +281,16 @@ export function GoalHorizonsMatrix({
   }, [copyState]);
 
   const markdown = useMemo(() => goalsToMarkdown(ownerDraft, goals), [goals, ownerDraft]);
-  const saveLabel =
+  const statusLabel =
     goalsQ.isLoading && !hydrated
-      ? "Loading saved goals..."
+      ? "loading…"
       : saveState === "saving" || saveMut.isPending
-        ? "Saving..."
+        ? "saving…"
         : saveState === "error"
-          ? "Local draft only"
+          ? "local draft only"
           : lastSavedAt
-            ? `Synced at ${lastSavedAt}`
-            : "Ready to sync";
+            ? `saved ${lastSavedAt}`
+            : "not saved yet";
 
   async function copyMarkdown() {
     try {
@@ -331,186 +335,138 @@ export function GoalHorizonsMatrix({
     });
   }
 
+  function renderCellTextarea(key: GoalCellKey, prompt: string, rows: number) {
+    return (
+      <textarea
+        value={goals[key]}
+        onChange={(event) => setGoals((current) => ({ ...current, [key]: event.target.value }))}
+        placeholder={prompt}
+        rows={rows}
+        className="w-full flex-1 resize-none border-0 bg-transparent p-0 text-sm leading-[1.45] text-foreground placeholder:text-[var(--muted-soft)] focus:outline-none focus:ring-0"
+      />
+    );
+  }
+
+  function renderBreakLink(horizonLabel: string, areaLabel: string, key: GoalCellKey) {
+    if (!goals[key].trim()) return null;
+    return (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          breakGoalIntoTasks(horizonLabel, areaLabel, goals[key]);
+        }}
+        title="Send this goal to the AI assistant to break into tasks"
+        className="mt-3 self-start text-xs text-muted transition-colors hover:text-[var(--teal)]"
+      >
+        → break into tasks
+      </button>
+    );
+  }
+
   return (
-    <section className={cn("overflow-hidden rounded-lg border border-white/10 bg-surface", className)}>
-      <div className="border-b border-white/10 px-4 py-4 md:px-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              <Target size={14} className="text-primary-text" />
-              Goal horizons
-            </div>
-            <h2 className="mt-2 font-display text-3xl text-foreground sm:text-4xl">
-              Goals - {ownerDraft.trim() || "Me"}
-            </h2>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
-              <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">
-                {filledCount} of 9 goals set
-              </span>
-              <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">
-                {saveLabel}
-              </span>
-            </div>
+    <section className={cn("flex flex-col gap-6", className)}>
+      {/* ── Daybook header ─────────────────────────────────────────── */}
+      {standalone ? (
+        <header>
+          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--teal)]">
+            Direction setting
+          </p>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+            <h1 className="mt-1.5 font-display text-[32px] leading-[1.05] text-foreground md:text-[52px]">
+              Where this is all going.
+            </h1>
+            <p className="shrink-0 text-sm text-muted">
+              {filledCount} of 9 set · {statusLabel}
+            </p>
           </div>
+        </header>
+      ) : (
+        <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+          <h2 className="font-display text-[22px] text-foreground">Goal horizons</h2>
+          <p className="shrink-0 text-sm text-muted">
+            {filledCount} of 9 set · {statusLabel}
+          </p>
+        </header>
+      )}
 
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-            <label className="min-w-[220px] text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Owner
-              <div className="mt-1 flex items-center gap-2 rounded-lg border border-white/10 bg-background/40 px-3 py-2">
-                <UserRound size={14} className="shrink-0 text-muted" />
-                <input
-                  value={ownerDraft}
-                  onChange={(event) => setOwnerDraft(event.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-sm font-normal text-foreground placeholder:text-muted/60"
-                  placeholder="Name"
-                />
-              </div>
-            </label>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={loadStarterGoals}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-white/10"
-                title="Fill the matrix with editable starter examples"
-              >
-                <Sparkles size={14} />
-                Load template
-              </button>
-              <button
-                type="button"
-                onClick={() => void copyMarkdown()}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-white/10"
-                title="Copy the matrix as markdown"
-              >
-                <ClipboardCheck size={14} />
-                {copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy"}
-              </button>
-              <button
-                type="button"
-                onClick={downloadMarkdown}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-white/10"
-                title="Download the matrix as markdown"
-              >
-                <Download size={14} />
-                Export
-              </button>
-              <button
-                type="button"
-                onClick={resetGoals}
-                className="ml-1 inline-flex items-center justify-center gap-2 rounded-lg border border-danger/25 px-3 py-2 text-xs font-semibold text-danger/70 transition-colors hover:bg-danger/10 hover:text-danger"
-                title="Clears every goal in the matrix (undoable for 6 seconds)"
-              >
-                <RefreshCw size={14} />
-                Reset
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-black/40">
-          <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${progressPercent}%` }} />
-        </div>
-      </div>
-
-      <div className="hidden overflow-x-auto p-4 lg:block">
-        <div className="overflow-hidden rounded-md border border-white/15 bg-background/25">
-          <div className="grid grid-cols-[minmax(110px,170px)_repeat(3,minmax(0,1fr))] border-b border-white/15 text-sm font-semibold text-foreground">
-            <div className="border-r border-white/15 bg-white/5 px-4 py-4 text-muted" />
-            {AREAS.map((area) => (
-              <div key={area.key} className="border-r border-white/15 px-4 py-4 text-center last:border-r-0">
-                {area.label}
-              </div>
-            ))}
-          </div>
-
-          {HORIZONS.map((horizon) => (
-            <div
-              key={horizon.key}
-              className="grid min-h-[190px] grid-cols-[minmax(110px,170px)_repeat(3,minmax(0,1fr))] border-b border-white/15 last:border-b-0"
+      {/* ── Editorial hairline table (desktop) ─────────────────────── */}
+      <div className="hidden border-t border-[var(--hairline)] lg:grid lg:grid-cols-[110px_repeat(3,minmax(0,1fr))]">
+        {/* column headers */}
+        <div className="py-4" />
+        {AREAS.map((area) => (
+          <div key={area.key} className="border-l border-[var(--hairline-soft)] py-4 pl-5 pr-4">
+            <p
+              className={cn(
+                "text-[11px] font-semibold uppercase tracking-[0.08em]",
+                area.colorClass
+              )}
             >
-              <div className="border-r border-white/15 bg-white/5 px-4 py-5 text-center">
-                <p className="text-base font-semibold text-foreground">{horizon.label}</p>
-                <p className="mt-1 text-sm font-semibold text-muted">({horizon.range})</p>
-              </div>
-              {AREAS.map((area) => {
-                const key = cellKey(horizon.key, area.key);
-                return (
-                  <label key={key} className="group flex min-h-[190px] flex-col border-r border-white/15 p-4 last:border-r-0">
-                    <span className="sr-only">
-                      {horizon.label} {area.label} goal
-                    </span>
-                    <span className="mb-2 flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                      <span>{lineCount(goals[key]) || "No"} goal(s)</span>
-                      {goals[key].trim() ? (
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            breakGoalIntoTasks(horizon.label, area.label, goals[key]);
-                          }}
-                          title="Send this goal to the AI assistant to break into tasks"
-                          className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold normal-case tracking-normal text-primary-text transition-colors hover:bg-primary/20"
-                        >
-                          <Wand2 size={11} />
-                          Break into tasks
-                        </button>
-                      ) : (
-                        <span className="opacity-0 transition-opacity group-focus-within:opacity-100">Editing</span>
-                      )}
-                    </span>
-                    <textarea
-                      value={goals[key]}
-                      onChange={(event) => setGoals((current) => ({ ...current, [key]: event.target.value }))}
-                      placeholder={area.prompt}
-                      rows={7}
-                      className="min-h-0 flex-1 resize-none rounded-md border border-transparent bg-transparent px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-muted/60 transition-colors focus:border-primary/40 focus:bg-background/50"
-                    />
-                  </label>
-                );
-              })}
+              {area.label}
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--muted-soft)]">{area.micro}</p>
+          </div>
+        ))}
+
+        {HORIZONS.map((horizon) => (
+          <div key={horizon.key} className="contents">
+            <div className="border-t border-[var(--hairline)] py-5 pr-4">
+              <p className="font-display text-[19px] italic leading-tight text-foreground">
+                {horizon.label}
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--muted-soft)]">{horizon.range}</p>
             </div>
-          ))}
-        </div>
+            {AREAS.map((area) => {
+              const key = cellKey(horizon.key, area.key);
+              return (
+                <label
+                  key={key}
+                  className="flex min-h-[150px] flex-col border-l border-t border-[var(--hairline)] border-l-[var(--hairline-soft)] p-5"
+                >
+                  <span className="sr-only">
+                    {horizon.label} {area.label} goal
+                  </span>
+                  {renderCellTextarea(key, area.prompt, 5)}
+                  {renderBreakLink(horizon.label, area.label, key)}
+                </label>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
-      <div className="grid gap-3 p-3 lg:hidden">
+      {/* ── Stacked matrix (mobile / tablet) ───────────────────────── */}
+      <div className="flex flex-col lg:hidden">
         {HORIZONS.map((horizon) => (
-          <section key={horizon.key} className="overflow-hidden rounded-lg border border-white/10 bg-background/30">
-            <div className="border-b border-white/10 px-3 py-3">
-              <p className="text-sm font-semibold text-foreground">{horizon.label}</p>
-              <p className="text-xs text-muted">({horizon.range})</p>
-            </div>
-            <div className="divide-y divide-white/10">
-              {AREAS.map((area) => {
+          <section key={horizon.key} className="border-t border-[var(--hairline)] py-4">
+            <p className="font-display text-[19px] italic leading-tight text-foreground">
+              {horizon.label}
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--muted-soft)]">{horizon.range}</p>
+            <div className="mt-3 flex flex-col">
+              {AREAS.map((area, index) => {
                 const key = cellKey(horizon.key, area.key);
                 return (
-                  <label key={key} className="block px-3 py-3">
-                    <span className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                      <span>{area.label}</span>
-                      <span>{lineCount(goals[key]) || "No"} goal(s)</span>
-                    </span>
-                    <textarea
-                      value={goals[key]}
-                      onChange={(event) => setGoals((current) => ({ ...current, [key]: event.target.value }))}
-                      placeholder={area.prompt}
-                      rows={4}
-                      className="mt-2 w-full resize-none rounded-md border border-white/10 bg-surface px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-muted/60 focus:border-primary/40"
-                    />
-                    {goals[key].trim() && (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          breakGoalIntoTasks(horizon.label, area.label, goals[key]);
-                        }}
-                        className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary-text transition-colors hover:bg-primary/20"
-                      >
-                        <Wand2 size={12} />
-                        Break into tasks
-                      </button>
+                  <label
+                    key={key}
+                    className={cn(
+                      "flex flex-col py-4",
+                      index > 0 && "border-t border-[var(--hairline-soft)]"
                     )}
+                  >
+                    <span
+                      className={cn(
+                        "text-[11px] font-semibold uppercase tracking-[0.08em]",
+                        area.colorClass
+                      )}
+                    >
+                      {area.label}
+                    </span>
+                    <div className="mt-2 flex flex-col">
+                      {renderCellTextarea(key, area.prompt, 3)}
+                      {renderBreakLink(horizon.label, area.label, key)}
+                    </div>
                   </label>
                 );
               })}
@@ -518,6 +474,55 @@ export function GoalHorizonsMatrix({
           </section>
         ))}
       </div>
+
+      {/* ── Quiet actions row ──────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-[var(--hairline)] pt-4">
+        <label className="flex items-center gap-2 text-[13px] text-muted">
+          Owner
+          <input
+            value={ownerDraft}
+            onChange={(event) => setOwnerDraft(event.target.value)}
+            placeholder="Name"
+            className="w-36 border-b border-[var(--hairline)] bg-transparent pb-0.5 text-[13px] text-foreground placeholder:text-[var(--muted-soft)] focus:border-[var(--teal)] focus:outline-none"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={loadStarterGoals}
+          title="Fill the matrix with editable starter examples"
+          className="text-[13px] text-[var(--teal)] hover:underline"
+        >
+          Load template
+        </button>
+        <button
+          type="button"
+          onClick={() => void copyMarkdown()}
+          title="Copy the matrix as markdown"
+          className="text-[13px] text-[var(--teal)] hover:underline"
+        >
+          {copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy Markdown"}
+        </button>
+        <button
+          type="button"
+          onClick={downloadMarkdown}
+          title="Download the matrix as markdown"
+          className="text-[13px] text-[var(--teal)] hover:underline"
+        >
+          Export .md
+        </button>
+        <button
+          type="button"
+          onClick={resetGoals}
+          title="Clears every goal in the matrix (undoable for 6 seconds)"
+          className="text-[13px] text-muted hover:underline"
+        >
+          Clear all
+        </button>
+      </div>
+
+      <p className="text-[13px] text-muted">
+        Weekly win conditions on Today should ladder up to these. Export as Markdown from Settings.
+      </p>
     </section>
   );
 }

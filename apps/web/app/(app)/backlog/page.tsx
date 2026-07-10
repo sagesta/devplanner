@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStatus } from "@/hooks/use-auth-status";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { ArrowRight, ChevronDown, ChevronRight, Inbox, CheckCircle2, Trash2, Plus, Circle } from "lucide-react";
+import { ChevronDown, ChevronRight, CheckCircle2, Trash2, Circle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -24,13 +24,6 @@ import { cn, displayPhysicalEnergy, displayWorkDepth, isTaskOverdue } from "@/li
 import { TagChip } from "@/components/TagChip";
 import { TimerButton } from "@/components/TimerButton";
 
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "bg-red-500/20 text-red-300",
-  high: "bg-orange-500/20 text-orange-300",
-  normal: "bg-zinc-500/20 text-zinc-300",
-  low: "bg-zinc-700/20 text-zinc-500",
-};
-
 const RECURRENCE_PRESETS: { label: string; value: string }[] = [
   { label: "No repeat", value: "" },
   { label: "Daily", value: "FREQ=DAILY" },
@@ -50,6 +43,28 @@ function localISODate(d = new Date()) {
 function displayAreaName(area?: AreaRow): string {
   if (!area) return "Unknown area";
   return area.name.trim().toLowerCase() === "growth" ? "Professional" : area.name;
+}
+
+function areaDotColor(area?: AreaRow): string {
+  const n = (area?.name ?? "").toLowerCase();
+  if (n.includes("personal")) return "var(--rose)";
+  if (n.includes("professional") || n.includes("growth")) return "var(--emerald)";
+  if (n.includes("work")) return "var(--sky)";
+  return area?.color ?? "var(--teal)";
+}
+
+function taskMeta(t: TaskRow): string {
+  const parts: string[] = [];
+  const captured = new Date(t.createdAt);
+  if (!Number.isNaN(captured.getTime())) {
+    parts.push(`captured ${captured.toLocaleDateString(undefined, { weekday: "short" })}`);
+  }
+  const depth = displayWorkDepth(t);
+  if (depth === "deep") parts.push("deep work");
+  else if (depth === "shallow") parts.push("shallow work");
+  parts.push(`${displayPhysicalEnergy(t)} energy`);
+  if (t.dueDate) parts.push(`due ${t.dueDate.slice(0, 10)}`);
+  return parts.join(" · ");
 }
 
 export default function BacklogPage() {
@@ -153,44 +168,41 @@ export default function BacklogPage() {
     matchesAreaFilter(areaMap.get(areaId))
   );
 
+  const total = q.data?.length;
+  const headline =
+    total === undefined
+      ? "Inbox"
+      : total === 0
+        ? "Nothing awaits triage."
+        : total === 1
+          ? "One thing awaits triage."
+          : `${total} things await triage.`;
+
   return (
-    <div>
-      <h1 className="font-display text-2xl text-foreground">Inbox</h1>
-      <p className="mt-1 text-sm text-muted">
-        Captured work that has not been committed to a sprint yet — {q.data?.length ?? 0} total.
-      </p>
-      <div className="mt-4 grid gap-2 rounded-lg border border-white/10 bg-surface p-3 text-xs text-muted lg:grid-cols-4">
-        <div className="flex items-center gap-2">
-          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-white/5 text-[11px] font-semibold text-foreground">1</span>
-          Capture via Brain dump or quick add.
+    <div className="mx-auto flex max-w-[960px] flex-col gap-6">
+      <header>
+        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--teal)]">
+          Capture &amp; triage
+        </p>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+          <h1 className="mt-1.5 font-display text-[32px] font-normal leading-[1.05] text-[var(--ink)] md:text-[52px]">
+            {headline}
+          </h1>
+          <p className="shrink-0 text-sm text-muted">capture → clarify → commit → execute</p>
         </div>
-        <div className="flex items-center gap-2">
-          <ArrowRight size={13} className="hidden shrink-0 text-muted/70 lg:block" />
-          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-white/5 text-[11px] font-semibold text-foreground">2</span>
-          Clarify priority, area, energy, and subtasks.
-        </div>
-        <div className="flex items-center gap-2">
-          <ArrowRight size={13} className="hidden shrink-0 text-muted/70 lg:block" />
-          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-white/5 text-[11px] font-semibold text-foreground">3</span>
-          Add the few that matter to a sprint.
-        </div>
-        <div className="flex items-center gap-2">
-          <ArrowRight size={13} className="hidden shrink-0 text-muted/70 lg:block" />
-          <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-primary/15 text-[11px] font-semibold text-primary-text">4</span>
-          Execute from Today, Board, or Timeline.
-        </div>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
+      </header>
+
+      <div className="flex flex-wrap gap-1.5">
         {(["all", "work", "personal", "professional"] as const).map((key) => (
           <button
             key={key}
             type="button"
             onClick={() => setAreaFilter(key)}
             className={cn(
-              "rounded-full px-3 py-1 text-[11px] font-medium transition-colors",
+              "rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors",
               areaFilter === key
-                ? "bg-primary text-white"
-                : "bg-white/5 text-muted hover:bg-white/10 hover:text-foreground"
+                ? "border-[var(--ink-btn-bg)] bg-[var(--ink-btn-bg)] text-[var(--ink-btn-fg)]"
+                : "border-[var(--hairline)] text-muted hover:bg-[var(--teal-a08)]"
             )}
           >
             {key === "all" ? "All areas" : key === "work" ? "Work" : key === "personal" ? "Personal" : "Professional"}
@@ -199,52 +211,61 @@ export default function BacklogPage() {
       </div>
 
       {q.isLoading && (
-        <div className="mt-4 space-y-2">
+        <div className="space-y-2">
           <SkeletonListItem />
           <SkeletonListItem />
           <SkeletonListItem />
         </div>
       )}
 
-      <div className="mt-4 space-y-6">
+      <div className="flex flex-col gap-7">
         {filteredGroups.map(([areaId, tasks]) => {
           const area = areaMap.get(areaId);
           return (
-            <div key={areaId}>
-              <div className="mb-2 flex items-center gap-2">
-                {area?.color && (
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: area.color }} />
-                )}
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
+            <section key={areaId}>
+              <div className="mb-2.5 flex items-baseline gap-2">
+                <span
+                  className="h-[9px] w-[9px] shrink-0 self-center rounded-full"
+                  style={{ backgroundColor: areaDotColor(area) }}
+                />
+                <h2 className="font-display text-[19px] font-normal italic text-[var(--ink)]">
                   {displayAreaName(area)}
                 </h2>
-                <span className="text-[11px] text-muted/85">{tasks.length}</span>
+                <span className="text-xs text-[var(--muted-soft)]">{tasks.length}</span>
               </div>
-              <ul className="space-y-1.5 stagger-list">
+              <ul className="stagger-list overflow-hidden rounded-[14px] border border-[var(--hairline)] bg-[var(--card)] shadow-[var(--card-shadow)]">
                 {tasks.map((t) => {
                   const open = expandedId === t.id;
+                  const showHigh = t.priority === "high" || t.priority === "urgent";
                   return (
-                    <li
-                      key={t.id}
-                      className="overflow-hidden rounded-lg border border-white/10 bg-surface text-sm text-foreground card-hover"
-                    >
-                      <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
+                    <li key={t.id} className="border-b border-[var(--hairline-soft)] text-[var(--ink)] last:border-b-0">
+                      <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-5 py-[15px]">
                         <button
                           type="button"
-                          className="rounded p-0.5 text-muted hover:bg-white/10 hover:text-foreground"
+                          className="shrink-0 rounded p-0.5 text-muted transition-colors hover:bg-[var(--teal-a08)] hover:text-[var(--ink)]"
                           aria-expanded={open}
                           onClick={() => setExpandedId(open ? null : t.id)}
                         >
                           {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                         </button>
-                        {isTaskOverdue(t, todayYmd) && (
-                          <span className="rounded-full bg-red-500/20 px-1.5 py-0.5 text-[8px] font-semibold uppercase text-red-200">
-                            Overdue
-                          </span>
-                        )}
-                        <span className="min-w-0 flex-1">{t.title}</span>
+                        <div className="min-w-0 flex-1 basis-48">
+                          <p className="text-[15px] font-medium">
+                            {t.title}
+                            {showHigh && (
+                              <span className="ml-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--high)]">
+                                {t.priority === "urgent" ? "Urgent" : "High"}
+                              </span>
+                            )}
+                            {isTaskOverdue(t, todayYmd) && (
+                              <span className="ml-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--rose)]">
+                                Overdue
+                              </span>
+                            )}
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-muted">{taskMeta(t)}</p>
+                        </div>
                         {t._subtasksTotal !== undefined && t._subtasksTotal > 0 && (
-                          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-muted">
+                          <span className="shrink-0 rounded-full border border-[var(--hairline)] px-2.5 py-0.5 text-xs text-muted">
                             {t._subtasksDone}/{t._subtasksTotal}
                           </span>
                         )}
@@ -253,9 +274,10 @@ export default function BacklogPage() {
                         ))}
                         <TimerButton taskId={t.id} compact />
                         <select
-                          className="max-w-[140px] rounded-md border border-white/10 bg-primary/10 text-primary-text px-2 py-1 text-[11px] font-medium transition-colors hover:bg-primary/20"
+                          className="max-w-[150px] shrink-0 cursor-pointer appearance-none rounded border-none bg-transparent text-[13px] font-medium text-[var(--teal)] outline-none hover:underline disabled:cursor-default disabled:opacity-50"
                           value={t.sprintId ?? ""}
                           disabled={patchMeta.isPending}
+                          aria-label="Add to sprint"
                           onChange={(e) => {
                             const val = e.target.value;
                             if (val === "") {
@@ -269,7 +291,7 @@ export default function BacklogPage() {
                               { onSuccess: () => {
                                   toast.success(`Added to ${sprintName}`);
                                   void qc.invalidateQueries({ queryKey: ["backlog", userId] });
-                                } 
+                                }
                               }
                             );
                           }}
@@ -281,36 +303,15 @@ export default function BacklogPage() {
                             </option>
                           ))}
                         </select>
-                        <select
-                          className="max-w-[140px] rounded-md border border-white/10 bg-background px-2 py-1 text-[11px] text-muted"
-                          value={t.areaId}
-                          disabled={moveArea.isPending}
-                          onChange={(e) => moveArea.mutate({ taskId: t.id, areaId: e.target.value })}
-                          aria-label="Category / area"
-                        >
-                          {(areasQ.data ?? []).map((a) => (
-                            <option key={a.id} value={a.id}>
-                              {displayAreaName(a)}
-                            </option>
-                          ))}
-                        </select>
-                        <span
-                          className={cn(
-                            "inline-block rounded-full px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider",
-                            PRIORITY_COLORS[t.priority] ?? PRIORITY_COLORS.normal
-                          )}
-                        >
-                          {t.priority}
-                        </span>
                       </div>
                       {open && (
-                        <div className="space-y-2 border-t border-white/10 bg-background/30 px-3 py-3 text-[11px]">
+                        <div className="space-y-2 border-t border-[var(--hairline-soft)] bg-background px-5 py-4 text-[11px]">
                           <div className="grid gap-2 sm:grid-cols-2">
                             <label className="text-muted">
                               Due date
                               <input
                                 type="date"
-                                className="mt-1 w-full rounded-md border border-white/10 bg-background px-2 py-1.5 text-foreground"
+                                className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-[var(--card)] px-2 py-1.5 text-[var(--ink)]"
                                 defaultValue={t.dueDate?.slice(0, 10) ?? ""}
                                 onBlur={(e) => {
                                   const v = e.target.value.trim();
@@ -320,11 +321,27 @@ export default function BacklogPage() {
                                 }}
                               />
                             </label>
+                            <label className="text-muted">
+                              Area
+                              <select
+                                className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-[var(--card)] px-2 py-1.5 text-[var(--ink)]"
+                                value={t.areaId}
+                                disabled={moveArea.isPending}
+                                onChange={(e) => moveArea.mutate({ taskId: t.id, areaId: e.target.value })}
+                                aria-label="Category / area"
+                              >
+                                {(areasQ.data ?? []).map((a) => (
+                                  <option key={a.id} value={a.id}>
+                                    {displayAreaName(a)}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
 
                             <label className="text-muted sm:col-span-2">
                               Sprint
                               <select
-                                className="mt-1 w-full rounded-md border border-white/10 bg-background px-2 py-1.5 text-foreground"
+                                className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-[var(--card)] px-2 py-1.5 text-[var(--ink)]"
                                 defaultValue={t.sprintId ?? ""}
                                 onChange={(e) => {
                                   const v = e.target.value;
@@ -345,7 +362,7 @@ export default function BacklogPage() {
                             <label className="text-muted">
                               Priority
                               <select
-                                className="mt-1 w-full rounded-md border border-white/10 bg-background px-2 py-1.5 capitalize"
+                                className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-[var(--card)] px-2 py-1.5 capitalize text-[var(--ink)]"
                                 defaultValue={t.priority}
                                 onChange={(e) =>
                                   patchMeta.mutate({ taskId: t.id, priority: e.target.value })
@@ -361,7 +378,7 @@ export default function BacklogPage() {
                             <label className="text-muted">
                               Physical energy
                               <select
-                                className="mt-1 w-full rounded-md border border-white/10 bg-background px-2 py-1.5"
+                                className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-[var(--card)] px-2 py-1.5 text-[var(--ink)]"
                                 defaultValue={displayPhysicalEnergy(t)}
                                 onChange={(e) =>
                                   patchMeta.mutate({
@@ -380,7 +397,7 @@ export default function BacklogPage() {
                             <label className="text-muted">
                               Depth
                               <select
-                                className="mt-1 w-full rounded-md border border-white/10 bg-background px-2 py-1.5 capitalize"
+                                className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-[var(--card)] px-2 py-1.5 capitalize text-[var(--ink)]"
                                 defaultValue={displayWorkDepth(t)}
                                 onChange={(e) =>
                                   patchMeta.mutate({ taskId: t.id, workDepth: e.target.value })
@@ -393,10 +410,10 @@ export default function BacklogPage() {
                                 ))}
                               </select>
                             </label>
-                            <label className="text-muted sm:col-span-2">
+                            <label className="text-muted">
                               Recurrence
                               <select
-                                className="mt-1 w-full rounded-md border border-white/10 bg-background px-2 py-1.5"
+                                className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-[var(--card)] px-2 py-1.5 text-[var(--ink)]"
                                 defaultValue={
                                   t.recurrenceRule &&
                                   RECURRENCE_PRESETS.some((p) => p.value === t.recurrenceRule)
@@ -426,23 +443,23 @@ export default function BacklogPage() {
                               </select>
                             </label>
                           </div>
-                          
+
                           {/* SUBTASKS SECTION */}
-                          <div className="mt-4 pt-4 border-t border-white/10">
+                          <div className="mt-4 border-t border-[var(--hairline-soft)] pt-4">
                             <div className="mb-2 flex items-center justify-between">
-                              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">Subtasks</h4>
+                              <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Subtasks</h4>
                             </div>
                             <ul className="mb-3 space-y-1.5">
                               {(t._subtasks ?? []).map((sub) => (
-                                <li key={sub.id} className="flex items-center gap-2 rounded-md bg-white/5 px-2 py-1.5 group">
+                                <li key={sub.id} className="group flex items-center gap-2 rounded-lg border border-[var(--hairline-soft)] bg-[var(--card)] px-2 py-1.5">
                                   <button
-                                    className="shrink-0 text-muted hover:text-white"
+                                    className="shrink-0 text-muted transition-colors hover:text-[var(--success-text)]"
                                     onClick={() => updateSubtaskM.mutate({ id: sub.id, updates: { completed: !sub.completed }})}
                                   >
-                                    {sub.completed ? <CheckCircle2 size={14} className="text-success" /> : <Circle size={14} />}
+                                    {sub.completed ? <CheckCircle2 size={14} className="text-[var(--success-text)]" /> : <Circle size={14} />}
                                   </button>
-                                  <input 
-                                    className={cn("flex-1 bg-transparent px-1 text-xs outline-none focus:ring-1 focus:ring-primary/50 rounded", sub.completed && "line-through text-muted")}
+                                  <input
+                                    className={cn("flex-1 rounded bg-transparent px-1 text-xs text-[var(--ink)] outline-none focus:ring-1 focus:ring-[var(--teal-a30)]", sub.completed && "text-muted line-through")}
                                     defaultValue={sub.title}
                                     onBlur={(e) => {
                                       const val = e.target.value.trim();
@@ -452,7 +469,7 @@ export default function BacklogPage() {
 
                                   <button
                                     onClick={() => deleteSubtaskM.mutate(sub.id)}
-                                    className="hover-actions opacity-0 group-hover:opacity-100 p-0.5 text-muted hover:bg-danger/20 hover:text-danger rounded sm-transition"
+                                    className="hover-actions sm-transition rounded p-0.5 text-muted opacity-0 hover:text-[var(--rose)] group-hover:opacity-100"
                                     title="Delete subtask"
                                   >
                                     <Trash2 size={12} />
@@ -460,14 +477,14 @@ export default function BacklogPage() {
                                 </li>
                               ))}
                               {(t._subtasks ?? []).length === 0 && (
-                                <p className="text-[11px] text-muted/85 italic px-1">No subtasks yet</p>
+                                <p className="px-1 text-[11px] italic text-[var(--muted-soft)]">No subtasks yet</p>
                               )}
                             </ul>
                             <div className="flex items-center gap-2">
                               <input
                                 type="text"
                                 placeholder="+ Add subtask..."
-                                className="flex-1 rounded-md border border-white/5 bg-background px-3 py-1.5 text-xs focus:border-primary/50 focus:outline-none"
+                                className="flex-1 rounded-lg border border-[var(--hairline)] bg-[var(--card)] px-3 py-1.5 text-xs text-[var(--ink)] placeholder:text-muted focus:border-[var(--teal)] focus:outline-none"
                                 value={newSubtaskTitles[t.id] ?? ""}
                                 onChange={e => setNewSubtaskTitles((prev) => ({ ...prev, [t.id]: e.target.value }))}
                                 onKeyDown={e => {
@@ -481,7 +498,7 @@ export default function BacklogPage() {
                             </div>
                           </div>
 
-                          <p className="mt-3 text-[11px] text-muted/85">
+                          <p className="mt-3 text-[11px] text-[var(--muted-soft)]">
                             Blur date fields to save. Other fields save on change.
                           </p>
                         </div>
@@ -490,26 +507,34 @@ export default function BacklogPage() {
                   );
                 })}
               </ul>
-            </div>
+            </section>
           );
         })}
       </div>
 
       {!q.isLoading && (q.data?.length ?? 0) > 0 && filteredGroups.length === 0 && (
-        <p className="mt-6 text-center text-sm text-muted">No tasks in this category filter.</p>
+        <p className="text-center text-sm text-muted">No tasks in this category filter.</p>
       )}
 
       {!q.isLoading && (q.data?.length ?? 0) === 0 && (
-        <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-surface/50 py-16 text-center">
-          <CheckCircle2 size={32} className="mb-4 text-primary-text/40" />
-          <p className="text-foreground font-medium text-sm">Your backlog is clean!</p>
-          <p className="mt-1 text-xs text-muted max-w-sm">
+        <div className="mt-6 flex flex-col items-center justify-center rounded-[14px] border border-dashed border-[var(--hairline)] bg-[var(--card)] py-16 text-center shadow-[var(--card-shadow)]">
+          <CheckCircle2 size={32} className="mb-4 text-[var(--teal)]" />
+          <p className="font-display text-[19px] font-normal italic text-[var(--ink)]">Inbox cleared.</p>
+          <p className="mt-1 max-w-sm text-[13px] text-muted">
             All caught up. Use the Brain Dump (Ctrl/Cmd+Shift+D) to capture new tasks, or head to the{" "}
-            <Link href="/plan?view=board" className="text-primary-text hover:underline font-medium">
+            <Link href="/plan?view=board" className="text-[var(--teal)] hover:underline">
               Plan board
             </Link>.
           </p>
         </div>
+      )}
+
+      {!q.isLoading && (q.data?.length ?? 0) > 0 && (
+        <p className="text-[13px] text-muted">
+          Captured work lives here until it earns a spot in a sprint. Capture fast with{" "}
+          <span className="font-semibold text-[var(--ink)]">Brain dump</span>, clarify when you have a
+          spare minute.
+        </p>
       )}
     </div>
   );

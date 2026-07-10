@@ -29,14 +29,14 @@ function StepRow({
   action?: React.ReactNode;
 }) {
   return (
-    <li className="flex items-start gap-3 px-4 py-3">
+    <li className="flex items-start gap-3 px-5 py-3">
       {done ? (
-        <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-success" />
+        <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-[var(--success-text)]" />
       ) : (
         <Circle size={18} className="mt-0.5 shrink-0 text-muted/70" />
       )}
       <div className="min-w-0 flex-1">
-        <p className={cn("text-sm font-medium", done ? "text-muted line-through" : "text-foreground")}>
+        <p className={cn("text-sm font-medium", done ? "text-muted line-through" : "text-[var(--ink)]")}>
           {title}
         </p>
         {!done && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
@@ -83,22 +83,22 @@ export function GettingStartedCard({
   }
 
   return (
-    <section className="rounded-lg border border-primary/25 bg-primary/5">
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+    <section className="rounded-2xl border border-[var(--teal-a30)] bg-[var(--card)] shadow-[var(--card-shadow)]">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--hairline-soft)] px-5 py-3.5">
         <div className="flex items-center gap-2">
-          <Rocket size={16} className="text-primary-text" />
-          <h2 className="text-sm font-semibold text-foreground">Get set up in 2 minutes</h2>
+          <Rocket size={16} className="text-[var(--teal)]" />
+          <h2 className="font-display text-[19px] italic text-[var(--ink)]">Get set up in 2 minutes</h2>
         </div>
         <button
           type="button"
           onClick={dismiss}
-          className="rounded p-1 text-muted hover:bg-white/10 hover:text-foreground"
+          className="rounded-full p-1 text-muted transition-colors hover:bg-[var(--teal-a08)] hover:text-[var(--ink)]"
           aria-label="Dismiss getting started checklist"
         >
           <X size={14} />
         </button>
       </div>
-      <ul className="divide-y divide-white/5">
+      <ul className="divide-y divide-[var(--hairline-soft)]">
         <StepRow
           done={hasAnyTask}
           title="1. Empty your head"
@@ -107,7 +107,7 @@ export function GettingStartedCard({
             <button
               type="button"
               onClick={requestBrainDump}
-              className="rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-white hover:bg-primary-hover"
+              className="rounded-full bg-[var(--ink-btn-bg)] px-3.5 py-1.5 text-xs font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85"
             >
               Brain Dump
             </button>
@@ -120,7 +120,7 @@ export function GettingStartedCard({
           action={
             <Link
               href="/backlog"
-              className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-white/10"
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline)] px-3.5 py-1.5 text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--teal-a08)]"
             >
               <ListTodo size={12} />
               Open Inbox
@@ -134,7 +134,7 @@ export function GettingStartedCard({
           action={
             <Link
               href="/settings?tab=calendar"
-              className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-white/10"
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline)] px-3.5 py-1.5 text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--teal-a08)]"
             >
               <CalendarCheck size={12} />
               Settings
@@ -142,8 +142,8 @@ export function GettingStartedCard({
           }
         />
       </ul>
-      <p className="flex items-center gap-1.5 border-t border-white/10 px-4 py-2.5 text-xs text-muted">
-        <Sparkles size={12} className="text-primary-text/70" />
+      <p className="flex items-center gap-1.5 border-t border-[var(--hairline-soft)] px-5 py-2.5 text-xs text-muted">
+        <Sparkles size={12} className="text-[var(--teal)]" />
         Tip: the AI button (bottom right) can plan your week and break tasks into steps.
       </p>
     </section>

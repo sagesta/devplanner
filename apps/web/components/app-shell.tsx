@@ -5,17 +5,16 @@ import {
   CalendarCheck,
   Inbox,
   Lightbulb,
-  PanelLeftClose,
-  PanelLeftOpen,
   Settings,
   Sun,
   Moon,
+  Target,
   Trophy,
   Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton, useClerk, useUser } from "@clerk/nextjs";
+import { UserButton, useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { AiChatDock } from "@/components/ai-chat-dock";
 import { BrainDumpModal } from "@/components/brain-dump-modal";
@@ -29,8 +28,9 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/now", label: "Today", Icon: Zap, matches: ["/now"] },
   { href: "/backlog", label: "Inbox", Icon: Inbox, matches: ["/backlog"] },
-  { href: "/plan", label: "Plan", Icon: CalendarCheck, matches: ["/plan", "/sprints", "/board", "/timeline", "/table", "/goals"] },
+  { href: "/plan", label: "Plan", Icon: CalendarCheck, matches: ["/plan", "/sprints", "/board", "/timeline", "/table"] },
   { href: "/review", label: "Review", Icon: Trophy, matches: ["/review", "/insights"] },
+  { href: "/goals", label: "Goals", Icon: Target, matches: ["/goals"] },
 ] as const;
 
 const SETTINGS_NAV = { href: "/settings", label: "Settings", Icon: Settings, matches: ["/settings"] } as const;
@@ -39,13 +39,34 @@ function isNavActive(pathname: string, matches: readonly string[]) {
   return matches.some((href) => pathname === href || pathname.startsWith(`${href}/`));
 }
 
+/** 36px circular icon button used in the top bar (bell, theme, settings). */
+function IconCircleButton({
+  active,
+  className,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors",
+        active
+          ? "border-[var(--teal-a30)] bg-[var(--teal-a12)] text-[var(--ink)]"
+          : "border-[var(--hairline)] bg-transparent text-muted hover:bg-[var(--teal-a08)] hover:text-[var(--ink)]",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [brainOpen, setBrainOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [collapsed, setCollapsed] = useState(false);
+  // Daybook is light-first; saved preference still wins.
+  const [theme, setTheme] = useState<"dark" | "light">("light");
 
   useEffect(() => {
     const saved = localStorage.getItem("devplanner-theme") as "dark" | "light" | null;
@@ -90,227 +111,176 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   const { user } = useUser();
-  const { signOut } = useClerk();
   const userId = useAppUserId();
   const userEmail = user?.primaryEmailAddress?.emailAddress ?? "";
+
+  const openBrainDump = () => {
+    setCommandOpen(false);
+    setNotificationsOpen(false);
+    setBrainOpen(true);
+  };
 
   return (
     <div className="min-h-screen [overflow-x:clip]">
       <IdleBanner />
-      <div className="flex min-h-screen">
-        {/* ─── Desktop sidebar ──────────────────────────────────── */}
-        <aside
-          className={cn(
-            "hidden shrink-0 border-r border-white/10 bg-surface md:flex md:flex-col transition-all duration-300 overflow-hidden",
-            collapsed ? "w-14" : "w-56"
-          )}
-        >
-          <div className={cn("p-5", collapsed && "px-2 py-4")}>
-            {collapsed ? (
-              <p className="font-display text-lg text-foreground text-center">D</p>
-            ) : (
-              <>
-                <p className="text-lg font-semibold text-foreground">DevPlanner</p>
-                <p className="mt-0.5 text-[11px] text-muted">Plan less. Finish more.</p>
-              </>
-            )}
-          </div>
-          <nav className={cn("flex flex-1 flex-col gap-0.5 pb-4", collapsed ? "px-1" : "px-3")}>
-            {NAV.map(({ href, label, Icon, matches }) => {
+      <div className="flex min-h-screen flex-col">
+        {/* ─── Top nav (desktop) ─────────────────────────────────── */}
+        <header className="hidden items-center gap-8 border-b border-[var(--hairline)] px-12 py-[18px] md:flex">
+          <Link href="/now" className="font-display text-[22px] italic leading-none text-[var(--ink)]">
+            DevPlanner
+          </Link>
+          <nav className="flex flex-1 gap-1" aria-label="Main">
+            {NAV.map(({ href, label, matches }) => {
               const active = isNavActive(pathname, matches);
               return (
                 <Link
                   key={href}
                   href={href}
                   className={cn(
-                    "group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all",
+                    "whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm transition-colors",
                     active
-                      ? "bg-primary/10 text-foreground border-l-2 border-primary pl-2.5"
-                      : "text-muted hover:bg-white/5 hover:text-foreground",
-                    collapsed && "justify-center px-0 gap-0"
+                      ? "bg-[var(--teal-a12)] font-semibold text-[var(--ink)]"
+                      : "text-muted hover:bg-[var(--teal-a08)] hover:text-[var(--ink)]"
                   )}
-                  title={collapsed ? label : undefined}
                 >
-                  <Icon
-                    size={16}
-                    className={cn(
-                      "shrink-0 transition-colors",
-                      active ? "text-primary-text" : "text-muted group-hover:text-foreground"
-                    )}
-                  />
-                  {!collapsed && label}
+                  {label}
                 </Link>
               );
             })}
           </nav>
-          <div className={cn("border-t border-white/10 p-3 space-y-2", collapsed && "px-1")}>
-            <Link
-              href={SETTINGS_NAV.href}
-              className={cn(
-                "group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all",
-                isNavActive(pathname, SETTINGS_NAV.matches)
-                  ? "bg-primary/10 text-foreground border-l-2 border-primary pl-2.5"
-                  : "text-muted hover:bg-white/5 hover:text-foreground",
-                collapsed && "justify-center px-0 gap-0"
-              )}
-              title={collapsed ? SETTINGS_NAV.label : undefined}
-            >
-              <Settings
-                size={16}
-                className={cn(
-                  "shrink-0 transition-colors",
-                  isNavActive(pathname, SETTINGS_NAV.matches)
-                    ? "text-primary-text"
-                    : "text-muted group-hover:text-foreground"
-                )}
-              />
-              {!collapsed && SETTINGS_NAV.label}
-            </Link>
-            {!collapsed && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-[11px] text-muted hover:bg-white/10 hover:text-foreground transition-colors"
-                  onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-                >
-                  {theme === "dark" ? <Sun size={12} /> : <Moon size={12} />}
-                  {theme === "dark" ? "Light" : "Dark"}
-                </button>
-                <UserButton afterSignOutUrl="/login" />
-                <span className="text-[11px] text-muted/85 truncate max-w-[104px]" title={userEmail}>
-                  {userEmail || (userId ? "✓ signed in" : "…")}
-                </span>
-              </div>
-            )}
-            {collapsed && (
-              <button
-                type="button"
-                className="flex w-full justify-center rounded-lg bg-white/5 p-1.5 text-muted hover:bg-white/10 hover:text-foreground transition-colors"
-                onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-                title={theme === "dark" ? "Switch to light" : "Switch to dark"}
-              >
-                {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
-              </button>
-            )}
-            {!collapsed && (
-              <>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2 text-[11px] text-muted hover:bg-white/5 hover:text-foreground transition-colors"
-                  onClick={() => void signOut({ redirectUrl: "/login" })}
-                >
-                  Sign out
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary/80 py-2 text-[11px] font-medium text-white hover:bg-primary transition-colors"
-                  onClick={() => {
-                    setCommandOpen(false);
-                    setNotificationsOpen(false);
-                    setBrainOpen(true);
-                  }}
-                >
-                  <Lightbulb size={12} />
-                  Brain dump
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2 text-[11px] text-muted hover:bg-white/5 hover:text-foreground transition-colors"
-                  onClick={() => {
-                    setCommandOpen(false);
-                    setBrainOpen(false);
-                    setNotificationsOpen(true);
-                  }}
-                  aria-label="Notifications"
-                  aria-keyshortcuts="Alt+T"
-                  title="Notifications — press Alt+T"
-                >
-                  <Bell size={12} />
-                  Alerts
-                </button>
-              </>
-            )}
+          <div className="flex items-center gap-2.5">
+            <GlobalTimerIndicator />
             <button
               type="button"
-              className="flex w-full items-center justify-center rounded-lg p-1.5 text-muted hover:bg-white/5 hover:text-foreground transition-colors"
-              onClick={() => setCollapsed((c) => !c)}
-              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--ink-btn-bg)] px-[18px] py-[9px] text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85"
+              onClick={openBrainDump}
             >
-              {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+              <Lightbulb size={13} />
+              Brain dump
             </button>
-          </div>
-        </aside>
-
-        {/* ─── Main content area ────────────────────────────────── */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* Mobile header */}
-          <header className="border-b border-white/10 bg-surface/80 backdrop-blur-sm md:hidden">
-            <div className="flex items-center gap-2 px-4 py-2.5">
-              <span className="min-w-0 flex-1 truncate font-display text-lg text-foreground">DevPlanner</span>
-              <Link
-                href={SETTINGS_NAV.href}
-                className={cn(
-                  "flex shrink-0 items-center rounded-lg border border-white/10 p-1.5 transition-colors",
-                  isNavActive(pathname, SETTINGS_NAV.matches)
-                    ? "bg-primary/15 text-foreground"
-                    : "text-muted hover:bg-white/5 hover:text-foreground"
-                )}
-                aria-label="Settings"
-              >
-                <Settings size={14} />
-              </Link>
-              <button
-                type="button"
-                className="flex shrink-0 items-center gap-1 rounded-lg bg-primary/80 px-2.5 py-1.5 text-xs text-white"
-                onClick={() => {
-                  setCommandOpen(false);
-                  setBrainOpen(true);
-                }}
-              >
-                <Lightbulb size={12} />
-                Dump
-              </button>
-            </div>
-            <nav
-              className="flex gap-0.5 overflow-x-auto border-t border-white/5 px-2 py-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              aria-label="Main"
+            <IconCircleButton
+              title="Notifications — press Alt+T"
+              aria-label="Notifications"
+              aria-keyshortcuts="Alt+T"
+              onClick={() => {
+                setCommandOpen(false);
+                setBrainOpen(false);
+                setNotificationsOpen(true);
+              }}
             >
-              {NAV.map(({ href, label, Icon, matches }) => {
-                const active = isNavActive(pathname, matches);
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={cn(
-                      "flex shrink-0 items-center gap-1 rounded-md px-2 py-1.5 text-xs transition-colors",
-                      active
-                        ? "bg-primary/15 text-foreground"
-                        : "text-muted hover:bg-white/5 hover:text-foreground"
-                    )}
-                  >
-                    <Icon size={12} />
-                    {label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </header>
-          {/* Desktop top bar with timer indicator */}
-          <header className="hidden md:flex items-center justify-end gap-3 border-b border-white/10 bg-surface/40 backdrop-blur-sm px-4 py-2">
-            <GlobalTimerIndicator />
-          </header>
-          <main className="flex-1 p-4 md:p-6">{children}</main>
-        </div>
+              <Bell size={15} />
+            </IconCircleButton>
+            <IconCircleButton
+              title="Switch theme"
+              aria-label="Switch theme"
+              onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+            >
+              {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
+            </IconCircleButton>
+            <Link
+              href={SETTINGS_NAV.href}
+              aria-label="Settings"
+              title="Settings"
+              className={cn(
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors",
+                isNavActive(pathname, SETTINGS_NAV.matches)
+                  ? "border-[var(--teal-a30)] bg-[var(--teal-a12)] text-[var(--ink)]"
+                  : "border-[var(--hairline)] text-muted hover:bg-[var(--teal-a08)] hover:text-[var(--ink)]"
+              )}
+            >
+              <Settings size={15} />
+            </Link>
+            <div
+              className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--teal)]"
+              title={userEmail || (userId ? "Signed in" : undefined)}
+            >
+              <UserButton afterSignOutUrl="/login" />
+            </div>
+          </div>
+        </header>
+
+        {/* ─── Mobile top bar ────────────────────────────────────── */}
+        <header className="flex items-center gap-2 border-b border-[var(--hairline)] bg-background/90 px-5 py-3 backdrop-blur-md md:hidden">
+          <Link href="/now" className="min-w-0 flex-1 truncate font-display text-[20px] italic text-[var(--ink)]">
+            DevPlanner
+          </Link>
+          <IconCircleButton
+            className="h-8 w-8"
+            title="Notifications"
+            aria-label="Notifications"
+            onClick={() => {
+              setCommandOpen(false);
+              setBrainOpen(false);
+              setNotificationsOpen(true);
+            }}
+          >
+            <Bell size={14} />
+          </IconCircleButton>
+          <IconCircleButton
+            className="h-8 w-8"
+            title="Switch theme"
+            aria-label="Switch theme"
+            onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+          >
+            {theme === "light" ? <Moon size={14} /> : <Sun size={14} />}
+          </IconCircleButton>
+          <Link
+            href={SETTINGS_NAV.href}
+            aria-label="Settings"
+            className={cn(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors",
+              isNavActive(pathname, SETTINGS_NAV.matches)
+                ? "border-[var(--teal-a30)] bg-[var(--teal-a12)] text-[var(--ink)]"
+                : "border-[var(--hairline)] text-muted hover:bg-[var(--teal-a08)] hover:text-[var(--ink)]"
+            )}
+          >
+            <Settings size={14} />
+          </Link>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--teal)]">
+            <UserButton afterSignOutUrl="/login" />
+          </div>
+        </header>
+
+        {/* ─── Main content ──────────────────────────────────────── */}
+        <main className="flex-1 px-5 pb-32 pt-6 md:px-12 md:pb-16 md:pt-10">{children}</main>
+
+        {/* ─── Mobile: floating capture + bottom tab bar ─────────── */}
+        <button
+          type="button"
+          className="fixed bottom-[86px] right-4 z-40 inline-flex items-center gap-2 rounded-full bg-[var(--ink-btn-bg)] px-[18px] py-[11px] text-[13px] font-semibold text-[var(--ink-btn-fg)] shadow-[var(--card-shadow)] transition-opacity hover:opacity-85 md:hidden"
+          onClick={openBrainDump}
+        >
+          <Lightbulb size={13} />
+          Dump
+        </button>
+        <nav
+          className="fixed inset-x-0 bottom-0 z-40 flex border-t border-[var(--hairline)] bg-background/90 px-2 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 backdrop-blur-md md:hidden"
+          aria-label="Main"
+        >
+          {NAV.map(({ href, label, Icon, matches }) => {
+            const active = isNavActive(pathname, matches);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "flex flex-1 flex-col items-center gap-1 text-[11px] transition-colors",
+                  active ? "font-semibold text-[var(--teal)]" : "text-muted"
+                )}
+              >
+                <Icon size={20} />
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
       <BrainDumpModal open={brainOpen} onClose={() => setBrainOpen(false)} />
       <NotificationsTray open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
       <CommandMenu
         open={commandOpen}
         onOpenChange={setCommandOpen}
-        onBrainDump={() => {
-          setCommandOpen(false);
-          setBrainOpen(true);
-        }}
+        onBrainDump={openBrainDump}
       />
       <AiChatDock />
     </div>

@@ -18,6 +18,7 @@ import confetti from "canvas-confetti";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
+import { useActiveTimer, formatElapsed } from "@/hooks/use-active-timer";
 import { useTags } from "@/hooks/use-tags";
 import {
   fetchSprints,
@@ -62,6 +63,17 @@ const STATUS_CYCLE: Record<string, string> = {
 
 const COL_KEYS: Set<string> = new Set(COLS.map(([k]) => k));
 
+/** Mobile: columns stack as sections In progress → Todo → Done (desktop keeps DOM order). */
+const COL_MOBILE_ORDER: Record<string, string> = {
+  todo: "order-2 md:order-none",
+  in_progress: "order-1 md:order-none",
+  done: "order-3 md:order-none",
+};
+
+/** Daybook card chrome, layered over TaskCard's base styles via twMerge. */
+const DAYBOOK_CARD_CLASS =
+  "rounded-xl border-[var(--hairline)] bg-[var(--card)] px-4 py-3.5 shadow-[var(--card-shadow)] hover:-translate-y-0.5 hover:border-[var(--hairline)] hover:shadow-[var(--card-shadow)]";
+
 function resolveDropStatus(overId: string | undefined, rootsList: TaskRow[]): string | null {
   if (!overId) return null;
   if (COL_KEYS.has(overId)) return overId;
@@ -82,6 +94,7 @@ export function KanbanBoard() {
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [sprintFormStart, setSprintFormStart] = useState<string>("");
   const { tags: allTags } = useTags();
+  const { activeLog, isRunning: timerIsRunning, elapsed: timerElapsed } = useActiveTimer();
   const todayYmd = useMemo(() => toYMD(new Date()), []);
 
   const areasQ = useQuery({
@@ -265,9 +278,9 @@ export function KanbanBoard() {
 
   if (!activeSprint) {
     return (
-      <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-surface/50 py-16 px-6 text-center">
-        <Sparkles size={32} className="mb-4 text-primary-text/40" />
-        <p className="text-foreground font-medium text-lg">No active sprint</p>
+      <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--rule)] bg-[var(--card)] py-16 px-6 text-center shadow-[var(--card-shadow)]">
+        <Sparkles size={32} className="mb-4 text-[var(--teal)]" />
+        <p className="font-display text-[26px] italic text-[var(--ink)]">No active sprint</p>
         <p className="mt-1 text-sm text-muted max-w-md">
           Create a new sprint to start adding tasks from your backlog and tracking your progress!
         </p>
@@ -291,32 +304,32 @@ export function KanbanBoard() {
             createSprintM.mutate({ name, startDate, endDate, status: "active" });
           }}
         >
-          <input 
-             name="name" 
-             placeholder="Sprint name (e.g. Launch Week)" 
-             className="w-full rounded-lg border border-white/10 bg-background px-4 py-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50" 
+          <input
+             name="name"
+             placeholder="Sprint name (e.g. Launch Week)"
+             className="w-full rounded-xl border border-[var(--hairline)] bg-background px-4 py-3 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none"
              required
              defaultValue="Sprint 1"
           />
           <div className="flex gap-3 w-full">
              <div className="flex-1">
-               <label className="block text-left text-[11px] uppercase font-semibold text-muted mb-1 px-1">Start date</label>
+               <label className="block text-left text-[11px] uppercase font-semibold tracking-[0.08em] text-muted mb-1 px-1">Start date</label>
                <input
                  type="date"
                  name="startDate"
-                 className="w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+                 className="w-full rounded-xl border border-[var(--hairline)] bg-background px-3 py-2 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none"
                  required
                  defaultValue={todayYmd}
                  onChange={(e) => setSprintFormStart(e.target.value)}
                />
              </div>
              <div className="flex-1">
-               <label className="block text-left text-[11px] uppercase font-semibold text-muted mb-1 px-1">End date</label>
+               <label className="block text-left text-[11px] uppercase font-semibold tracking-[0.08em] text-muted mb-1 px-1">End date</label>
                <input
                  type="date"
                  name="endDate"
                  min={sprintFormStart || todayYmd}
-                 className="w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+                 className="w-full rounded-xl border border-[var(--hairline)] bg-background px-3 py-2 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none"
                  required
                  defaultValue={toYMD(new Date(Date.now() + 14 * 86400000))}
                />
@@ -325,14 +338,14 @@ export function KanbanBoard() {
           <button 
              type="submit" 
              disabled={createSprintM.isPending}
-             className="w-full mt-2 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
+             className="w-full mt-2 flex items-center justify-center gap-2 rounded-full bg-[var(--ink-btn-bg)] px-5 py-3 text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-50"
           >
              <Plus size={16} /> Create & Start Sprint
           </button>
         </form>
 
-        <div className="mt-6 border-t border-white/5 pt-4">
-          <Link href="/plan?view=sprints" className="text-xs text-muted hover:text-white hover:underline transition-colors">
+        <div className="mt-6 border-t border-[var(--hairline-soft)] pt-4">
+          <Link href="/plan?view=sprints" className="text-[13px] text-[var(--teal)] hover:underline transition-colors">
             Or manage sprints in Plan →
           </Link>
         </div>
@@ -343,14 +356,14 @@ export function KanbanBoard() {
   return (
     <>
       {overdueRoots.length >= 3 && !rescueDismissed && (
-        <div className="mb-4 flex flex-col gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-foreground sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 flex flex-col gap-2 rounded-xl border border-[var(--hairline)] bg-[var(--card)] px-4 py-3 text-sm text-foreground shadow-[var(--card-shadow)] sm:flex-row sm:items-center sm:justify-between">
           <span>
-            You have {overdueRoots.length} overdue tasks. Reschedule all to today?
+            You have <span className="font-semibold text-[var(--high)]">{overdueRoots.length} overdue tasks</span>. Reschedule all to today?
           </span>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
+              className="rounded-full bg-[var(--ink-btn-bg)] px-3.5 py-1.5 text-xs font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-40"
               disabled={rescueMut.isPending}
               onClick={() => rescueMut.mutate(overdueRoots.map((t) => t.id))}
             >
@@ -358,7 +371,7 @@ export function KanbanBoard() {
             </button>
             <button
               type="button"
-              className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-muted hover:bg-white/5"
+              className="rounded-full border border-[var(--hairline)] px-3.5 py-1.5 text-xs text-muted transition-colors hover:bg-[var(--teal-a08)]"
               onClick={() => setRescueDismissed(true)}
             >
               Dismiss
@@ -366,14 +379,14 @@ export function KanbanBoard() {
           </div>
         </div>
       )}
-      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-white/10 bg-surface/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Active sprint board</p>
-          <h1 className="mt-1 truncate font-display text-xl text-foreground">{activeSprint.name}</h1>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--teal)]">Active sprint board</p>
+          <h2 className="mt-1 truncate font-display text-[22px] text-[var(--ink)]">{activeSprint.name}</h2>
           <div className="mt-0.5 flex items-center gap-2">
             <p className="text-xs text-muted">{activeSprint.startDate} to {activeSprint.endDate}</p>
             {activeSprint.endDate < todayYmd && (
-              <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[11px] font-semibold text-red-300">
+              <span className="rounded-full border border-[var(--high)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--high)]">
                 Sprint expired
               </span>
             )}
@@ -383,7 +396,7 @@ export function KanbanBoard() {
           <label className="flex shrink-0 flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-muted">
             Sprint
             <select
-              className="min-w-[220px] rounded-lg border border-white/10 bg-background px-3 py-2 text-sm normal-case text-foreground"
+              className="min-w-[220px] rounded-xl border border-[var(--hairline)] bg-background px-3 py-2 text-sm normal-case text-foreground focus:border-[var(--teal)]"
               value={activeSprint.id}
               onChange={(e) => setSelectedSprintId(e.target.value)}
             >
@@ -403,23 +416,23 @@ export function KanbanBoard() {
           <button
             type="button"
             className={cn(
-              "flex items-center gap-1.5 rounded-lg border bg-surface px-3 py-1.5 text-sm transition-colors",
+              "flex items-center gap-1.5 rounded-full border bg-transparent px-3.5 py-1.5 text-[13px] transition-colors",
               selectedTags.length > 0
-                ? "border-primary text-primary-text bg-primary/10"
-                : "border-white/10 text-muted hover:bg-white/5 hover:text-foreground"
+                ? "border-[var(--teal)] bg-[var(--teal-a12)] text-[var(--teal)]"
+                : "border-[var(--hairline)] text-muted hover:bg-[var(--teal-a08)] hover:text-[var(--teal)]"
             )}
           >
             <Filter size={14} />
             <span>Tags {selectedTags.length > 0 ? `(${selectedTags.length})` : ""}</span>
           </button>
-          
-          <div className="absolute right-0 top-full mt-1 hidden w-56 flex-col overflow-hidden rounded-xl border border-white/10 bg-surface shadow-xl group-hover/filter:flex z-[40]">
-            <div className="border-b border-white/5 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
+
+          <div className="absolute right-0 top-full mt-1 hidden w-56 flex-col overflow-hidden rounded-xl border border-[var(--hairline)] bg-[var(--card)] shadow-[var(--card-shadow)] group-hover/filter:flex z-[40]">
+            <div className="border-b border-[var(--hairline-soft)] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
               Filter by Tag
             </div>
             <div className="max-h-60 overflow-y-auto p-1">
               {allTags.length === 0 ? (
-                <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                <div className="px-3 py-4 text-center text-xs text-muted">
                   No tags created yet.
                 </div>
               ) : (
@@ -429,21 +442,21 @@ export function KanbanBoard() {
                     <label
                       key={tag.id}
                       className={cn(
-                        "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors hover:bg-white/5",
-                        active && "bg-primary/5"
+                        "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors hover:bg-[var(--teal-a08)]",
+                        active && "bg-[var(--teal-a08)]"
                       )}
                     >
                       <input
                         type="checkbox"
                         checked={active}
-                        className="rounded border-white/20 bg-background text-primary-text focus:ring-primary/50"
+                        className="rounded border-[var(--rule)] bg-background accent-[var(--teal)]"
                         onChange={(e) => {
                           if (e.target.checked) setSelectedTags((prev) => [...prev, tag.id]);
                           else setSelectedTags((prev) => prev.filter((id) => id !== tag.id));
                         }}
                       />
                       <span
-                        className="h-2 w-2 rounded-full ring-1 ring-inset ring-white/20"
+                        className="h-2 w-2 rounded-full ring-1 ring-inset ring-[var(--hairline)]"
                         style={{ backgroundColor: tag.color ?? "#6B7280" }}
                       />
                       <span className="flex-1 text-foreground">{tag.name}</span>
@@ -463,7 +476,7 @@ export function KanbanBoard() {
         onDragEnd={onDragEnd}
         onDragCancel={() => setDragId(null)}
       >
-        <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-3">
           {COLS.map(([key, label]) => {
             const colTasks = filteredRoots.filter((t) => t.status === key);
             return (
@@ -474,6 +487,7 @@ export function KanbanBoard() {
                 count={colTasks.length}
                 showColumnEmpty={!q.isLoading && colTasks.length === 0 && addingCol !== key}
                 onAdd={() => setAddingCol(addingCol === key ? null : key)}
+                className={COL_MOBILE_ORDER[key]}
               >
                 {q.isLoading && (
                   <>
@@ -484,10 +498,16 @@ export function KanbanBoard() {
                 )}
                 {colTasks.map((t) => {
                   const area = areaMap.get(t.areaId);
+                  const timerRunningHere = timerIsRunning && activeLog?.taskId === t.id;
+                  const subtaskPct =
+                    (t._subtasksTotal ?? 0) > 0
+                      ? Math.round(((t._subtasksDone ?? 0) / (t._subtasksTotal ?? 1)) * 100)
+                      : null;
                   return (
                     <div key={t.id} className="space-y-0.5">
                       <DraggableCard id={t.id}>
                         <TaskCard
+                          className={cn(DAYBOOK_CARD_CLASS, t.status === "done" && "opacity-55")}
                           title={t.title}
                           status={t.status}
                           priority={t.priority}
@@ -511,17 +531,33 @@ export function KanbanBoard() {
                           tags={t._tags}
                         />
                       </DraggableCard>
+                      {timerRunningHere && (
+                        <div className="px-1 pt-1.5">
+                          <div className="flex items-center gap-2 text-xs text-muted">
+                            <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[var(--teal)]" />
+                            <span>timer running · {formatElapsed(timerElapsed)}</span>
+                          </div>
+                          {subtaskPct !== null && (
+                            <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-[var(--track)]">
+                              <div
+                                className="h-full rounded-full bg-[var(--teal)] transition-[width] duration-300"
+                                style={{ width: `${subtaskPct}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 pl-1">
                         <button
                           type="button"
-                          className="text-[11px] text-primary-text/70 hover:text-primary-text hover:underline transition-colors"
+                          className="text-[11px] text-[var(--teal)] transition-colors hover:underline"
                           onClick={() => setOpenTaskId(t.id)}
                         >
                           Details / subtasks
                         </button>
                         <button
                           type="button"
-                          className="rounded p-0.5 text-muted hover:bg-red-500/15 hover:text-red-300"
+                          className="rounded p-0.5 text-muted transition-colors hover:text-[var(--rose)]"
                           title="Delete task"
                           onClick={() => {
                             void (async () => {
@@ -574,8 +610,9 @@ export function KanbanBoard() {
         </div>
         <DragOverlay>
           {draggedTask && (
-            <div className="rotate-2 scale-105 opacity-90 shadow-2xl">
+            <div className="rotate-2 scale-105 opacity-90">
               <TaskCard
+                className={DAYBOOK_CARD_CLASS}
                 title={draggedTask.title}
                 status={draggedTask.status}
                 priority={draggedTask.priority}
@@ -786,7 +823,7 @@ function TaskDrawer({
       onClick={onClose}
     >
       <div
-        className="h-full w-full max-w-lg overflow-auto border-l border-white/10 bg-surface p-5 animate-slideInRight"
+        className="h-full w-full max-w-lg overflow-auto border-l border-[var(--hairline)] bg-background p-5 animate-slideInRight"
         onClick={(e) => e.stopPropagation()}
       >
         {q.isLoading && (
@@ -800,7 +837,7 @@ function TaskDrawer({
           <>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="font-display text-xl text-foreground">{q.data.task.title}</h2>
+                <h2 className="font-display text-[22px] text-[var(--ink)]">{q.data.task.title}</h2>
                 <p className="mt-1 text-xs text-muted">
                   Status: <span className="capitalize">{q.data.task.status.replace("_", " ")}</span>
                   {q.data.task.description && (
@@ -811,7 +848,7 @@ function TaskDrawer({
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  className="rounded-lg p-1.5 text-muted hover:bg-red-500/15 hover:text-red-300"
+                  className="rounded-full p-1.5 text-muted transition-colors hover:text-[var(--rose)]"
                   title="Delete task"
                   disabled={delTask.isPending}
                   onClick={() => delTask.mutate()}
@@ -820,7 +857,7 @@ function TaskDrawer({
                 </button>
                 <button
                   type="button"
-                  className="rounded-lg p-1.5 text-muted hover:bg-white/10 hover:text-foreground"
+                  className="rounded-full p-1.5 text-muted transition-colors hover:bg-[var(--teal-a08)] hover:text-foreground"
                   onClick={onClose}
                 >
                   <X size={16} />
@@ -843,13 +880,13 @@ function TaskDrawer({
               />
             </div>
 
-            <div className="mt-4 space-y-3 rounded-xl border border-white/10 bg-background/30 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Fields &amp; Deadline</p>
+            <div className="mt-4 space-y-3 rounded-xl border border-[var(--hairline)] bg-[var(--card)] p-3 shadow-[var(--card-shadow)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Fields &amp; Deadline</p>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block text-[11px] text-muted">
                   Priority
                   <select
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                    className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-background px-2 py-1.5 text-sm text-foreground focus:border-[var(--teal)]"
                     value={priority}
                     onChange={(e) => setPriority(e.target.value)}
                   >
@@ -863,7 +900,7 @@ function TaskDrawer({
                 <label className="block text-[11px] text-muted">
                   Depth
                   <select
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                    className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-background px-2 py-1.5 text-sm text-foreground focus:border-[var(--teal)]"
                     value={workDepth}
                     onChange={(e) => setWorkDepth(e.target.value)}
                   >
@@ -877,7 +914,7 @@ function TaskDrawer({
                 <label className="col-span-2 block text-[11px] text-muted">
                   Physical energy
                   <select
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                    className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-background px-2 py-1.5 text-sm text-foreground focus:border-[var(--teal)]"
                     value={physicalEnergy}
                     onChange={(e) => setPhysicalEnergy(e.target.value)}
                   >
@@ -891,7 +928,7 @@ function TaskDrawer({
                 <label className="col-span-2 block text-[11px] text-muted">
                   Cognitive energy
                   <select
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                    className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-background px-2 py-1.5 text-sm text-foreground focus:border-[var(--teal)]"
                     value={energyLevel}
                     onChange={(e) => setEnergyLevel(e.target.value)}
                   >
@@ -911,7 +948,7 @@ function TaskDrawer({
               <label className="block text-[11px] text-muted">
                 Area
                 <select
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                  className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-background px-2 py-1.5 text-sm text-foreground focus:border-[var(--teal)]"
                   value={areaId}
                   onChange={(e) => setAreaId(e.target.value)}
                 >
@@ -926,7 +963,7 @@ function TaskDrawer({
                 Schedule Date
                 <input
                   type="date"
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                  className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-background px-2 py-1.5 text-sm text-foreground focus:border-[var(--teal)]"
                   value={scheduledDate}
                   onChange={(e) => setScheduledDate(e.target.value)}
                 />
@@ -935,7 +972,7 @@ function TaskDrawer({
                 Due Date
                 <input
                   type="date"
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                  className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-background px-2 py-1.5 text-sm text-foreground focus:border-[var(--teal)]"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
                 />
@@ -943,7 +980,7 @@ function TaskDrawer({
               <label className="block text-[11px] text-muted">
                 Recurrence (RRULE)
                 <select
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
+                  className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-background px-2 py-1.5 text-sm text-foreground focus:border-[var(--teal)]"
                   value={recurrence}
                   onChange={(e) => setRecurrence(e.target.value)}
                 >
@@ -962,7 +999,7 @@ function TaskDrawer({
               <button
                 type="button"
                 disabled={saveMeta.isPending}
-                className="w-full rounded-lg bg-primary py-2 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
+                className="w-full rounded-full bg-[var(--ink-btn-bg)] py-2 text-xs font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-40"
                 onClick={() => saveMeta.mutate()}
               >
                 {saveMeta.isPending ? "Saving…" : "Save details"}
@@ -970,26 +1007,26 @@ function TaskDrawer({
             </div>
 
             <div className="mt-6 flex items-center justify-between">
-              <h3 className="font-display text-sm tracking-wide text-foreground">Subtasks</h3>
-              <button onClick={() => setShowSpread(!showSpread)} className="text-xs text-primary-text hover:text-primary-text/80 flex items-center gap-1">
+              <h3 className="font-display text-[19px] italic text-[var(--ink)]">Subtasks</h3>
+              <button onClick={() => setShowSpread(!showSpread)} className="text-xs text-[var(--teal)] hover:underline flex items-center gap-1">
                 <Sparkles size={12}/> Spread across days
               </button>
             </div>
 
             {showSpread && (
-               <div className="mt-2 rounded-xl border border-primary/30 bg-primary/5 p-3 flex flex-col gap-2">
+               <div className="mt-2 rounded-xl border border-[var(--teal-a30)] bg-[var(--teal-a08)] p-3 flex flex-col gap-2">
                  <p className="text-xs text-muted">Distribute unscheduled subtasks across a date range.</p>
                  <div className="flex gap-2">
                    <div className="flex-1">
-                     <label className="block text-[11px] uppercase tracking-wider text-muted mb-1">Start</label>
-                     <input type="date" defaultValue={spreadStart} onChange={e => setSpreadStart(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-white/10" />
+                     <label className="block text-[11px] uppercase tracking-[0.08em] text-muted mb-1">Start</label>
+                     <input type="date" defaultValue={spreadStart} onChange={e => setSpreadStart(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-[var(--hairline)]" />
                    </div>
                    <div className="flex-1">
-                     <label className="block text-[11px] uppercase tracking-wider text-muted mb-1">End</label>
-                     <input type="date" defaultValue={spreadEnd} onChange={e => setSpreadEnd(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-white/10" />
+                     <label className="block text-[11px] uppercase tracking-[0.08em] text-muted mb-1">End</label>
+                     <input type="date" defaultValue={spreadEnd} onChange={e => setSpreadEnd(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-[var(--hairline)]" />
                    </div>
                  </div>
-                 <button onClick={() => spreadSubs.mutate()} disabled={!spreadStart || !spreadEnd || spreadSubs.isPending || !q.data.subtasks.some((s: SubtaskRow) => !s.scheduledDate)} className="w-full mt-2 rounded bg-primary py-1.5 text-xs text-white hover:bg-primary-hover disabled:opacity-50">
+                 <button onClick={() => spreadSubs.mutate()} disabled={!spreadStart || !spreadEnd || spreadSubs.isPending || !q.data.subtasks.some((s: SubtaskRow) => !s.scheduledDate)} className="w-full mt-2 rounded-full bg-[var(--ink-btn-bg)] py-1.5 text-xs font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-50">
                     Apply Spread
                  </button>
                </div>
@@ -1005,7 +1042,7 @@ function TaskDrawer({
                 <li
                   key={s.id}
                   className={cn(
-                    "group flex items-center gap-2 rounded-lg border border-white/5 bg-background/50 px-2 py-2 transition-all hover:border-white/10",
+                    "group flex items-center gap-2 rounded-lg border border-[var(--hairline-soft)] bg-[var(--card)] px-2 py-2 transition-all hover:border-[var(--hairline)]",
                     s.completed && "opacity-50"
                   )}
                 >
@@ -1013,10 +1050,10 @@ function TaskDrawer({
                   <button
                     type="button"
                     className={cn(
-                      "h-4 w-4 shrink-0 rounded border transition-colors",
+                      "h-4 w-4 shrink-0 rounded-full border transition-colors",
                       s.completed
-                        ? "bg-primary border-primary"
-                        : "border-white/20 hover:border-primary/50"
+                        ? "border-[var(--teal)] bg-[var(--teal)]"
+                        : "border-[var(--rule)] hover:border-[var(--success-border)] hover:bg-[var(--success-bg)]"
                     )}
                     onClick={() => toggleSubStatus.mutate(s)}
                   />
@@ -1026,7 +1063,7 @@ function TaskDrawer({
                     id={`subtask-${s.id}-name`}
                     name={`subtask-${s.id}-name`}
                     className={cn(
-                      "flex-1 bg-transparent px-1 min-w-0 text-sm outline-none placeholder:text-muted/60",
+                      "flex-1 bg-transparent px-1 min-w-0 text-sm outline-none placeholder:text-[var(--muted-soft)]",
                       s.completed && "line-through text-muted"
                     )}
                     defaultValue={s.title}
@@ -1087,7 +1124,7 @@ function TaskDrawer({
                   <button
                     type="button"
                     onClick={() => { if (confirm("Delete subtask?")) deleteSub.mutate(s.id); }}
-                    className="shrink-0 p-1 rounded text-muted hover-actions opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-red-400 hover:bg-white/5 transition-all"
+                    className="shrink-0 p-1 rounded text-muted hover-actions opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[var(--rose)] transition-all"
                     title="Delete subtask"
                   >
                     <Trash2 size={12} />
@@ -1097,7 +1134,7 @@ function TaskDrawer({
             </ul>
             <div className="mt-4 flex gap-2">
               <input
-                className="flex-1 rounded-lg border border-white/10 bg-background px-3 py-2 text-sm placeholder:text-muted/60 focus:border-primary focus:ring-1 focus:ring-primary"
+                className="flex-1 rounded-lg border border-[var(--hairline)] bg-background px-3 py-2 text-sm placeholder:text-[var(--muted-soft)] focus:border-[var(--teal)]"
                 placeholder="+ Add executable step"
                 value={newSubtaskTitle}
                 onChange={(e) => setNewSubtaskTitle(e.target.value)}
@@ -1107,7 +1144,7 @@ function TaskDrawer({
               />
               <button
                 type="button"
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors"
+                className="rounded-full bg-[var(--ink-btn-bg)] px-4 py-2 text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85"
                 onClick={() => addSub.mutate()}
               >
                 Add

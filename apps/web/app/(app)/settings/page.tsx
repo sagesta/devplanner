@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, Download, Layers, RefreshCw, Settings as SettingsIcon, Cpu, FolderPlus, LogOut, Zap } from "lucide-react";
+import { Calendar, Download, Layers, Settings as SettingsIcon, Cpu, Zap } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useState } from "react";
@@ -21,7 +21,6 @@ import {
   postGoogleCalendarDisconnect,
   postGoogleCalendarPullNow,
   postGoogleCalendarPullQueued,
-  type AiLogRow,
 } from "@/lib/api";
 import { Skeleton } from "@/lib/skeleton";
 import {
@@ -43,6 +42,21 @@ const TABS = [
   { key: "ai", label: "AI", icon: Cpu, hint: "Chat model and assistant behavior" },
 ] as const;
 
+/** Same key the AI chat dock reads for its "Can edit" writes toggle. */
+const LS_AI_WRITES = "devplanner.aiWritesEnabled";
+
+/* Daybook building blocks */
+const CARD = "rounded-2xl border border-[var(--hairline)] bg-[var(--card)] p-6 shadow-[var(--card-shadow)]";
+const CARD_TITLE = "font-display text-[22px] text-foreground";
+const LINK = "text-[13px] text-[var(--teal)] transition-colors hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:no-underline";
+const LINK_MUTED = "text-[13px] text-muted transition-colors hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:no-underline";
+const INK_BTN = "inline-flex items-center gap-1.5 rounded-full bg-[var(--ink-btn-bg)] px-5 py-2.5 text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-40";
+const BADGE_SUCCESS = "rounded-full border border-[var(--success-border)] bg-[var(--success-bg)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--success-text)]";
+const BADGE_MUTED = "rounded-full border border-[var(--hairline)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted";
+const MONO_FIELD = "rounded-lg border border-[var(--hairline)] bg-background px-3 py-2.5 font-mono text-[13px] text-foreground";
+const INPUT = "rounded-lg border border-[var(--hairline)] bg-background px-3 py-2 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none";
+const CODE_CHIP = "rounded bg-background px-1 font-mono text-xs";
+
 export default function SettingsPage() {
   const { user } = useUser();
   const userId = useAppUserId();
@@ -59,6 +73,7 @@ export default function SettingsPage() {
   const [aiModel, setAiModel] = useState("");
   const [aiBudget, setAiBudget] = useState(false);
   const [aiEnergySuggest, setAiEnergySuggest] = useState(true);
+  const [aiWrites, setAiWrites] = useState(false);
   const [calPrimaryOnly, setCalPrimaryOnly] = useState(true);
 
   useEffect(() => {
@@ -81,6 +96,7 @@ export default function SettingsPage() {
     setAiModel(localStorage.getItem(LS_CHAT_MODEL) ?? "");
     setAiBudget(localStorage.getItem(LS_AI_BUDGET) === "1");
     setAiEnergySuggest(localStorage.getItem(LS_AI_ENERGY_SUGGEST) !== "0");
+    setAiWrites(localStorage.getItem(LS_AI_WRITES) === "1");
   }, [tab]);
 
   useEffect(() => {
@@ -246,126 +262,189 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-3xl">
-      <h1 className="font-display text-2xl text-foreground">Settings</h1>
-      <p className="mt-1 text-sm text-muted">Self-hosted DevPlanner configuration.</p>
+    <div className="mx-auto flex max-w-[900px] flex-col gap-6 pb-16">
+      {/* ── Daybook header ─────────────────────────────────────────── */}
+      <header>
+        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--teal)]">
+          Configuration
+        </p>
+        <h1 className="mt-1.5 font-display text-[32px] leading-[1.05] text-foreground md:text-[52px]">
+          Settings
+        </h1>
+      </header>
 
-      {/* Tabs */}
-      <div className="mt-5 flex gap-1 border-b border-white/10 pb-0">
-        {TABS.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            type="button"
-            className={cn(
-              "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-medium transition-colors",
-              tab === key
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted hover:text-foreground"
-            )}
-            onClick={() => setTab(key)}
-            title={TABS.find(t => t.key === key)?.hint}
-          >
-            <Icon size={13} />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab hint */}
-      <p className="mt-3 text-xs text-muted">
-        {TABS.find(t => t.key === tab)?.hint}
-      </p>
-
-      <div className="mt-5 animate-fadeIn" key={tab}>
-        {tab === "general" && (
-          <section className="rounded-xl border border-white/10 bg-surface p-5">
-            <h2 className="text-sm font-semibold text-foreground">General</h2>
-            <p className="mt-2 text-sm text-muted leading-relaxed">
-              Your daily capacity is derived from the weekly hour targets you set in{" "}
-              <button
-                type="button"
-                className="text-primary-text hover:underline font-medium"
-                onClick={() => setTab("areas")}
-              >
-                Settings → Areas
-              </button>. The AI
-              assistant uses these limits when suggesting a schedule.
-            </p>
-            <p className="mt-3 text-sm text-muted leading-relaxed">
-              <strong className="text-foreground">Theme:</strong> use the Sun / Moon control in the sidebar (bottom) to switch light and dark mode.
-            </p>
-            <div className="mt-4 rounded-lg bg-background/50 p-3 text-xs text-muted space-y-1">
-              <p>
-                Signed in as{" "}
-                <span className="text-foreground">{user?.primaryEmailAddress?.emailAddress ?? "—"}</span>
-              </p>
-            </div>
-          </section>
-        )}
-
-        {tab === "areas" && (
-          <AreasSection userId={userId} />
-        )}
-
-        {tab === "calendar" && (
-          <section className="space-y-6">
-            <div className="rounded-xl border border-white/10 bg-surface p-5">
-              <h2 className="text-sm font-semibold text-foreground">Google Calendar</h2>
-              <p className="mt-2 text-sm text-muted leading-relaxed">
-                Connect your Google account to sync tasks that have a <strong>scheduled date</strong> or{" "}
-                <strong>due date</strong> with your primary Google calendar (two-way: edits in DevPlanner push via the
-                worker; pull imports changes from Google). Set{" "}
-                <code className="rounded bg-background px-1 text-xs">GOOGLE_*</code> and{" "}
-                <code className="rounded bg-background px-1 text-xs">WEB_APP_URL</code> in the API{" "}
-                <code className="rounded bg-background px-1 text-xs">.env</code> — see{" "}
-                <code className="rounded bg-background px-1 text-xs">.env.example</code>.
-              </p>
-              {googleQ.isLoading && (
-                <p className="mt-3 text-xs text-muted">Loading connection status…</p>
+      <div className="grid items-start gap-8 md:grid-cols-[220px_minmax(0,1fr)] md:gap-12">
+        {/* ── Tab list ───────────────────────────────────────────── */}
+        <nav className="flex flex-col gap-0.5">
+          {TABS.map(({ key, label, hint }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              className={cn(
+                "rounded-[10px] px-3.5 py-2.5 text-left transition-colors",
+                tab === key ? "bg-[var(--teal-a12)]" : "hover:bg-[var(--teal-a08)]"
               )}
-              {googleQ.data && (
-                <div className="mt-3 rounded-lg bg-background/50 p-3 text-xs text-muted space-y-2">
-                  <p>
-                    API OAuth:{" "}
-                    <span className="text-foreground">
-                      {googleQ.data.oauthConfigured ? "configured" : "not configured"}
-                    </span>
-                    {" · "}
-                    Account:{" "}
-                    <span className="text-foreground">{googleQ.data.connected ? "connected" : "not connected"}</span>
-                  </p>
-                  {googleQ.data.connected && (
-                    <>
-                      <p>
-                        Calendar ID:{" "}
-                        <code className="text-foreground">{googleQ.data.calendarId ?? "primary"}</code>
-                      </p>
-                      <p>
-                        Last import:{" "}
-                        <span className="text-foreground">
-                          {googleQ.data.lastGooglePullAt
-                            ? new Date(googleQ.data.lastGooglePullAt).toLocaleString()
-                            : "— (run Pull from Google)"}
-                        </span>
-                      </p>
-                      <p className="text-[11px] text-muted/85">
-                        Link updated:{" "}
-                        {googleQ.data.linkUpdatedAt
-                          ? new Date(googleQ.data.linkUpdatedAt).toLocaleString()
-                          : "—"}
-                      </p>
-                    </>
-                  )}
-                  {!googleQ.data.oauthConfigured && (
-                    <p>
-                      Add Google OAuth credentials and redirect URI{" "}
-                      <code className="text-foreground">…/api/sync/google/callback</code> in Google Cloud Console.
+            >
+              <p
+                className={cn(
+                  "text-sm",
+                  tab === key ? "font-semibold text-[var(--ink)]" : "text-muted"
+                )}
+              >
+                {label}
+              </p>
+              <p className="mt-px text-xs text-[var(--muted-soft)]">{hint}</p>
+            </button>
+          ))}
+        </nav>
+
+        {/* ── Panels ─────────────────────────────────────────────── */}
+        <div className="animate-fadeIn flex min-w-0 flex-col gap-5" key={tab}>
+          {tab === "general" && (
+            <section className={CARD}>
+              <h2 className={CARD_TITLE}>General</h2>
+              <p className="mt-3 text-[13px] leading-relaxed text-muted">
+                Your daily capacity is derived from the weekly hour targets you set in{" "}
+                <button
+                  type="button"
+                  className="font-medium text-[var(--teal)] hover:underline"
+                  onClick={() => setTab("areas")}
+                >
+                  Settings → Areas
+                </button>
+                . The AI assistant uses these limits when suggesting a schedule.
+              </p>
+              <p className="mt-3 text-[13px] leading-relaxed text-muted">
+                <strong className="text-foreground">Theme:</strong> use the Sun / Moon control in the top bar to switch
+                light and dark mode.
+              </p>
+              <div className="mt-4 rounded-lg border border-[var(--hairline-soft)] bg-background p-3 text-xs text-muted">
+                <p>
+                  Signed in as{" "}
+                  <span className="text-foreground">{user?.primaryEmailAddress?.emailAddress ?? "—"}</span>
+                </p>
+              </div>
+            </section>
+          )}
+
+          {tab === "areas" && <AreasSection userId={userId} />}
+
+          {tab === "calendar" && (
+            <>
+              <section className={CARD}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className={CARD_TITLE}>Google Calendar</h2>
+                    <p className="mt-1 text-[13px] text-muted">
+                      {googleQ.data?.connected
+                        ? `Connected · calendar ${googleQ.data.calendarId ?? "primary"}`
+                        : "Two-way sync for tasks with a scheduled or due date"}
                     </p>
-                  )}
-                  <label className="flex cursor-pointer items-center gap-2 pt-1 text-[11px] text-foreground">
+                  </div>
+                  {googleQ.data &&
+                    (googleQ.data.connected ? (
+                      <span className={BADGE_SUCCESS}>Connected</span>
+                    ) : (
+                      <span className={BADGE_MUTED}>Not connected</span>
+                    ))}
+                </div>
+                <p className="mt-4 text-[13px] leading-relaxed text-muted">
+                  Connect your Google account to sync tasks that have a <strong>scheduled date</strong> or{" "}
+                  <strong>due date</strong> with your primary Google calendar (two-way: edits in DevPlanner push via
+                  the worker; pull imports changes from Google). Set <code className={CODE_CHIP}>GOOGLE_*</code> and{" "}
+                  <code className={CODE_CHIP}>WEB_APP_URL</code> in the API <code className={CODE_CHIP}>.env</code> —
+                  see <code className={CODE_CHIP}>.env.example</code>.
+                </p>
+                {googleQ.isLoading && <p className="mt-3 text-xs text-muted">Loading connection status…</p>}
+                {googleQ.data && (
+                  <div className="mt-4 space-y-1.5 text-[13px] text-muted">
+                    <p>
+                      API OAuth:{" "}
+                      <span className="text-foreground">
+                        {googleQ.data.oauthConfigured ? "configured" : "not configured"}
+                      </span>
+                      {" · "}
+                      Account:{" "}
+                      <span className="text-foreground">
+                        {googleQ.data.connected ? "connected" : "not connected"}
+                      </span>
+                    </p>
+                    {googleQ.data.connected && (
+                      <>
+                        <p>
+                          Last import:{" "}
+                          <span className="text-foreground">
+                            {googleQ.data.lastGooglePullAt
+                              ? new Date(googleQ.data.lastGooglePullAt).toLocaleString()
+                              : "— (run Pull now)"}
+                          </span>
+                        </p>
+                        <p className="text-xs text-[var(--muted-soft)]">
+                          Link updated:{" "}
+                          {googleQ.data.linkUpdatedAt
+                            ? new Date(googleQ.data.linkUpdatedAt).toLocaleString()
+                            : "—"}
+                        </p>
+                      </>
+                    )}
+                    {!googleQ.data.oauthConfigured && (
+                      <p>
+                        Add Google OAuth credentials and redirect URI{" "}
+                        <code className={cn(CODE_CHIP, "text-foreground")}>…/api/sync/google/callback</code> in Google
+                        Cloud Console.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {!googleQ.data?.connected && (
+                  <div className="mt-5">
+                    <button
+                      type="button"
+                      disabled={
+                        !userId ||
+                        googleBusy !== null ||
+                        googleQ.isLoading ||
+                        (googleQ.isFetched && !googleQ.data?.oauthConfigured)
+                      }
+                      className={INK_BTN}
+                      onClick={() => connectGoogle()}
+                    >
+                      Connect Google Calendar
+                    </button>
+                  </div>
+                )}
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <button
+                    type="button"
+                    disabled={!userId || !googleQ.data?.connected || googleBusy !== null}
+                    className={LINK}
+                    onClick={() => void googlePullNow()}
+                  >
+                    {googleBusy === "pull" ? "Pulling…" : "Pull now"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!userId || !googleQ.data?.connected || googleBusy !== null}
+                    className={LINK}
+                    onClick={() => void googleQueuePull()}
+                  >
+                    {googleBusy === "queue" ? "Queuing…" : "Queue background sync"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!userId || !googleQ.data?.connected || googleBusy !== null}
+                    className={LINK_MUTED}
+                    onClick={() => void disconnectGoogle()}
+                  >
+                    {googleBusy === "disconnect" ? "Disconnecting…" : "Disconnect"}
+                  </button>
+                </div>
+                {googleQ.data && (
+                  <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-[13px] text-muted">
                     <input
                       type="checkbox"
-                      className="rounded"
+                      className="rounded accent-[var(--teal)]"
                       checked={calPrimaryOnly}
                       onChange={(e) => {
                         const on = e.target.checked;
@@ -373,340 +452,327 @@ export default function SettingsPage() {
                         localStorage.setItem("devplanner.googleImportPrimaryOnly", on ? "1" : "0");
                       }}
                     />
-                    Import primary calendar only (preference — multi-calendar picker coming later)
+                    Only sync the primary calendar (multi-calendar picker coming later)
+                  </label>
+                )}
+              </section>
+
+              <section className={CARD}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className={CARD_TITLE}>CalDAV</h2>
+                    <p className="mt-1 text-[13px] text-muted">Apple Calendar, Radicale, and friends</p>
+                  </div>
+                  <span className={BADGE_MUTED}>Optional</span>
+                </div>
+                <p className="mt-4 text-[13px] leading-relaxed text-muted">
+                  Tasks with a <strong>scheduled date</strong> or <strong>due date</strong> sync as VEVENT{" "}
+                  <code className={CODE_CHIP}>.ics</code> files to a CalDAV collection (e.g. Radicale from{" "}
+                  <code className={CODE_CHIP}>docker compose</code> on port 5232). Run{" "}
+                  <code className={CODE_CHIP}>npm run worker</code> with Redis so jobs run.
+                </p>
+                <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] leading-relaxed text-muted">
+                  <li>
+                    In API <code className={CODE_CHIP}>.env</code>: set{" "}
+                    <code className={CODE_CHIP}>CALDAV_CALENDAR_URL</code> to your collection (must end with{" "}
+                    <code className={CODE_CHIP}>/</code>, e.g.{" "}
+                    <code className={CODE_CHIP}>http://localhost:5232/alice/tasks/</code>
+                    ), plus <code className={CODE_CHIP}>CALDAV_USER</code> and{" "}
+                    <code className={CODE_CHIP}>CALDAV_PASSWORD</code>.
+                  </li>
+                  <li>
+                    Optional: <code className={CODE_CHIP}>CALDAV_IMPORT_AREA_ID</code> (UUID) for new events from the
+                    calendar; otherwise the first area (by name) is used.
+                  </li>
+                  <li>
+                    Optional: <code className={CODE_CHIP}>CALDAV_PULL_INTERVAL_MS</code> on the <strong>worker</strong>{" "}
+                    for automatic pull (e.g. <code className={cn(CODE_CHIP, "text-foreground")}>3600000</code> hourly).
+                  </li>
+                  <li>
+                    <strong>Two-way:</strong> edits in DevPlanner push to CalDAV; use <strong>Pull now</strong> to
+                    import/merge external events and reconcile deletions.
+                  </li>
+                </ul>
+                <p className="mt-4 text-[13px] text-muted">Server root</p>
+                <p className={cn(MONO_FIELD, "mt-1.5")}>http://localhost:5232/</p>
+                <p className="mt-2 text-xs text-[var(--muted-soft)]">
+                  Push errors land in <code className="font-mono">caldav_sync_log</code> after task edits.
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <button
+                    type="button"
+                    disabled={!userId || calBusy !== null}
+                    className={LINK}
+                    onClick={() => void runMkcol()}
+                  >
+                    {calBusy === "mkcol" ? "Working…" : "Create collection"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!userId || calBusy !== null}
+                    className={LINK}
+                    onClick={() => void runPullNow()}
+                  >
+                    {calBusy === "pull" ? "Pulling…" : "Pull now"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!userId || calBusy !== null}
+                    className={LINK}
+                    onClick={() => void queuePull()}
+                  >
+                    {calBusy === "queue" ? "Queuing…" : "Queue pull (worker)"}
+                  </button>
+                </div>
+              </section>
+            </>
+          )}
+
+          {tab === "focus" && (
+            <>
+              <section className={CARD}>
+                <h2 className={CARD_TITLE}>Pomodoro &amp; focus</h2>
+                <p className="mt-2 text-[13px] leading-relaxed text-muted">
+                  Stored in this browser only. Use these values in your focus routine or a future in-app timer.
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <label className="text-xs text-muted">
+                    Work (minutes)
+                    <input
+                      type="number"
+                      min={5}
+                      max={120}
+                      className={cn(INPUT, "mt-1.5 w-full")}
+                      value={pomoWork}
+                      onChange={(e) => setPomoWork(e.target.value)}
+                      onBlur={() => localStorage.setItem(LS_POMO_WORK, pomoWork)}
+                    />
+                  </label>
+                  <label className="text-xs text-muted">
+                    Short break
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      className={cn(INPUT, "mt-1.5 w-full")}
+                      value={pomoShort}
+                      onChange={(e) => setPomoShort(e.target.value)}
+                      onBlur={() => localStorage.setItem(LS_POMO_SHORT, pomoShort)}
+                    />
+                  </label>
+                  <label className="text-xs text-muted">
+                    Long break
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      className={cn(INPUT, "mt-1.5 w-full")}
+                      value={pomoLong}
+                      onChange={(e) => setPomoLong(e.target.value)}
+                      onBlur={() => localStorage.setItem(LS_POMO_LONG, pomoLong)}
+                    />
                   </label>
                 </div>
-              )}
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={
-                    !userId ||
-                    googleBusy !== null ||
-                    googleQ.isLoading ||
-                    (googleQ.isFetched && !googleQ.data?.oauthConfigured)
-                  }
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
-                  onClick={() => connectGoogle()}
-                >
-                  Connect Google Calendar
-                </button>
-                <button
-                  type="button"
-                  disabled={!userId || !googleQ.data?.connected || googleBusy !== null}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 disabled:opacity-40"
-                  onClick={() => void disconnectGoogle()}
-                >
-                  <LogOut size={14} />
-                  {googleBusy === "disconnect" ? "…" : "Disconnect"}
-                </button>
-                <button
-                  type="button"
-                  disabled={!userId || !googleQ.data?.connected || googleBusy !== null}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 disabled:opacity-40"
-                  onClick={() => void googlePullNow()}
-                >
-                  <RefreshCw size={14} className={googleBusy === "pull" ? "animate-spin" : ""} />
-                  {googleBusy === "pull" ? "Pulling…" : "Pull from Google now"}
-                </button>
-                <button
-                  type="button"
-                  disabled={!userId || !googleQ.data?.connected || googleBusy !== null}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 disabled:opacity-40"
-                  onClick={() => void googleQueuePull()}
-                >
-                  {googleBusy === "queue" ? "Queuing…" : "Queue Google pull (worker)"}
-                </button>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-white/10 bg-surface p-5">
-            <h2 className="text-sm font-semibold text-foreground">CalDAV (optional)</h2>
-            <p className="mt-2 text-sm text-muted leading-relaxed">
-              Tasks with a <strong>scheduled date</strong> or <strong>due date</strong> sync as VEVENT <code className="rounded bg-background px-1 text-xs">.ics</code> files
-              to a CalDAV collection (e.g. Radicale from <code className="rounded bg-background px-1 text-xs">docker compose</code> on port 5232).
-              Run <code className="rounded bg-background px-1 text-xs">npm run worker</code> with Redis so jobs run.
-            </p>
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted">
-              <li>
-                In API <code className="rounded bg-background px-1 text-xs">.env</code>: set{" "}
-                <code className="rounded bg-background px-1 text-xs">CALDAV_CALENDAR_URL</code> to your collection (must end with{" "}
-                <code className="rounded bg-background px-1 text-xs">/</code>, e.g.{" "}
-                <code className="rounded bg-background px-1 text-xs">http://localhost:5232/alice/tasks/</code>
-                ), plus <code className="rounded bg-background px-1 text-xs">CALDAV_USER</code> and{" "}
-                <code className="rounded bg-background px-1 text-xs">CALDAV_PASSWORD</code>.
-              </li>
-              <li>
-                Optional: <code className="rounded bg-background px-1 text-xs">CALDAV_IMPORT_AREA_ID</code> (UUID) for new events from
-                the calendar; otherwise the first area (by name) is used.
-              </li>
-              <li>
-                Optional: <code className="rounded bg-background px-1 text-xs">CALDAV_PULL_INTERVAL_MS</code> on the{" "}
-                <strong>worker</strong> for automatic pull (e.g. <code className="text-foreground">3600000</code> hourly).
-              </li>
-              <li>
-                <strong>Two-way:</strong> edits in DevPlanner push to CalDAV; use <strong>Pull from calendar</strong> to import/merge
-                external events and reconcile deletions.
-              </li>
-            </ul>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={!userId || calBusy !== null}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 disabled:opacity-40"
-                onClick={() => void runMkcol()}
-              >
-                <FolderPlus size={14} />
-                {calBusy === "mkcol" ? "Working…" : "Ensure calendar folder (MKCOL)"}
-              </button>
-              <button
-                type="button"
-                disabled={!userId || calBusy !== null}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-40"
-                onClick={() => void runPullNow()}
-              >
-                <RefreshCw size={14} className={calBusy === "pull" ? "animate-spin" : ""} />
-                {calBusy === "pull" ? "Pulling…" : "Pull from calendar now"}
-              </button>
-              <button
-                type="button"
-                disabled={!userId || calBusy !== null}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 disabled:opacity-40"
-                onClick={() => void queuePull()}
-              >
-                {calBusy === "queue" ? "Queuing…" : "Queue pull (worker)"}
-              </button>
-            </div>
-            <div className="mt-4 rounded-lg bg-background/50 p-3 text-xs text-muted font-mono space-y-1">
-              <p>Server root: http://localhost:5232/</p>
-              <p>Push errors: <code className="text-foreground">caldav_sync_log</code> after task edits.</p>
-            </div>
-            </div>
-          </section>
-        )}
-
-        {tab === "focus" && (
-          <section className="space-y-4">
-            <div className="rounded-xl border border-white/10 bg-surface p-5">
-              <h2 className="text-sm font-semibold text-foreground">Pomodoro &amp; focus</h2>
-              <p className="mt-2 text-xs text-muted leading-relaxed">
-                Stored in this browser only. Use these values in your focus routine or a future in-app timer.
-              </p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <label className="text-[11px] text-muted">
-                  Work (minutes)
+                <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-[13px] text-muted">
                   <input
-                    type="number"
-                    min={5}
-                    max={120}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
-                    value={pomoWork}
-                    onChange={(e) => setPomoWork(e.target.value)}
-                    onBlur={() => localStorage.setItem(LS_POMO_WORK, pomoWork)}
-                  />
-                </label>
-                <label className="text-[11px] text-muted">
-                  Short break
-                  <input
-                    type="number"
-                    min={1}
-                    max={60}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
-                    value={pomoShort}
-                    onChange={(e) => setPomoShort(e.target.value)}
-                    onBlur={() => localStorage.setItem(LS_POMO_SHORT, pomoShort)}
-                  />
-                </label>
-                <label className="text-[11px] text-muted">
-                  Long break
-                  <input
-                    type="number"
-                    min={1}
-                    max={60}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
-                    value={pomoLong}
-                    onChange={(e) => setPomoLong(e.target.value)}
-                    onBlur={() => localStorage.setItem(LS_POMO_LONG, pomoLong)}
-                  />
-                </label>
-              </div>
-              <label className="mt-4 flex cursor-pointer items-center gap-2 text-[11px] text-foreground">
-                <input
-                  type="checkbox"
-                  className="rounded"
-                  checked={focusModeDef}
-                  onChange={(e) => {
-                    setFocusModeDef(e.target.checked);
-                    localStorage.setItem(LS_FOCUS_MODE, e.target.checked ? "1" : "0");
-                  }}
-                />
-                Prefer focus mode (fewer distractions) by default
-              </label>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-surface p-5">
-              <h2 className="text-sm font-semibold text-foreground">Focus export</h2>
-              <p className="mt-2 text-sm text-muted">
-                Export today&apos;s scheduled tasks as JSON (pomodoro estimates).
-              </p>
-              <button
-                type="button"
-                disabled={!userId || exporting}
-                className="mt-4 flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-40"
-                onClick={() => void downloadFocus()}
-              >
-                <Download size={14} />
-                {exporting ? "Exporting…" : "Download export"}
-              </button>
-            </div>
-          </section>
-        )}
-
-        {tab === "ai" && (
-          <div className="space-y-6">
-          <div className="rounded-xl border border-white/10 bg-surface p-5">
-            <h2 className="text-sm font-semibold text-foreground">AI assistant</h2>
-            <p className="mt-2 text-xs text-muted leading-relaxed">
-              The chat dock calls <code className="rounded bg-background px-1">POST /api/ai/chat</code>. Set{" "}
-              <code className="rounded bg-background px-1">OPENAI_API_KEY</code> in the API{" "}
-              <code className="rounded bg-background px-1">.env</code> (never in the browser). Optional:{" "}
-              <code className="rounded bg-background px-1">OPENAI_SMART_MODEL</code> (default{" "}
-              <code className="text-foreground">gpt-4o-mini</code>).
-            </p>
-            {aiConfigQ.isPending && (
-              <div className="mt-3 space-y-2">
-                <Skeleton className="h-10 w-full max-w-md rounded-lg" />
-                <Skeleton className="h-9 w-full max-w-xs rounded-lg" />
-              </div>
-            )}
-            {aiConfigQ.isError && (
-              <p className="mt-3 text-xs text-red-300">
-                Could not load AI config. Is the API running?{" "}
-                {aiConfigQ.error instanceof Error ? aiConfigQ.error.message : String(aiConfigQ.error)}
-              </p>
-            )}
-            {aiConfigQ.data && (
-              <div
-                className={cn(
-                  "mt-3 rounded-lg border px-3 py-2 text-xs",
-                  aiConfigQ.data.openaiKeySet
-                    ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100/90"
-                    : "border-amber-500/30 bg-amber-500/10 text-amber-100/90"
-                )}
-              >
-                {aiConfigQ.data.openaiKeySet
-                  ? "OpenAI API key is configured on the server."
-                  : "OpenAI API key is not set — chat will show a stub message until OPENAI_API_KEY is set."}
-              </div>
-            )}
-            <div className="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-[11px] text-amber-100/90">
-              Never paste <code className="rounded bg-black/20 px-1">OPENAI_API_KEY</code> into the browser or
-              client-side settings — it would be exposed to anyone with access to this device. Configure keys only
-              in the API server <code className="rounded bg-black/20 px-1">.env</code>.
-            </div>
-            <div className="mt-4 space-y-3">
-              <label className="block text-[11px] text-muted">
-                Chat model (synced with AI dock)
-                {aiConfigQ.isPending ? (
-                  <Skeleton className="mt-1 h-9 w-full max-w-xs rounded-lg" />
-                ) : (
-                  <select
-                    className="mt-1 w-full max-w-xs rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground"
-                    value={
-                      aiModel ||
-                      aiConfigQ.data?.defaultChatModel ||
-                      "gpt-4o-mini"
-                    }
+                    type="checkbox"
+                    className="rounded accent-[var(--teal)]"
+                    checked={focusModeDef}
                     onChange={(e) => {
-                      const v = e.target.value;
-                      setAiModel(v);
-                      localStorage.setItem(LS_CHAT_MODEL, v);
+                      setFocusModeDef(e.target.checked);
+                      localStorage.setItem(LS_FOCUS_MODE, e.target.checked ? "1" : "0");
                     }}
-                  >
-                    {(aiConfigQ.data?.allowedChatModels ?? ["gpt-4o-mini", "gpt-4o"]).map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
+                  />
+                  Prefer focus mode (fewer distractions) by default
+                </label>
+              </section>
+              <section className={CARD}>
+                <h2 className={CARD_TITLE}>Focus export</h2>
+                <p className="mt-2 text-[13px] text-muted">
+                  Export today&apos;s scheduled tasks as JSON (pomodoro estimates).
+                </p>
+                <button
+                  type="button"
+                  disabled={!userId || exporting}
+                  className={cn(INK_BTN, "mt-4")}
+                  onClick={() => void downloadFocus()}
+                >
+                  <Download size={14} />
+                  {exporting ? "Exporting…" : "Download export"}
+                </button>
+              </section>
+            </>
+          )}
+
+          {tab === "ai" && (
+            <>
+              <section className={CARD}>
+                <div className="flex items-start justify-between gap-4">
+                  <h2 className={CARD_TITLE}>AI assistant</h2>
+                  {aiConfigQ.data &&
+                    (aiConfigQ.data.openaiKeySet ? (
+                      <span className={BADGE_SUCCESS}>Key set</span>
+                    ) : (
+                      <span className={BADGE_MUTED}>No key</span>
                     ))}
-                  </select>
+                </div>
+                <p className="mt-3 text-[13px] leading-relaxed text-muted">
+                  The chat dock calls <code className={CODE_CHIP}>POST /api/ai/chat</code>. Set{" "}
+                  <code className={CODE_CHIP}>OPENAI_API_KEY</code> in the API <code className={CODE_CHIP}>.env</code>{" "}
+                  (never in the browser). Optional: <code className={CODE_CHIP}>OPENAI_SMART_MODEL</code> (default{" "}
+                  <code className={cn(CODE_CHIP, "text-foreground")}>gpt-4o-mini</code>).
+                </p>
+                {aiConfigQ.isPending && (
+                  <div className="mt-3 space-y-2">
+                    <Skeleton className="h-10 w-full max-w-md rounded-lg" />
+                    <Skeleton className="h-9 w-full max-w-xs rounded-lg" />
+                  </div>
                 )}
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 text-[11px] text-foreground">
-                <input
-                  type="checkbox"
-                  className="rounded"
-                  checked={aiBudget}
-                  onChange={(e) => {
-                    setAiBudget(e.target.checked);
-                    localStorage.setItem(LS_AI_BUDGET, e.target.checked ? "1" : "0");
-                  }}
-                />
-                Add daily budget reminder to AI messages (work/personal caps in prompts)
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 text-[11px] text-foreground">
-                <input
-                  type="checkbox"
-                  className="rounded"
-                  checked={aiEnergySuggest}
-                  onChange={(e) => {
-                    setAiEnergySuggest(e.target.checked);
-                    localStorage.setItem(LS_AI_ENERGY_SUGGEST, e.target.checked ? "1" : "0");
-                  }}
-                />
-                Send current physical energy to AI (from Now page / shared preference)
-              </label>
-            </div>
-            <p className="mt-3 text-xs text-muted">
-              <strong className="text-foreground">Task tools</strong> live in the floating AI panel. They let the
-              assistant list, create, update, delete, and reschedule tasks.
-            </p>
-          </div>
-          <section className="rounded-xl border border-white/10 bg-surface p-5">
-            <h2 className="text-sm font-semibold text-foreground">AI usage log</h2>
-            {logsQ.isLoading && (
-              <div className="mt-3 space-y-2">
-                <Skeleton className="h-8 w-full rounded" />
-                <Skeleton className="h-8 w-full rounded" />
-                <Skeleton className="h-8 w-full rounded" />
-              </div>
-            )}
-            {logsQ.data && logsQ.data.logs.length > 0 && (
-              <div className="mt-3 overflow-x-auto rounded-lg border border-white/5">
-                <table className="w-full text-left text-xs">
-                  <thead className="border-b border-white/10 bg-background/50 text-[11px] uppercase tracking-wider text-muted">
-                    <tr>
-                      <th className="p-2">Time</th>
-                      <th className="p-2">Job</th>
-                      <th className="p-2">Model</th>
-                      <th className="p-2 text-right">Tokens</th>
-                      <th className="p-2 text-right">Latency</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {logsQ.data.logs.map((l) => (
-                      <tr key={l.id} className="border-b border-white/5 hover:bg-white/[0.02]">
-                        <td className="p-2 text-muted">
-                          {new Date(l.createdAt).toLocaleDateString()}
-                        </td>
-                        <td className="p-2 text-foreground">{l.jobType}</td>
-                        <td className="p-2 text-muted font-mono">{l.model}</td>
-                        <td className="p-2 text-right text-muted">
-                          {l.inputTokens ?? "—"}/{l.outputTokens ?? "—"}
-                        </td>
-                        <td className="p-2 text-right text-muted">
-                          {l.latencyMs ? `${l.latencyMs}ms` : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {logsQ.data && logsQ.data.logs.length === 0 && (
-              <p className="mt-3 text-sm text-muted">No AI calls logged yet.</p>
-            )}
-          </section>
-          </div>
-        )}
+                {aiConfigQ.isError && (
+                  <p className="mt-3 text-xs text-[var(--high)]">
+                    Could not load AI config. Is the API running?{" "}
+                    {aiConfigQ.error instanceof Error ? aiConfigQ.error.message : String(aiConfigQ.error)}
+                  </p>
+                )}
+                {aiConfigQ.data && (
+                  <div
+                    className={cn(
+                      "mt-3 rounded-lg border px-3 py-2 text-xs",
+                      aiConfigQ.data.openaiKeySet
+                        ? "border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success-text)]"
+                        : "border-[var(--hairline)] bg-background text-[var(--high)]"
+                    )}
+                  >
+                    {aiConfigQ.data.openaiKeySet
+                      ? "OpenAI API key is configured on the server."
+                      : "OpenAI API key is not set — chat will show a stub message until OPENAI_API_KEY is set."}
+                  </div>
+                )}
+                <div className="mt-4 rounded-lg border border-[var(--hairline)] bg-background p-3 text-xs leading-relaxed text-[var(--high)]">
+                  Never paste <code className="rounded bg-[var(--track)] px-1 font-mono">OPENAI_API_KEY</code> into the
+                  browser or client-side settings — it would be exposed to anyone with access to this device. Configure
+                  keys only in the API server <code className="rounded bg-[var(--track)] px-1 font-mono">.env</code>.
+                </div>
+                <div className="mt-5 space-y-3.5">
+                  <label className="block text-xs text-muted">
+                    Chat model (synced with AI dock)
+                    {aiConfigQ.isPending ? (
+                      <Skeleton className="mt-1.5 h-9 w-full max-w-xs rounded-lg" />
+                    ) : (
+                      <select
+                        className={cn(INPUT, "mt-1.5 w-full max-w-xs")}
+                        value={aiModel || aiConfigQ.data?.defaultChatModel || "gpt-4o-mini"}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setAiModel(v);
+                          localStorage.setItem(LS_CHAT_MODEL, v);
+                        }}
+                      >
+                        {(aiConfigQ.data?.allowedChatModels ?? ["gpt-4o-mini", "gpt-4o"]).map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-muted">
+                    <input
+                      type="checkbox"
+                      className="rounded accent-[var(--teal)]"
+                      checked={aiWrites}
+                      onChange={(e) => {
+                        const on = e.target.checked;
+                        setAiWrites(on);
+                        localStorage.setItem(LS_AI_WRITES, on ? "1" : "0");
+                        if (on) {
+                          toast.info(
+                            "The assistant can now create and edit tasks for you. It will say exactly what it changed."
+                          );
+                        }
+                      }}
+                    />
+                    Can edit — let the assistant create and change tasks (synced with AI dock)
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-muted">
+                    <input
+                      type="checkbox"
+                      className="rounded accent-[var(--teal)]"
+                      checked={aiBudget}
+                      onChange={(e) => {
+                        setAiBudget(e.target.checked);
+                        localStorage.setItem(LS_AI_BUDGET, e.target.checked ? "1" : "0");
+                      }}
+                    />
+                    Add daily budget reminder to AI messages (work/personal caps in prompts)
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-muted">
+                    <input
+                      type="checkbox"
+                      className="rounded accent-[var(--teal)]"
+                      checked={aiEnergySuggest}
+                      onChange={(e) => {
+                        setAiEnergySuggest(e.target.checked);
+                        localStorage.setItem(LS_AI_ENERGY_SUGGEST, e.target.checked ? "1" : "0");
+                      }}
+                    />
+                    Send current physical energy to AI (from Now page / shared preference)
+                  </label>
+                </div>
+                <p className="mt-4 text-xs text-muted">
+                  <strong className="text-foreground">Task tools</strong> live in the floating AI panel. They let the
+                  assistant list, create, update, delete, and reschedule tasks.
+                </p>
+              </section>
+              <section className={CARD}>
+                <h2 className={CARD_TITLE}>AI usage log</h2>
+                {logsQ.isLoading && (
+                  <div className="mt-3 space-y-2">
+                    <Skeleton className="h-8 w-full rounded" />
+                    <Skeleton className="h-8 w-full rounded" />
+                    <Skeleton className="h-8 w-full rounded" />
+                  </div>
+                )}
+                {logsQ.data && logsQ.data.logs.length > 0 && (
+                  <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--hairline-soft)]">
+                    <table className="w-full text-left text-xs">
+                      <thead className="border-b border-[var(--hairline)] bg-background text-[11px] uppercase tracking-[0.08em] text-muted">
+                        <tr>
+                          <th className="p-2 font-semibold">Time</th>
+                          <th className="p-2 font-semibold">Job</th>
+                          <th className="p-2 font-semibold">Model</th>
+                          <th className="p-2 text-right font-semibold">Tokens</th>
+                          <th className="p-2 text-right font-semibold">Latency</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {logsQ.data.logs.map((l) => (
+                          <tr
+                            key={l.id}
+                            className="border-b border-[var(--hairline-soft)] transition-colors last:border-b-0 hover:bg-[var(--teal-a08)]"
+                          >
+                            <td className="p-2 text-muted">{new Date(l.createdAt).toLocaleDateString()}</td>
+                            <td className="p-2 text-foreground">{l.jobType}</td>
+                            <td className="p-2 font-mono text-muted">{l.model}</td>
+                            <td className="p-2 text-right text-muted">
+                              {l.inputTokens ?? "—"}/{l.outputTokens ?? "—"}
+                            </td>
+                            <td className="p-2 text-right text-muted">
+                              {l.latencyMs ? `${l.latencyMs}ms` : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {logsQ.data && logsQ.data.logs.length === 0 && (
+                  <p className="mt-3 text-[13px] text-muted">No AI calls logged yet.</p>
+                )}
+              </section>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -732,9 +798,9 @@ function AreasSection({ userId }: { userId: string | undefined }) {
   });
 
   return (
-    <section className="rounded-xl border border-white/10 bg-surface p-5">
-      <h2 className="text-sm font-semibold text-foreground">Areas &amp; weekly hour targets</h2>
-      <p className="mt-2 text-sm text-muted leading-relaxed">
+    <section className={CARD}>
+      <h2 className={CARD_TITLE}>Areas &amp; weekly hour targets</h2>
+      <p className="mt-2 text-[13px] leading-relaxed text-muted">
         Set a weekly hour target for each area. This is shown in the Review time panel as a progress bar.
       </p>
 
@@ -746,25 +812,26 @@ function AreasSection({ userId }: { userId: string | undefined }) {
       )}
 
       {areasQ.data && (
-        <div className="mt-4 space-y-3">
-          {areasQ.data.map((area) => (
-            <div key={area.id} className="flex items-center gap-3 rounded-lg border border-white/10 bg-background/30 px-3 py-2.5">
-              {area.color && (
-                <span
-                  className="h-3 w-3 shrink-0 rounded-full"
-                  style={{ backgroundColor: area.color }}
-                />
+        <div className="mt-4 flex flex-col">
+          {areasQ.data.map((area, index) => (
+            <div
+              key={area.id}
+              className={cn(
+                "flex items-center gap-3 py-3",
+                index > 0 && "border-t border-[var(--hairline-soft)]"
               )}
-              <span className="min-w-0 flex-1 text-sm text-foreground truncate">
-                {area.name}
-              </span>
+            >
+              {area.color && (
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: area.color }} />
+              )}
+              <span className="min-w-0 flex-1 truncate text-sm text-foreground">{area.name}</span>
               <div className="flex items-center gap-1.5">
                 <input
                   type="number"
                   min={0}
                   max={168}
                   step={0.5}
-                  className="w-20 rounded-lg border border-white/10 bg-background px-2 py-1.5 text-sm text-foreground text-right"
+                  className={cn(INPUT, "w-20 text-right")}
                   defaultValue={area.weeklyHourTarget ?? ""}
                   placeholder="—"
                   onBlur={(e) => {
@@ -779,7 +846,7 @@ function AreasSection({ userId }: { userId: string | undefined }) {
                     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                   }}
                 />
-                <span className="text-[11px] text-muted">h/wk</span>
+                <span className="text-xs text-muted">h/wk</span>
               </div>
             </div>
           ))}
@@ -787,7 +854,7 @@ function AreasSection({ userId }: { userId: string | undefined }) {
       )}
 
       {areasQ.data && areasQ.data.length === 0 && (
-        <p className="mt-4 text-sm text-muted">No areas found. Create areas from the Board view.</p>
+        <p className="mt-4 text-[13px] text-muted">No areas found. Create areas from the Board view.</p>
       )}
     </section>
   );
