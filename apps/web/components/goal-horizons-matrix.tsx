@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -169,6 +170,7 @@ export function GoalHorizonsMatrix({
 }) {
   const defaultOwnerName = ownerName?.trim() || "My Goals";
   const userId = useAppUserId();
+  const { isLoaded: authLoaded } = useAuth();
   const qc = useQueryClient();
   const [goals, setGoals] = useState<GoalMatrix>(EMPTY_GOALS);
   const [ownerDraft, setOwnerDraft] = useState(defaultOwnerName);
@@ -207,6 +209,12 @@ export function GoalHorizonsMatrix({
 
   useEffect(() => {
     if (loadedRef.current) return;
+    // Clerk resolves userId asynchronously — a momentarily-undefined userId right
+    // after mount is NOT the same as "signed out". Treating it as signed-out here
+    // would permanently skip loading server goals (loadedRef latches) and skip
+    // skipAutosaveRef, so the next autosave silently overwrites server data with
+    // empty/local state once userId does arrive. Wait for Clerk to finish.
+    if (!authLoaded) return;
 
     if (!userId) {
       const localDraft = readLocalDraft(defaultOwnerName);
@@ -252,7 +260,7 @@ export function GoalHorizonsMatrix({
       setHydrated(true);
       loadedRef.current = true;
     }
-  }, [defaultOwnerName, goalsQ.data, goalsQ.isError, userId]);
+  }, [authLoaded, defaultOwnerName, goalsQ.data, goalsQ.isError, userId]);
 
   useEffect(() => {
     if (!hydrated) return;
