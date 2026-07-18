@@ -289,6 +289,13 @@ export async function patchTasksBulkSchedule(ids: string[], scheduledDate: strin
   });
 }
 
+export async function patchTasksBulkSprint(taskIds: string[], sprintId: string | null) {
+  return fetchJson<{ updated: number }>(apiUrl("/api/tasks/bulk-sprint"), {
+    method: "POST",
+    body: JSON.stringify({ taskIds, sprintId }),
+  });
+}
+
 export async function postAutoSchedule(date: string) {
   return fetchJson<SchedulePreviewResponse & { mode?: string; message?: string; error?: string }>(apiUrl("/api/tasks/auto-schedule"), {
     method: "POST",

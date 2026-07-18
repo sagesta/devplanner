@@ -12,6 +12,7 @@ import {
   fetchBacklog,
   fetchSprints,
   patchTask,
+  patchTasksBulkSprint,
   createSubtask,
   patchSubtask,
   deleteSubtask,
@@ -74,7 +75,17 @@ export default function BacklogPage() {
   const [areaFilter, setAreaFilter] = useState<AreaFilter>("all");
   const [newSubtaskTitles, setNewSubtaskTitles] = useState<Record<string, string>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const todayYmd = localISODate();
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const areasQ = useQuery({
     queryKey: ["areas", userId],
@@ -131,6 +142,21 @@ export default function BacklogPage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["backlog", userId] });
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const bulkAssignSprint = useMutation({
+    mutationFn: ({ taskIds, sprintId }: { taskIds: string[]; sprintId: string }) =>
+      patchTasksBulkSprint(taskIds, sprintId),
+    onSuccess: (data, vars) => {
+      const sprintName = sprintsQ.data?.sprints.find((s) => s.id === vars.sprintId)?.name ?? "sprint";
+      toast.success(`Added ${data.updated} task${data.updated === 1 ? "" : "s"} to ${sprintName}`);
+      setSelected(new Set());
+      void qc.invalidateQueries({ queryKey: ["backlog", userId] });
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
       void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -210,6 +236,45 @@ export default function BacklogPage() {
         ))}
       </div>
 
+      {selected.size > 0 && (
+        <div className="sticky top-3 z-20 flex flex-wrap items-center gap-3 rounded-[14px] border border-[var(--teal-a30)] bg-[var(--teal-a08)] px-4 py-3 backdrop-blur-sm">
+          <span className="text-[13px] font-semibold text-[var(--ink)]">
+            {selected.size} selected
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <select
+              className="cursor-pointer rounded-lg border border-[var(--hairline)] bg-[var(--card)] px-3 py-1.5 text-[13px] font-medium text-[var(--teal)] outline-none disabled:opacity-50"
+              value=""
+              disabled={bulkAssignSprint.isPending}
+              aria-label="Add selected tasks to sprint"
+              onChange={(e) => {
+                const sprintId = e.target.value;
+                if (!sprintId) return;
+                bulkAssignSprint.mutate({ taskIds: Array.from(selected), sprintId });
+              }}
+            >
+              <option value="">
+                {bulkAssignSprint.isPending ? "Adding…" : `Add ${selected.size} to sprint →`}
+              </option>
+              {(sprintsQ.data?.sprints ?? [])
+                .filter((s) => s.status !== "completed")
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setSelected(new Set())}
+              className="rounded-lg border border-[var(--hairline)] px-3 py-1.5 text-[13px] font-medium text-muted hover:bg-[var(--teal-a08)]"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {q.isLoading && (
         <div className="space-y-2">
           <SkeletonListItem />
@@ -221,11 +286,27 @@ export default function BacklogPage() {
       <div className="flex flex-col gap-7">
         {filteredGroups.map(([areaId, tasks]) => {
           const area = areaMap.get(areaId);
+          const groupIds = tasks.map((t) => t.id);
+          const allSelected = groupIds.length > 0 && groupIds.every((id) => selected.has(id));
           return (
             <section key={areaId}>
-              <div className="mb-2.5 flex items-baseline gap-2">
+              <div className="mb-2.5 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 shrink-0 cursor-pointer accent-[var(--teal)]"
+                  checked={allSelected}
+                  onChange={() =>
+                    setSelected((prev) => {
+                      const next = new Set(prev);
+                      if (allSelected) groupIds.forEach((id) => next.delete(id));
+                      else groupIds.forEach((id) => next.add(id));
+                      return next;
+                    })
+                  }
+                  aria-label={`Select all in ${displayAreaName(area)}`}
+                />
                 <span
-                  className="h-[9px] w-[9px] shrink-0 self-center rounded-full"
+                  className="h-[9px] w-[9px] shrink-0 rounded-full"
                   style={{ backgroundColor: areaDotColor(area) }}
                 />
                 <h2 className="font-display text-[19px] font-normal italic text-[var(--ink)]">
@@ -240,6 +321,13 @@ export default function BacklogPage() {
                   return (
                     <li key={t.id} className="border-b border-[var(--hairline-soft)] text-[var(--ink)] last:border-b-0">
                       <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-5 py-[15px]">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 shrink-0 cursor-pointer accent-[var(--teal)]"
+                          checked={selected.has(t.id)}
+                          onChange={() => toggleSelect(t.id)}
+                          aria-label={`Select ${t.title}`}
+                        />
                         <button
                           type="button"
                           className="shrink-0 rounded p-0.5 text-muted transition-colors hover:bg-[var(--teal-a08)] hover:text-[var(--ink)]"

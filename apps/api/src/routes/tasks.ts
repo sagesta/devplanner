@@ -103,6 +103,11 @@ const bulkScheduleBody = z.object({
   scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
+const bulkSprintBody = z.object({
+  taskIds: z.array(z.string().uuid()).min(1),
+  sprintId: z.string().uuid().nullable(),
+});
+
 const PATCH_FIELDS = [
   "title", "description", "projectId", "sprintId", "areaId",
   "priority", "energyLevel", "workDepth", "physicalEnergy",
@@ -387,6 +392,39 @@ export const taskRoutes = new Hono<AppEnv>()
         logger.error({ err, taskId: candidate.id }, "recurrence respawn failed")
       );
     }
+    return c.json({ updated: updated.length });
+  })
+  .post("/bulk-sprint", async (c) => {
+    const parsed = bulkSprintBody.safeParse(await c.req.json());
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.flatten() }, 422);
+    }
+    const userId = c.get("userId");
+    const { taskIds, sprintId } = parsed.data;
+
+    // Assigning to a sprint: verify it's the caller's own sprint (never trust a
+    // client-supplied id to cross into another user's data).
+    if (sprintId) {
+      const sprint = await db.query.sprints.findFirst({
+        where: and(eq(sprints.id, sprintId), eq(sprints.userId, userId)),
+      });
+      if (!sprint) return c.json({ error: "sprint not found" }, 404);
+    }
+
+    // The board only renders todo/in_progress/done. Promote any other status
+    // (backlog/blocked/cancelled) to todo so an assigned task actually appears
+    // on the sprint board — mirrors the single-assign path in the backlog UI.
+    // sprintId is not a calendar field, so no calendar sync enqueue here.
+    const updated = await db
+      .update(tasks)
+      .set({
+        sprintId,
+        status: sql`CASE WHEN ${tasks.status} IN ('todo','in_progress','done') THEN ${tasks.status} ELSE 'todo' END`,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(tasks.userId, userId), inArray(tasks.id, taskIds), taskActive))
+      .returning({ id: tasks.id });
+
     return c.json({ updated: updated.length });
   })
   .post("/restore/:id", async (c) => {
