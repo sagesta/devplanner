@@ -50,7 +50,7 @@ export default function TablePage() {
   });
 
   const roots = useMemo(() => {
-    const items = q.data ?? [];
+    const items = [...(q.data ?? [])];
     return items.sort((a, b) => {
       let cmp = 0;
       const dateCmp = (x: string | null | undefined, y: string | null | undefined) => {
