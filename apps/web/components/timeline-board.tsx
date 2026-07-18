@@ -15,7 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStatus } from "@/hooks/use-auth-status";
 import { useAppUserId } from "@/hooks/use-app-user-id";
 import { ChevronLeft, ChevronRight, CalendarOff, CheckCircle2, Circle } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PRIORITY_BAR_CLASS } from "@/components/task-card";
 import {
@@ -440,7 +440,8 @@ export function TimelineBoard() {
   const userId = useAppUserId();
   const qc = useQueryClient();
   const [anchorDate, setAnchorDate] = useState(() => startOfWeekMonday(new Date()));
-  const [sprintId, setSprintId] = useState<string>("");
+  // null = default not resolved yet; "" = user explicitly chose "All tasks".
+  const [sprintId, setSprintId] = useState<string | null>(null);
   const [zoom, setZoom] = useState<ZoomLevel>("3-week");
   const NUM_DAYS = zoomToDays(zoom);
   const todayYMD = toYMD(new Date());
@@ -466,10 +467,25 @@ export function TimelineBoard() {
     enabled: Boolean(userId),
   });
 
+  // Default to the active sprint (matches the Board) so backlog tasks stay in
+  // the Backlog unless "All tasks" is chosen deliberately.
+  useEffect(() => {
+    if (!sprintsQ.data) return;
+    if (sprintId === null) {
+      const active = sprintsQ.data.sprints.find((s: SprintRow) => s.status === "active");
+      setSprintId(active?.id ?? "");
+      return;
+    }
+    // Selected sprint no longer exists (deleted) — fall back to All tasks.
+    if (sprintId !== "" && !sprintsQ.data.sprints.some((s: SprintRow) => s.id === sprintId)) {
+      setSprintId("");
+    }
+  }, [sprintId, sprintsQ.data]);
+
   const tasksQ = useQuery({
     queryKey: ["tasks", userId, sprintId || "all"],
     queryFn: () => fetchTasks(sprintId || undefined),
-    enabled: Boolean(userId),
+    enabled: Boolean(userId) && sprintId !== null,
   });
 
   const areaMap = useMemo(() => {
@@ -651,7 +667,7 @@ export function TimelineBoard() {
             <select
               id="timeline-sprint"
               className="rounded-lg border border-white/10 bg-background px-2 py-1.5 text-xs text-foreground"
-              value={sprintId}
+              value={sprintId ?? ""}
               onChange={(e) => setSprintId(e.target.value)}
             >
               <option value="">All tasks</option>

@@ -3,10 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStatus } from "@/hooks/use-auth-status";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { deleteTask, fetchTasks, patchTask, postBulkStatus, restoreTask } from "@/lib/api";
+import { deleteTask, fetchSprints, fetchTasks, patchTask, postBulkStatus, restoreTask } from "@/lib/api";
 import { SkeletonRow } from "@/lib/skeleton";
 import { normalizeYmd } from "@/lib/timeline-utils";
 import { cn, displayPhysicalEnergy, displayWorkDepth } from "@/lib/utils";
@@ -49,8 +49,39 @@ export default function TablePage() {
     enabled: Boolean(userId),
   });
 
+  const sprintsQ = useQuery({
+    queryKey: ["sprints", userId],
+    queryFn: () => fetchSprints(),
+    enabled: Boolean(userId),
+  });
+
+  // "all" | "none" (backlog only) | sprint id. null = default not resolved yet;
+  // defaults to the active sprint (matches the Board) so backlog tasks stay in
+  // the Backlog unless "All tasks" is chosen deliberately.
+  const [sprintFilter, setSprintFilter] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sprintsQ.data) return;
+    if (sprintFilter === null) {
+      const active = sprintsQ.data.sprints.find((s) => s.status === "active");
+      setSprintFilter(active?.id ?? "all");
+      return;
+    }
+    // Selected sprint no longer exists (deleted) — fall back to All.
+    if (
+      sprintFilter !== "all" &&
+      sprintFilter !== "none" &&
+      !sprintsQ.data.sprints.some((s) => s.id === sprintFilter)
+    ) {
+      setSprintFilter("all");
+    }
+  }, [sprintFilter, sprintsQ.data]);
+
   const roots = useMemo(() => {
-    const items = [...(q.data ?? [])];
+    const items = [...(q.data ?? [])].filter((t) => {
+      if (!sprintFilter || sprintFilter === "all") return true;
+      if (sprintFilter === "none") return !t.sprintId;
+      return t.sprintId === sprintFilter;
+    });
     return items.sort((a, b) => {
       let cmp = 0;
       const dateCmp = (x: string | null | undefined, y: string | null | undefined) => {
@@ -86,7 +117,7 @@ export default function TablePage() {
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [q.data, sortKey, sortDir]);
+  }, [q.data, sortKey, sortDir, sprintFilter]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -146,7 +177,32 @@ export default function TablePage() {
   return (
     <div>
       <h1 className="font-display text-2xl text-foreground">Task table</h1>
-      <div className="mt-4 flex items-center min-h-[36px]">
+      <div className="mt-4 flex flex-wrap items-center gap-3 min-h-[36px]">
+        <div className="flex items-center gap-2">
+          <label htmlFor="table-sprint" className="text-[11px] uppercase tracking-wide text-muted">
+            Sprint
+          </label>
+          <select
+            id="table-sprint"
+            className="rounded-lg border border-white/10 bg-background px-2 py-1.5 text-xs text-foreground"
+            value={sprintFilter ?? "all"}
+            onChange={(e) => {
+              setSprintFilter(e.target.value);
+              setSel({});
+              setConfirmBulkDelete(false);
+            }}
+          >
+            <option value="all">All tasks</option>
+            <option value="none">Backlog (no sprint)</option>
+            {(sprintsQ.data?.sprints ?? [])
+              .filter((s) => s.status !== "completed")
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+          </select>
+        </div>
         {selCount > 0 && (
           <div className="flex flex-wrap items-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-3 py-1.5 animate-fadeIn">
             <span className="text-xs font-semibold text-primary-text">{selCount} selected</span>
