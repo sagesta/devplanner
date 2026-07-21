@@ -439,7 +439,7 @@ export default function BacklogPage() {
                                   });
                                 }}
                               >
-                                <option value="">No sprint (backlog)</option>
+                                <option value="">No sprint (Inbox)</option>
                                 {(sprintsQ.data?.sprints ?? []).map((s) => (
                                   <option key={s.id} value={s.id}>
                                     {s.name}

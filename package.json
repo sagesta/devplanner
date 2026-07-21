@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "concurrently -i -n web,api -c green,blue \"npm run dev -w @devplanner/web\" \"npm run dev -w @devplanner/api\"",
     "build": "npm run build -w @devplanner/api && npm run build -w @devplanner/web",
+    "test": "npm run test -w @devplanner/api",
     "db:generate": "npm run db:generate -w @devplanner/api",
     "db:migrate": "npm run db:migrate -w @devplanner/api",
     "db:studio": "npm run db:studio -w @devplanner/api",

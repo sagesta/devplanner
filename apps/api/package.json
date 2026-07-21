@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
+    "test": "tsx --test src/services/reviews.test.ts",
     "start": "node dist/index.js",
     "worker:start": "node dist/worker/index.js",
     "seed:start": "node dist/seed.js",

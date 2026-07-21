@@ -1,10 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { CalendarCheck, CheckCircle2, Circle, ListTodo, Rocket, Sparkles, X } from "lucide-react";
+import { CalendarCheck, CalendarRange, CheckCircle2, Circle, ListTodo, Rocket, Sparkles, Target, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { fetchGoogleCalendarStatus } from "@/lib/api";
+import { fetchGoalHorizons, fetchGoogleCalendarStatus, fetchSprints } from "@/lib/api";
 import { useAppUserId } from "@/hooks/use-app-user-id";
 import { cn } from "@/lib/utils";
 
@@ -47,9 +47,8 @@ function StepRow({
 }
 
 /**
- * First-run checklist shown on Today until the user has captured tasks and
- * planned a day. Auto-hides once the two core steps are done; dismissible
- * any time.
+ * First-run checklist shown on Today until the user has a complete planning
+ * loop: direction, captured work, a weekly commitment, and a daily plan.
  */
 export function GettingStartedCard({
   hasAnyTask,
@@ -65,7 +64,21 @@ export function GettingStartedCard({
     setDismissed(localStorage.getItem(LS_DISMISSED) === "1");
   }, []);
 
-  const coreDone = hasAnyTask && hasTodayPlan;
+  const goalsQ = useQuery({
+    queryKey: ["goal-horizons", userId],
+    queryFn: fetchGoalHorizons,
+    enabled: Boolean(userId) && !dismissed,
+    staleTime: 60_000,
+  });
+  const sprintsQ = useQuery({
+    queryKey: ["sprints", userId],
+    queryFn: fetchSprints,
+    enabled: Boolean(userId) && !dismissed,
+    staleTime: 60_000,
+  });
+  const hasGoal = Object.values(goalsQ.data?.goals ?? {}).some((goal) => goal.trim());
+  const hasSprint = (sprintsQ.data?.sprints ?? []).some((sprint) => sprint.status !== "completed");
+  const coreDone = hasGoal && hasAnyTask && hasSprint && hasTodayPlan;
 
   const googleQ = useQuery({
     queryKey: ["google-status", userId],
@@ -87,7 +100,7 @@ export function GettingStartedCard({
       <div className="flex items-center justify-between gap-3 border-b border-[var(--hairline-soft)] px-5 py-3.5">
         <div className="flex items-center gap-2">
           <Rocket size={16} className="text-[var(--teal)]" />
-          <h2 className="font-display text-[19px] italic text-[var(--ink)]">Get set up in 2 minutes</h2>
+          <h2 className="font-display text-[19px] italic text-[var(--ink)]">Build your first planning loop</h2>
         </div>
         <button
           type="button"
@@ -100,8 +113,22 @@ export function GettingStartedCard({
       </div>
       <ul className="divide-y divide-[var(--hairline-soft)]">
         <StepRow
+          done={hasGoal}
+          title="1. Choose a direction"
+          hint="Write one result you want, even if you do not yet know all the steps."
+          action={
+            <Link
+              href="/goals"
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline)] px-3.5 py-1.5 text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--teal-a08)]"
+            >
+              <Target size={12} />
+              Goals
+            </Link>
+          }
+        />
+        <StepRow
           done={hasAnyTask}
-          title="1. Empty your head"
+          title="2. Empty your head"
           hint="Type or speak everything on your mind — one task per line. DevPlanner sorts it."
           action={
             <button
@@ -114,8 +141,22 @@ export function GettingStartedCard({
           }
         />
         <StepRow
+          done={hasSprint}
+          title="3. Choose this week's focus"
+          hint="Create a sprint for the few outcomes you are willing to commit to this week."
+          action={
+            <Link
+              href="/plan?view=sprints"
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline)] px-3.5 py-1.5 text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--teal-a08)]"
+            >
+              <CalendarRange size={12} />
+              Plan week
+            </Link>
+          }
+        />
+        <StepRow
           done={hasTodayPlan}
-          title="2. Pick today's tasks"
+          title="4. Pick today's tasks"
           hint="Choose 3–7 tasks for today. One big, a few medium, a few small."
           action={
             <Link
@@ -127,25 +168,17 @@ export function GettingStartedCard({
             </Link>
           }
         />
-        <StepRow
-          done={calendarConnected}
-          title="3. Connect your calendar (optional)"
-          hint="Two-way sync with Google Calendar or CalDAV."
-          action={
-            <Link
-              href="/settings?tab=calendar"
-              className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline)] px-3.5 py-1.5 text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--teal-a08)]"
-            >
-              <CalendarCheck size={12} />
-              Settings
-            </Link>
-          }
-        />
       </ul>
-      <p className="flex items-center gap-1.5 border-t border-[var(--hairline-soft)] px-5 py-2.5 text-xs text-muted">
-        <Sparkles size={12} className="text-[var(--teal)]" />
-        Tip: the AI button (bottom right) can plan your week and break tasks into steps.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--hairline-soft)] px-5 py-2.5 text-xs text-muted">
+        <p className="flex items-center gap-1.5">
+          <Sparkles size={12} className="text-[var(--teal)]" />
+          The AI assistant can propose steps for a goal before creating tasks.
+        </p>
+        <Link href="/settings?tab=calendar" className="inline-flex items-center gap-1 text-[var(--teal)] hover:underline">
+          <CalendarCheck size={12} />
+          {calendarConnected ? "Calendar connected" : "Connect calendar (optional)"}
+        </Link>
+      </div>
     </section>
   );
 }

@@ -36,7 +36,7 @@ const BUCKET_CYCLE: DumpBucket[] = ["today", "this_week", "backlog", "noise"];
 const BUCKET_LABEL: Record<DumpBucket, string> = {
   today: "Do today",
   this_week: "This week",
-  backlog: "Backlog",
+  backlog: "Inbox",
   noise: "Noise",
 };
 

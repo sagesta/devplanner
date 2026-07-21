@@ -318,6 +318,38 @@ export const goalHorizons = pgTable("goal_horizons", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export type WeeklyReviewIntention = {
+  text: string;
+  goalKey: string | null;
+  goalLabel: string | null;
+};
+
+/** Structured weekly reviews are the cross-device source of truth. */
+export const weeklyReviews = pgTable(
+  "weekly_reviews",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    weekStart: date("week_start").notNull(),
+    weekEnd: date("week_end").notNull(),
+    wins: text("wins").notNull().default(""),
+    carryover: text("carryover").notNull().default(""),
+    intentions: jsonb("intentions").$type<WeeklyReviewIntention[]>().notNull().default(sql`'[]'::jsonb`),
+    sprintNotes: text("sprint_notes").notNull().default(""),
+    sprintId: uuid("sprint_id").references(() => sprints.id, { onDelete: "set null" }),
+    status: varchar("status", { length: 16 }).notNull().default("draft"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("weekly_reviews_user_week_uidx").on(t.userId, t.weekStart),
+    index("weekly_reviews_user_week_idx").on(t.userId, t.weekStart),
+  ]
+);
+
 /**
  * Accomplishments log — a lightweight record of "what I did / the impact / the
  * proof". Optional link back to the task it came from. Feeds CVs, performance

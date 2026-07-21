@@ -172,7 +172,7 @@ export const sprintRoutes = new Hono<AppEnv>()
 
     if ((assignedCount?.count ?? 0) > 0) {
       return c.json(
-        { error: `Cannot delete sprint — ${assignedCount.count} task(s) are still assigned. Move them to backlog first.` },
+        { error: `Cannot delete sprint — ${assignedCount.count} task(s) are still assigned. Move them to Inbox first.` },
         409
       );
     }

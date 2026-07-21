@@ -740,12 +740,61 @@ export async function patchArea(
 }
 
 // ─── Reviews ──────────────────────────────────────────────────────
-export async function saveReview(body: {
-  step1?: string;
-  step2?: string;
-  step3?: string;
-}) {
-  return fetchJson<{ success: boolean; file: string }>(apiUrl("/api/reviews"), {
+export type WeeklyReviewIntention = {
+  text: string;
+  goalKey: GoalCellKey | null;
+  goalLabel: string | null;
+};
+
+export type WeeklyReviewRow = {
+  id: string;
+  userId: string;
+  weekStart: string;
+  weekEnd: string;
+  wins: string;
+  carryover: string;
+  intentions: WeeklyReviewIntention[];
+  sprintNotes: string;
+  sprintId: string | null;
+  status: "draft" | "completed";
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WeeklyReviewInput = Pick<
+  WeeklyReviewRow,
+  "weekStart" | "weekEnd" | "wins" | "carryover" | "intentions" | "sprintNotes"
+>;
+
+export async function fetchCurrentReview(weekStart: string) {
+  return fetchJson<{ review: WeeklyReviewRow | null }>(
+    apiUrl(`/api/reviews/current?weekStart=${encodeURIComponent(weekStart)}`)
+  );
+}
+
+export async function fetchReviews(filters: { query?: string; from?: string; to?: string } = {}) {
+  const params = new URLSearchParams();
+  if (filters.query?.trim()) params.set("q", filters.query.trim());
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
+  const suffix = params.size ? `?${params.toString()}` : "";
+  return fetchJson<{ reviews: WeeklyReviewRow[] }>(apiUrl(`/api/reviews${suffix}`));
+}
+
+export async function saveReviewDraft(body: WeeklyReviewInput) {
+  return fetchJson<{ review: WeeklyReviewRow }>(apiUrl("/api/reviews"), {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function completeWeeklyReview(body: WeeklyReviewInput) {
+  return fetchJson<{
+    review: WeeklyReviewRow;
+    sprintId: string;
+    alreadyCompleted: boolean;
+  }>(apiUrl("/api/reviews/complete"), {
     method: "POST",
     body: JSON.stringify(body),
   });

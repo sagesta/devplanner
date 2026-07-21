@@ -481,7 +481,7 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack:
         {/* Backlog Pane */}
         <div className="flex-1 flex flex-col rounded-2xl border border-[var(--hairline)] bg-[var(--card)] shadow-[var(--card-shadow)] min-h-[300px]">
           <div className="p-3 border-b border-[var(--hairline-soft)] flex items-baseline justify-between">
-            <h2 className="font-display text-[19px] italic text-[var(--ink)]">Backlog</h2>
+            <h2 className="font-display text-[19px] italic text-[var(--ink)]">Inbox</h2>
             <span className="text-xs text-[var(--muted-soft)]">{backlogTasks.length}</span>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -498,7 +498,7 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack:
               </div>
             ))}
             {backlogTasks.length === 0 && (
-              <p className="text-center text-xs text-muted py-8">Backlog is empty</p>
+              <p className="text-center text-xs text-muted py-8">Inbox is empty</p>
             )}
           </div>
         </div>

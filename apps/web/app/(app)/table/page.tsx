@@ -193,7 +193,7 @@ export default function TablePage() {
             }}
           >
             <option value="all">All tasks</option>
-            <option value="none">Backlog (no sprint)</option>
+            <option value="none">Inbox (no sprint)</option>
             {(sprintsQ.data?.sprints ?? [])
               .filter((s) => s.status !== "completed")
               .map((s) => (

@@ -42,7 +42,7 @@ const VIEW_NAMES: Record<string, string> = {
   now: "Now",
   timeline: "Timeline",
   table: "Table",
-  backlog: "Backlog",
+  backlog: "Inbox",
   sprints: "Sprints",
   review: "Review",
   insights: "Review",

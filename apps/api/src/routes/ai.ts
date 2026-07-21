@@ -31,7 +31,7 @@ const chatBody = z.object({
   currentPhysicalEnergy: z.enum(["low", "medium", "high"]).optional(),
   /** Which app view the user is currently on */
   current_view: z
-    .enum(["Backlog", "Sprints", "Board", "Now", "Timeline", "Table", "Review", "Plan", "Goals"])
+    .enum(["Inbox", "Backlog", "Sprints", "Board", "Now", "Timeline", "Table", "Review", "Plan", "Goals"])
     .optional(),
   /** Task IDs the user has selected or is focused on */
   selected_task_ids: z.array(z.string()).optional(),
@@ -150,7 +150,7 @@ async function runPlannerToolLoop(
 
   const viewHint = opts?.current_view
     ? `\n\nCURRENT VIEW: The user is on the "${opts.current_view}" view. Tailor your response accordingly:\n` +
-      `- Backlog → help clarify, group, assign tasks to sprints, or defer them.\n` +
+      `- Inbox → help clarify, group, assign tasks to sprints, or defer them.\n` +
       `- Sprints/Board → help choose monthly/weekly priorities, assign to sprint.\n` +
       `- Table → bulk operations: normalize, add fields, generate subtasks for many tasks.\n` +
       `- Now → trim to 3–5 items; suggest moving excess out of Now.\n` +
