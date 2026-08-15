@@ -1,0 +1,25 @@
+name: devplanner/pino-http
+description: Parse DevPlanner Pino request logs into CrowdSec HTTP metadata
+filter: "evt.Line.Labels.type == 'devplanner' && JsonExtract(evt.Line.Raw, 'msg') == 'request'"
+onsuccess: next_stage
+statics:
+  - target: evt.StrTime
+    expression: "JsonExtract(evt.Line.Raw, 'time')"
+  - parsed: remote_addr
+    expression: "JsonExtract(evt.Line.Raw, 'sourceIp')"
+  - parsed: verb
+    expression: "JsonExtract(evt.Line.Raw, 'method')"
+  - parsed: request
+    expression: "JsonExtract(evt.Line.Raw, 'path')"
+  - parsed: status
+    expression: "ToString(JsonExtract(evt.Line.Raw, 'statusCode'))"
+  - meta: log_type
+    value: http_access-log
+  - meta: service
+    value: http
+  - meta: source_ip
+    expression: "evt.Parsed.remote_addr"
+  - meta: http_status
+    expression: "evt.Parsed.status"
+  - meta: http_path
+    expression: "evt.Parsed.request"

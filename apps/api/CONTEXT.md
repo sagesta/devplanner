@@ -15,7 +15,10 @@ The API ships with three observability pillars: **Prometheus metrics**, **struct
 | Log level | `LOG_LEVEL` env (default: `info`) |
 | Fixed fields | `service: "devplanner-api"`, ISO timestamp |
 
-Every HTTP request emits: `{ method, path, statusCode, durationMs, service, time }`.
+Every HTTP request emits: `{ method, path, statusCode, durationMs, sourceIp, service, time }`.
+
+`sourceIp` uses the network connection address by default. Set `TRUST_PROXY=true`
+only behind a trusted reverse proxy to use the first `X-Forwarded-For` value.
 
 Errors emitted via `logger.error({ err, stack, path }, message)`.
 

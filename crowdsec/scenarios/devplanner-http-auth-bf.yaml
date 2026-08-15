@@ -1,0 +1,12 @@
+type: leaky
+name: devplanner/http-auth-bf
+description: Detect repeated unauthorized requests to the DevPlanner API
+filter: "evt.Meta.log_type == 'http_access-log' && evt.Meta.http_status in ['401', '403']"
+groupby: evt.Meta.source_ip
+capacity: 5
+leakspeed: 10s
+blackhole: 5m
+labels:
+  service: http
+  type: bruteforce
+  remediation: true
