@@ -42,6 +42,15 @@ cd devplanner
 - `OPENAI_API_KEY`: For AI functionality (optional)
 
 ### 2. Start the Stack
+
+Create the private Docker network shared with InfraGuard once on the VPS:
+
+```bash
+docker network create infraguard-observability
+```
+
+Then start DevPlanner:
+
 ```bash
 docker compose up -d --build
 ```
@@ -76,10 +85,22 @@ Local endpoints:
 | CrowdSec LAPI | `http://127.0.0.1:8081` | Security decisions |
 | Alloy UI | `http://127.0.0.1:12345` | Local collector diagnostics |
 
-The observability APIs bind to loopback by default. If InfraGuard runs on
-another machine, set `OBSERVABILITY_BIND_ADDRESS` to the server's private VPN
-or Tailscale address and restrict that address with host firewall or VPN ACLs.
-Do not bind Loki, Prometheus, or CrowdSec directly to a public interface.
+The observability APIs bind to loopback by default. On the same VPS, InfraGuard
+joins the `infraguard-observability` Docker network and uses these private
+aliases: `devplanner-api`, `devplanner-web`, `devplanner-loki`,
+`devplanner-prometheus`, and `devplanner-crowdsec`. Do not bind Loki,
+Prometheus, or CrowdSec directly to a public interface.
+
+To let InfraGuard create CrowdSec decisions, set the same
+`CROWDSEC_MACHINE_ID` and `CROWDSEC_MACHINE_PASSWORD` in both projects and
+register the machine once from the DevPlanner directory:
+
+```bash
+docker compose exec crowdsec sh -lc 'cscli machines add "$CROWDSEC_MACHINE_ID" --password "$CROWDSEC_MACHINE_PASSWORD" --force'
+```
+
+CrowdSec decisions require a compatible bouncer or firewall integration before
+they are enforced on network traffic.
 
 Prometheus scrapes `api:3001/metrics` and the internal Node Exporter inside the
 Compose network. InfraGuard can query `{job="devplanner"}` in Loki, the standard
