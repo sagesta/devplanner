@@ -1,5 +1,6 @@
 import "./lib/loadRootEnv.js";
 import { serve } from "@hono/node-server";
+import { getConnInfo } from "@hono/node-server/conninfo";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { pool } from "./db/client.js";
@@ -41,11 +42,16 @@ app.use("*", async (c, next) => {
   const start = Date.now();
   await next();
   const durationMs = Date.now() - start;
+  const connectionIp = getConnInfo(c).remote.address;
+  const forwardedIp = c.req.header("x-forwarded-for")?.split(",", 1)[0]?.trim();
+  const trustProxy = ["1", "true", "yes"].includes((process.env.TRUST_PROXY ?? "").toLowerCase());
+  const sourceIp = trustProxy && forwardedIp ? forwardedIp : connectionIp;
   logger.info({
     method: c.req.method,
     path: c.req.path,
     statusCode: c.res.status,
     durationMs,
+    sourceIp,
   }, "request");
 });
 

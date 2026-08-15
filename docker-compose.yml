@@ -51,8 +51,17 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3001
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       DATABASE_URL: postgresql://devplanner:${DB_PASSWORD:-devplanner}@devplanner-db:5432/devplanner
       REDIS_URL: redis://devplanner-redis:6379
+    labels:
+      crowdsec.enable: "true"
+      crowdsec.labels.type: devplanner
     depends_on:
       devplanner-db:
         condition: service_healthy
@@ -71,6 +80,11 @@ services:
       retries: 5
       start_period: 120s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
 
   # Auth is Clerk — API requests carry a Bearer token, so no cross-subdomain
   # cookie config is needed. NEXT_PUBLIC_* values are baked at image build.
@@ -91,6 +105,7 @@ services:
       - .env
     environment:
       NODE_ENV: production
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
       DATABASE_URL: postgresql://devplanner:${DB_PASSWORD:-devplanner}@devplanner-db:5432/devplanner
     depends_on:
       devplanner-db:
@@ -98,6 +113,11 @@ services:
       api:
         condition: service_healthy
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
 
   worker:
     build:
@@ -118,6 +138,11 @@ services:
       api:
         condition: service_healthy
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
 
   # Optional: one-off schema push from the host repo (no image rebuild). Usually unnecessary — the API container runs push on start.
   # docker compose --profile tools run --rm migrate
@@ -135,41 +160,73 @@ services:
         condition: service_healthy
 
   loki:
-    image: grafana/loki:2.9.0
+    image: grafana/loki:3.7.4
     ports:
-      - "3100:3100"
+      - "${OBSERVABILITY_BIND_ADDRESS:-127.0.0.1}:3100:3100"
     volumes:
       - loki-data:/loki
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.13.2
     ports:
-      - "9090:9090"
+      - "${OBSERVABILITY_BIND_ADDRESS:-127.0.0.1}:9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
+    depends_on:
+      api:
+        condition: service_healthy
+      node-exporter:
+        condition: service_started
     restart: unless-stopped
 
-  promtail:
-    image: grafana/promtail:2.9.0
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|run/user)($$|/)
     volumes:
-      - /var/log:/var/log
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./promtail-config.yml:/etc/promtail/promtail-config.yml
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    restart: unless-stopped
+
+  alloy:
+    image: grafana/alloy:v1.18.0
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    ports:
+      - "127.0.0.1:${ALLOY_PORT:-12345}:12345"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./alloy-config.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy/data
+    depends_on:
+      - loki
     restart: unless-stopped
 
   crowdsec:
-    image: crowdsecurity/crowdsec:latest
+    image: crowdsecurity/crowdsec:v1.7.8
     ports:
-      - "8080:8080"
+      - "${OBSERVABILITY_BIND_ADDRESS:-127.0.0.1}:${CROWDSEC_PORT:-8081}:8080"
     environment:
       COLLECTIONS: "crowdsecurity/linux crowdsecurity/nginx crowdsecurity/sshd"
     volumes:
       - crowdsec-data:/etc/crowdsec
       - crowdsec-db:/var/lib/crowdsec/data
-      - /var/log/auth.log:/var/log/auth.log:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - ./crowdsec/parsers/devplanner-pino.yaml:/etc/crowdsec/parsers/s01-parse/devplanner-pino.yaml:ro
+      - ./crowdsec/scenarios/devplanner-http-auth-bf.yaml:/etc/crowdsec/scenarios/devplanner-http-auth-bf.yaml:ro
+    depends_on:
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
@@ -178,5 +235,6 @@ volumes:
   radicale_data:
   loki-data:
   prometheus-data:
+  alloy-data:
   crowdsec-data:
   crowdsec-db:

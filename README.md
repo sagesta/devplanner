@@ -37,7 +37,7 @@ cd devplanner
 ```
 **Required `.env` values:**
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: From Google Cloud Console
-- `NEXTAUTH_SECRET`: Run `openssl rand -base64 32`
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY`: From Clerk
 - `ALLOWED_EMAILS`: Your comma-separated login emails
 - `OPENAI_API_KEY`: For AI functionality (optional)
 
@@ -51,6 +51,39 @@ docker compose up -d --build
 ```bash
 docker compose exec api npm run seed:start -w @devplanner/api
 ```
+
+### 4. Verify Observability
+
+The Docker stack includes Prometheus, Node Exporter, Loki, Grafana Alloy, and CrowdSec. Alloy
+collects the API, web, and worker container logs; CrowdSec watches the API's
+structured request logs for repeated 401/403 responses.
+
+```bash
+curl http://127.0.0.1:3001/health
+curl http://127.0.0.1:3001/metrics
+curl http://127.0.0.1:3100/ready
+curl http://127.0.0.1:9090/-/ready
+docker compose exec crowdsec cscli metrics
+```
+
+Local endpoints:
+
+| Service | Address | Purpose |
+|---|---|---|
+| DevPlanner API | `http://127.0.0.1:3001` | Health, application traffic, and `/metrics` |
+| Loki | `http://127.0.0.1:3100` | Log query API |
+| Prometheus | `http://127.0.0.1:9090` | Metrics query API |
+| CrowdSec LAPI | `http://127.0.0.1:8081` | Security decisions |
+| Alloy UI | `http://127.0.0.1:12345` | Local collector diagnostics |
+
+The observability APIs bind to loopback by default. If InfraGuard runs on
+another machine, set `OBSERVABILITY_BIND_ADDRESS` to the server's private VPN
+or Tailscale address and restrict that address with host firewall or VPN ACLs.
+Do not bind Loki, Prometheus, or CrowdSec directly to a public interface.
+
+Prometheus scrapes `api:3001/metrics` and the internal Node Exporter inside the
+Compose network. InfraGuard can query `{job="devplanner"}` in Loki, the standard
+`http_requests_total` series, and host CPU, memory, and disk metrics.
 DevPlanner is now running at **[http://localhost:3000](http://localhost:3000)**!
 
 ---
