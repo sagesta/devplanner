@@ -1,0 +1,62 @@
+
+> @devplanner/web@0.1.0 test:coverage
+> jest --config jest.coverage.config.js --runInBand
+
+PASS components/weekly-review-panel.test.tsx (13.431 s)
+PASS components/kanban-board.test.tsx (8.808 s)
+PASS app/(app)/now/page.test.tsx (7.125 s)
+PASS app/(app)/settings/page.test.tsx (7.18 s)
+PASS components/timeline-board.test.tsx
+PASS components/brain-dump-modal.test.tsx (5.511 s)
+PASS components/goal-horizons-matrix.test.tsx
+PASS app/(app)/backlog/page.test.tsx
+PASS app/(app)/sprints/page.test.tsx
+PASS components/TaskDetailPanel.test.tsx (5.17 s)
+PASS components/ai-chat-dock.test.tsx
+PASS app/(app)/insights/page.test.tsx
+PASS components/priority-anchors-card.test.tsx
+PASS app/(app)/table/page.test.tsx
+PASS components/accomplishments-panel.test.tsx
+PASS components/quick-add-task.test.tsx
+PASS components/command-menu.test.tsx
+PASS components/TagSelector.test.tsx
+PASS components/planning-widgets.test.tsx
+PASS hooks/use-tags.test.tsx
+PASS components/review-history-panel.test.tsx
+PASS components/TaskTableRow.test.tsx
+PASS components/MarkdownMessage.test.tsx
+PASS components/task-card.test.tsx
+PASS components/app-shell.test.tsx
+PASS hooks/use-time-logs.test.tsx
+PASS hooks/use-active-timer.test.tsx
+PASS components/kanban/InlineAddTask.test.tsx
+PASS hooks/use-calendar-date.test.ts
+PASS components/getting-started-card.test.tsx
+PASS components/notifications-tray.test.tsx
+PASS hooks/use-sse.test.tsx
+PASS app/(app)/plan/page.test.tsx
+PASS hooks/auth-hooks.test.tsx
+PASS app/api/calendar/google/routes.test.ts
+PASS lib/api.test.ts
+PASS app/api/goals/route.test.ts
+PASS lib/ensureUser.test.ts
+PASS lib/utils.test.ts
+PASS lib/daily-api.test.ts
+PASS lib/timeline-utils.test.ts
+PASS lib/draft-storage.test.ts
+PASS lib/env.test.ts
+PASS lib/google-oauth-bridge.test.ts
+PASS lib/auth-token.test.ts
+
+=============================== Coverage summary ===============================
+Statements   : 86.91% ( 4422/5088 )
+Branches     : 80.59% ( 2264/2809 )
+Functions    : 85.34% ( 1287/1508 )
+Lines        : 88.86% ( 4127/4644 )
+================================================================================
+
+Test Suites: 45 passed, 45 total
+Tests:       358 passed, 358 total
+Snapshots:   0 total
+Time:        106.801 s
+Ran all test suites.

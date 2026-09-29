@@ -129,8 +129,8 @@ export default function SprintsPage() {
           <h2 className="text-sm font-semibold text-[var(--ink)] mb-3">Create sprint</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-[11px] uppercase tracking-[0.08em] text-muted">Name</label>
-              <input
+              <label htmlFor="sprint-name" className="text-[11px] uppercase tracking-[0.08em] text-muted">Name</label>
+              <input id="sprint-name"
                 className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-background px-3 py-2 text-sm focus:border-[var(--teal)]"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -138,8 +138,8 @@ export default function SprintsPage() {
               />
             </div>
             <div>
-              <label className="text-[11px] uppercase tracking-[0.08em] text-muted">Goal</label>
-              <input
+              <label htmlFor="sprint-goal" className="text-[11px] uppercase tracking-[0.08em] text-muted">Goal</label>
+              <input id="sprint-goal"
                 className="mt-1 w-full rounded-lg border border-[var(--hairline)] bg-background px-3 py-2 text-sm focus:border-[var(--teal)]"
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
@@ -147,8 +147,8 @@ export default function SprintsPage() {
               />
             </div>
             <div>
-              <label className="text-[11px] uppercase tracking-[0.08em] text-muted">Start date</label>
-              <input
+              <label htmlFor="sprint-start" className="text-[11px] uppercase tracking-[0.08em] text-muted">Start date</label>
+              <input id="sprint-start"
                 ref={startDateRef}
                 type="date"
                 className={cn(
@@ -166,8 +166,8 @@ export default function SprintsPage() {
               )}
             </div>
             <div>
-              <label className="text-[11px] uppercase tracking-[0.08em] text-muted">End date</label>
-              <input
+              <label htmlFor="sprint-end" className="text-[11px] uppercase tracking-[0.08em] text-muted">End date</label>
+              <input id="sprint-end"
                 ref={endDateRef}
                 type="date"
                 min={startDate || undefined}
@@ -228,6 +228,8 @@ export default function SprintsPage() {
         </div>
       )}
 
+      {q.isError && <div role="alert" className="mt-4 rounded-xl border border-danger/40 p-4"><p>Could not load your sprints. Your saved work has not changed.</p><button type="button" className="mt-2 min-h-11 underline" onClick={() => void q.refetch()}>Retry loading sprints</button></div>}
+
       {q.isLoading && (
         <div className="mt-4 space-y-3">
           <Skeleton className="h-20 w-full rounded-xl" />
@@ -255,6 +257,7 @@ export default function SprintsPage() {
                   {editingId === s.id ? (
                     <div className="flex items-center gap-1.5 flex-1">
                       <input
+                        aria-label="Sprint name"
                         autoFocus
                         className="flex-1 min-w-0 rounded-md border border-[var(--teal-a30)] bg-background px-2 py-0.5 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none"
                         value={editName}
@@ -468,7 +471,7 @@ function SprintPlanning({ sprint, onBack, userId }: { sprint: SprintRow; onBack:
   return (
     <div className="flex flex-col h-[calc(100vh-120px)] animate-slideIn">
       <div className="flex items-center gap-3 mb-4">
-        <button onClick={onBack} className="rounded-full p-1.5 hover:bg-[var(--teal-a08)] text-muted hover:text-[var(--teal)] transition-colors">
+        <button aria-label="Back to sprints" onClick={onBack} className="rounded-full p-1.5 hover:bg-[var(--teal-a08)] text-muted hover:text-[var(--teal)] transition-colors">
           <ArrowLeft size={16} />
         </button>
         <div>

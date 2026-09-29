@@ -1,0 +1,67 @@
+
+> devplanner@0.1.0 test:integration
+> node scripts/test-integration.mjs
+
+✔ calendar parser accepts real UTC calendar days across years (55.3999ms)
+✔ invalid calendar text never throws and normalized impossible dates fail (87.2952ms)
+✔ idempotency digest is independent of object property insertion order (436.8046ms)
+✔ arbitrary OAuth state cannot authorize without an owned stored attempt (160.6933ms)
+✔ reserved event retries converge after a lost insert response (2.6632ms)
+✔ transient patch failure never creates another event (0.5756ms)
+✔ concurrent insert conflict retries the same reserved event (0.5819ms)
+✔ state is opaque, unique, owned and single use (5.0171ms)
+✔ expired, modified, missing and legacy states fail (1.1522ms)
+✔ concurrent callbacks only consume once (0.7633ms)
+✔ error serialization excludes credential and planning-content canaries (6.3071ms)
+✔ basic planning does not require Google or AI credentials (3.5235ms)
+✔ missing required configuration reports names only (0.7903ms)
+✔ review PUT preflight permits configured split-origin bearer requests (61.0471ms)
+✔ unconfigured and lookalike origins receive no cross-origin authorization (3.2388ms)
+✔ public clients cannot bypass authentication using claimed ownership (80.1232ms)
+✔ capture rejects empty titles, invalid dates and invalid wall times before persistence (106.417ms)
+✔ capture rejects unsupported recurrence instead of storing an inert rule (21.8006ms)
+✔ malformed JSON is a validation response rather than internal failure (14.2213ms)
+✔ move rejects duplicate targets, missing revisions and invalid date (17.724ms)
+✔ focus and preferences reject malformed input before database access (169.3261ms)
+✔ public health responses never reveal underlying database or Redis secrets (60.514ms)
+✔ health probes reflect dependency availability without modifying the database (4.278ms)
+[migrate] Schema up-to-date ✓
+[migrate] Schema up-to-date ✓
+✔ daily persistence, revisions, stale scheduling and retry guarantees (1808.2965ms)
+[migrate] Schema up-to-date ✓
+[migrate] Schema up-to-date ✓
+✔ clean Drizzle journal and repeated startup are compatible (1800.5958ms)
+[migrate] Schema up-to-date ✓
+✔ Drizzle upgrades populated legacy journal without changing task data (5111.2488ms)
+✔ PostgreSQL OAuth attempts enforce owner, expiry and atomic single consumption (95.8411ms)
+✔ daily API uses authenticated context for capture, move, focus and preferences (582.7782ms)
+✔ account cascade deletion does not enqueue orphaned calendar events (64.4746ms)
+✔ capture persists optional fields, duration, defaults, and a user-selected area (88.0932ms)
+✔ moves reject terminal, deleted, missing and grouped targets; preserve deadlines and status (330.1509ms)
+✔ focus selects only the requested execution item and invalidates on completion or date change (238.1379ms)
+✔ capacity blends sufficient history and clamps unusually low and high observations (401.941ms)
+✔ learning splits elapsed time through DST fallback and does not multiply joined completions (175.1001ms)
+✔ preview prioritizes urgency, work depth and energy and uses available destination capacity (267.2804ms)
+✔ preview respects scheduled children, normalizes estimates and selects least-loaded overflow day (269.7919ms)
+✔ apply rejects expired, foreign, invented and duplicate preview selections atomically (253.4786ms)
+✔ destination insertion after preview invalidates context, and concurrent applies cannot double-move (312.3517ms)
+✔ legacy scheduler anchors urgent and running work and escalates repeated overflow (288.0724ms)
+✔ receipt retries only transient database failures, bounds retries and replays acknowledged work (110.2373ms)
+✔ midnight learning recommendations wrap and spring-forward logs omit the nonexistent hour (438.1627ms)
+✔ a database exception after the first write rolls back capture receipts and all task rows (94.8603ms)
+✔ capacity uses configured efficiency and buffer and work scores break ties predictably (251.4548ms)
+✔ review revision zero only creates a new row and updates require an exact revision (1.7791ms)
+✔ a lost completion response can be retried only with the same review content (0.3937ms)
+✔ review period uses Monday-Sunday and creates a Monday-Friday sprint (3.5772ms)
+✔ date arithmetic crosses month boundaries (0.3367ms)
+✔ intentions are trimmed, empty rows removed, and limited to three (0.6299ms)
+✔ sprint goal keeps intention and linked goal context (0.4816ms)
+✔ sprint names are stable across machine timezones (49.0335ms)
+ℹ tests 50
+ℹ suites 0
+ℹ pass 50
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35507.5635

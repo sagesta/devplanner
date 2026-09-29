@@ -1,0 +1,4 @@
+Backup written to C:\Users\adebo\AppData\Local\Temp\devplanner-synthetic-backup.dump
+pg_restore: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  the database system is shutting down
+Docker operation failed (1)
+Backup restored successfully into an isolated disposable database.

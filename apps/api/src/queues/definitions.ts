@@ -10,9 +10,14 @@ let googleCalendarPullQueue: Queue | null = null;
 function getCaldavQueue(): Queue | null {
   if (!caldavSyncQueue) {
     try {
-      caldavSyncQueue = new Queue("caldav-sync", { connection: createRedisConnection() });
+      caldavSyncQueue = new Queue("caldav-sync", {
+        connection: createRedisConnection(),
+      });
     } catch (e) {
-      console.warn("[caldav queue] Failed to create queue — Redis unavailable:", e);
+      console.warn(
+        "[caldav queue] Failed to create queue — Redis unavailable:",
+        e,
+      );
       return null;
     }
   }
@@ -22,9 +27,14 @@ function getCaldavQueue(): Queue | null {
 function getCaldavPullQueue(): Queue | null {
   if (!caldavPullQueue) {
     try {
-      caldavPullQueue = new Queue("caldav-pull", { connection: createRedisConnection() });
+      caldavPullQueue = new Queue("caldav-pull", {
+        connection: createRedisConnection(),
+      });
     } catch (e) {
-      console.warn("[caldav pull queue] Failed to create queue — Redis unavailable:", e);
+      console.warn(
+        "[caldav pull queue] Failed to create queue — Redis unavailable:",
+        e,
+      );
       return null;
     }
   }
@@ -34,7 +44,9 @@ function getCaldavPullQueue(): Queue | null {
 function getGoogleCalendarSyncQueue(): Queue | null {
   if (!googleCalendarSyncQueue) {
     try {
-      googleCalendarSyncQueue = new Queue("google-calendar-sync", { connection: createRedisConnection() });
+      googleCalendarSyncQueue = new Queue("google-calendar-sync", {
+        connection: createRedisConnection(),
+      });
     } catch (e) {
       console.warn("[google-calendar-sync queue] Redis unavailable:", e);
       return null;
@@ -46,7 +58,9 @@ function getGoogleCalendarSyncQueue(): Queue | null {
 function getGoogleCalendarPullQueue(): Queue | null {
   if (!googleCalendarPullQueue) {
     try {
-      googleCalendarPullQueue = new Queue("google-calendar-pull", { connection: createRedisConnection() });
+      googleCalendarPullQueue = new Queue("google-calendar-pull", {
+        connection: createRedisConnection(),
+      });
     } catch (e) {
       console.warn("[google-calendar-pull queue] Redis unavailable:", e);
       return null;
@@ -69,7 +83,10 @@ export async function enqueueCaldavSync(payload: CaldavSyncJob) {
   try {
     const queue = getCaldavQueue();
     if (!queue) return; // Redis not available — silently skip
-    await queue.add("sync", payload, { removeOnComplete: 100, removeOnFail: 50 });
+    await queue.add("sync", payload, {
+      removeOnComplete: 100,
+      removeOnFail: 50,
+    });
     bullmqJobsTotal.inc({ queue: "caldav-sync", status: "enqueued" });
   } catch (e) {
     console.warn("[caldav queue] unavailable:", e);
@@ -80,7 +97,10 @@ export async function enqueueCaldavPull(payload: { userId: string }) {
   try {
     const queue = getCaldavPullQueue();
     if (!queue) return;
-    await queue.add("pull", payload, { removeOnComplete: 50, removeOnFail: 25 });
+    await queue.add("pull", payload, {
+      removeOnComplete: 50,
+      removeOnFail: 25,
+    });
     bullmqJobsTotal.inc({ queue: "caldav-pull", status: "enqueued" });
   } catch (e) {
     console.warn("[caldav pull queue] unavailable:", e);
@@ -95,11 +115,16 @@ export type GoogleCalendarSyncJob = {
   action: "create" | "update" | "delete";
 };
 
-export async function enqueueGoogleCalendarSync(payload: GoogleCalendarSyncJob) {
+export async function enqueueGoogleCalendarSync(
+  payload: GoogleCalendarSyncJob,
+) {
   try {
     const queue = getGoogleCalendarSyncQueue();
     if (!queue) return;
-    await queue.add("sync", payload, { removeOnComplete: 100, removeOnFail: 50 });
+    await queue.add("sync", payload, {
+      removeOnComplete: 100,
+      removeOnFail: 50,
+    });
     bullmqJobsTotal.inc({ queue: "google-calendar-sync", status: "enqueued" });
   } catch (e) {
     console.warn("[google-calendar-sync queue] unavailable:", e);
@@ -110,7 +135,10 @@ export async function enqueueGoogleCalendarPull(payload: { userId: string }) {
   try {
     const queue = getGoogleCalendarPullQueue();
     if (!queue) return;
-    await queue.add("pull", payload, { removeOnComplete: 50, removeOnFail: 25 });
+    await queue.add("pull", payload, {
+      removeOnComplete: 50,
+      removeOnFail: 25,
+    });
     bullmqJobsTotal.inc({ queue: "google-calendar-pull", status: "enqueued" });
   } catch (e) {
     console.warn("[google-calendar-pull queue] unavailable:", e);
@@ -126,20 +154,29 @@ export async function enqueueTaskCalendarSync(p: {
   googleEventId?: string | null;
   action: "create" | "update" | "delete";
 }) {
-  const caldavUid = p.caldavUid?.trim() || null;
-  if (caldavUid) {
-    await enqueueCaldavSync({
-      userId: p.userId,
-      taskId: p.taskId,
-      caldavUid,
-      resourceFilename: p.resourceFilename,
-      action: p.action,
-    }).catch(() => {});
+  // Task mutations are captured atomically by the database outbox trigger.
+  // Retained for legacy callers; queue availability no longer changes save results.
+  void p;
+}
+
+/** Only the outbox dispatcher calls this; errors must propagate for retry. */
+export async function deliverCalendarOutbox(
+  eventId: string,
+  p: Parameters<typeof enqueueTaskCalendarSync>[0],
+) {
+  const options = {
+    jobId: eventId,
+    attempts: 10,
+    backoff: { type: "exponential", delay: 2000 },
+    removeOnComplete: { age: 8 * 24 * 60 * 60 },
+    removeOnFail: false as const,
+  };
+  if (p.caldavUid) {
+    const q = getCaldavQueue();
+    if (!q) throw new Error("Calendar queue unavailable");
+    await q.add("sync", p, options);
   }
-  await enqueueGoogleCalendarSync({
-    userId: p.userId,
-    taskId: p.taskId,
-    googleEventId: p.googleEventId,
-    action: p.action,
-  }).catch(() => {});
+  const q = getGoogleCalendarSyncQueue();
+  if (!q) throw new Error("Calendar queue unavailable");
+  await q.add("sync", p, options);
 }

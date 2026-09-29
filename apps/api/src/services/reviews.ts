@@ -24,7 +24,7 @@ export function normalizeReviewIntentions(
     text: string;
     goalKey?: string | null;
     goalLabel?: string | null;
-  }>
+  }>,
 ): WeeklyReviewIntention[] {
   return intentions
     .map((item) => ({
@@ -38,7 +38,7 @@ export function normalizeReviewIntentions(
 
 export function buildSprintGoal(
   intentions: WeeklyReviewIntention[],
-  sprintNotes: string
+  sprintNotes: string,
 ): string | null {
   const cleanIntentions = normalizeReviewIntentions(intentions);
   const intentionLines = cleanIntentions.map((item, index) => {
@@ -47,7 +47,9 @@ export function buildSprintGoal(
   });
   const notes = sprintNotes.trim();
   const sections = [
-    intentionLines.length ? `Top intentions:\n${intentionLines.join("\n")}` : "",
+    intentionLines.length
+      ? `Top intentions:\n${intentionLines.join("\n")}`
+      : "",
     notes ? `Sprint notes:\n${notes}` : "",
   ].filter(Boolean);
   return sections.length ? sections.join("\n\n") : null;
@@ -61,4 +63,42 @@ export function sprintNameFromStart(startYmd: string): string {
     timeZone: "UTC",
   });
   return `Week of ${label}`;
+}
+
+/** Revision zero is a create-only request; all updates require an exact match. */
+export function reviewRevisionMatches(
+  expected: number,
+  actual: number | null,
+  createdNow = false,
+): boolean {
+  if (expected === 0) return createdNow && actual === 1;
+  return actual === expected;
+}
+
+export function sameReviewContent(
+  left: {
+    weekStart: string;
+    weekEnd: string;
+    wins: string;
+    carryover: string;
+    intentions: WeeklyReviewIntention[];
+    sprintNotes: string;
+  },
+  right: {
+    weekStart: string;
+    weekEnd: string;
+    wins: string;
+    carryover: string;
+    intentions: WeeklyReviewIntention[];
+    sprintNotes: string;
+  },
+): boolean {
+  return (
+    left.weekStart === right.weekStart &&
+    left.weekEnd === right.weekEnd &&
+    left.wins === right.wins &&
+    left.carryover === right.carryover &&
+    left.sprintNotes === right.sprintNotes &&
+    JSON.stringify(left.intentions) === JSON.stringify(right.intentions)
+  );
 }

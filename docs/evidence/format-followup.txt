@@ -1,0 +1,118 @@
+[90mapps/api/package.json[39m 35ms (unchanged)
+[90mapps/api/src/contracts/daily-use.test.ts[39m 128ms (unchanged)
+[90mapps/api/src/contracts/daily-use.ts[39m 49ms (unchanged)
+[90mapps/api/src/db/daily-migration.ts[39m 6ms (unchanged)
+[90mapps/api/src/db/migrate.ts[39m 46ms (unchanged)
+[90mapps/api/src/db/migrations/meta/_journal.json[39m 8ms (unchanged)
+[90mapps/api/src/db/schema.ts[39m 162ms (unchanged)
+[90mapps/api/src/google/auth.ts[39m 40ms (unchanged)
+[90mapps/api/src/google/event-write.test.ts[39m 14ms (unchanged)
+[90mapps/api/src/google/event-write.ts[39m 11ms (unchanged)
+[90mapps/api/src/google/oauth-state.test.ts[39m 11ms (unchanged)
+[90mapps/api/src/google/oauth-state.ts[39m 9ms (unchanged)
+[90mapps/api/src/google/oauth-store.ts[39m 5ms (unchanged)
+[90mapps/api/src/google/sync-engine.ts[39m 141ms (unchanged)
+apps/api/src/index.ts 28ms
+[90mapps/api/src/lib/logger.test.ts[39m 4ms (unchanged)
+[90mapps/api/src/lib/logger.ts[39m 6ms (unchanged)
+[90mapps/api/src/lib/validateEnv.test.ts[39m 3ms (unchanged)
+[90mapps/api/src/lib/validateEnv.ts[39m 5ms (unchanged)
+[90mapps/api/src/middleware/aiRateLimit.ts[39m 7ms (unchanged)
+apps/api/src/middleware/appCors.test.ts 10ms
+apps/api/src/middleware/appCors.ts 4ms
+[90mapps/api/src/middleware/requireAuth.ts[39m 7ms (unchanged)
+[90mapps/api/src/queues/definitions.ts[39m 20ms (unchanged)
+[90mapps/api/src/routes/areas.ts[39m 24ms (unchanged)
+[90mapps/api/src/routes/daily-boundary.test.ts[39m 14ms (unchanged)
+[90mapps/api/src/routes/daily.ts[39m 25ms (unchanged)
+apps/api/src/routes/health.test.ts 6ms
+apps/api/src/routes/health.ts 10ms
+[90mapps/api/src/routes/reviews.ts[39m 35ms (unchanged)
+[90mapps/api/src/routes/schedule.ts[39m 8ms (unchanged)
+[90mapps/api/src/routes/subtasks.ts[39m 31ms (unchanged)
+[90mapps/api/src/routes/sync.ts[39m 33ms (unchanged)
+[90mapps/api/src/routes/tasks.ts[39m 157ms (unchanged)
+[90mapps/api/src/services/calendar-outbox.ts[39m 5ms (unchanged)
+[90mapps/api/src/services/daily.integration.test.ts[39m 154ms (unchanged)
+[90mapps/api/src/services/daily.ts[39m 41ms (unchanged)
+[90mapps/api/src/services/reviews.test.ts[39m 6ms (unchanged)
+[90mapps/api/src/services/reviews.ts[39m 10ms (unchanged)
+[90mapps/api/src/services/scheduler.ts[39m 86ms (unchanged)
+[90mapps/api/src/worker/index.ts[39m 37ms (unchanged)
+[90mapps/web/app/(app)/backlog/page.test.tsx[39m 17ms (unchanged)
+[90mapps/web/app/(app)/backlog/page.tsx[39m 146ms (unchanged)
+[90mapps/web/app/(app)/insights/page.tsx[39m 68ms (unchanged)
+apps/web/app/(app)/now/page.test.tsx 34ms
+apps/web/app/(app)/now/page.tsx 202ms
+[90mapps/web/app/(app)/settings/page.tsx[39m 136ms (unchanged)
+[90mapps/web/app/(app)/table/page.test.tsx[39m 34ms (unchanged)
+[90mapps/web/app/(app)/table/page.tsx[39m 81ms (unchanged)
+[90mapps/web/app/api/calendar/google/callback/route.ts[39m 5ms (unchanged)
+[90mapps/web/app/api/calendar/google/start/route.ts[39m 5ms (unchanged)
+apps/web/app/globals.css 262ms
+apps/web/app/providers.tsx 9ms
+apps/web/components/TaskDetailPanel.test.tsx 23ms
+apps/web/components/TaskDetailPanel.tsx 109ms
+[90mapps/web/components/TimerButton.tsx[39m 11ms (unchanged)
+[90mapps/web/components/accomplishments-panel.test.tsx[39m 31ms (unchanged)
+[90mapps/web/components/accomplishments-panel.tsx[39m 75ms (unchanged)
+apps/web/components/app-shell.test.tsx 43ms
+apps/web/components/app-shell.tsx 56ms
+apps/web/components/brain-dump-modal.test.tsx 37ms
+apps/web/components/brain-dump-modal.tsx 171ms
+apps/web/components/command-menu.tsx 66ms
+apps/web/components/getting-started-card.test.tsx 20ms
+apps/web/components/getting-started-card.tsx 92ms
+apps/web/components/goal-horizons-matrix.test.tsx 48ms
+[90mapps/web/components/goal-horizons-matrix.tsx[39m 93ms (unchanged)
+apps/web/components/kanban-board.test.tsx 52ms
+[90mapps/web/components/kanban-board.tsx[39m 245ms (unchanged)
+apps/web/components/notifications-tray.test.tsx 19ms
+apps/web/components/notifications-tray.tsx 46ms
+[90mapps/web/components/plan-header.tsx[39m 21ms (unchanged)
+apps/web/components/priority-anchors-card.test.tsx 23ms
+[90mapps/web/components/priority-anchors-card.tsx[39m 77ms (unchanged)
+[90mapps/web/components/quick-add-task.test.tsx[39m 36ms (unchanged)
+apps/web/components/quick-add-task.tsx 51ms
+apps/web/components/timeline-board.test.tsx 35ms
+[90mapps/web/components/timeline-board.tsx[39m 216ms (unchanged)
+apps/web/components/weekly-review-panel.test.tsx 52ms
+apps/web/components/weekly-review-panel.tsx 129ms
+[90mapps/web/eslint.config.mjs[39m 18ms (unchanged)
+apps/web/hooks/use-active-timer.test.tsx 15ms
+apps/web/hooks/use-active-timer.ts 18ms
+apps/web/hooks/use-calendar-date.test.ts 32ms
+[90mapps/web/hooks/use-calendar-date.ts[39m 14ms (unchanged)
+apps/web/hooks/use-sse.ts 13ms
+[90mapps/web/jest.coverage.config.js[39m 13ms (unchanged)
+apps/web/lib/api.test.ts 122ms
+apps/web/lib/api.ts 120ms
+apps/web/lib/auth-token.test.ts 7ms
+apps/web/lib/daily-api.test.ts 18ms
+[90mapps/web/lib/daily-api.ts[39m 12ms (unchanged)
+[90mapps/web/lib/draft-storage.test.ts[39m 24ms (unchanged)
+[90mapps/web/lib/draft-storage.ts[39m 14ms (unchanged)
+[90mapps/web/lib/env.test.ts[39m 5ms (unchanged)
+apps/web/lib/google-oauth-bridge.test.ts 21ms
+[90mapps/web/lib/google-oauth-bridge.ts[39m 8ms (unchanged)
+apps/web/lib/utils.test.ts 8ms
+[90mapps/web/next.config.mjs[39m 8ms (unchanged)
+[90mapps/web/package.json[39m 5ms (unchanged)
+apps/web/tsconfig.json 4ms
+[90mpackage.json[39m 4ms (unchanged)
+[90mplaywright.config.ts[39m 8ms (unchanged)
+playwright.ui.config.ts 6ms
+scripts/backup-database.mjs 77ms
+[90mscripts/check-format.mjs[39m 5ms (unchanged)
+[90mscripts/daily-benchmark.mjs[39m 45ms (unchanged)
+scripts/serve-ui-harness.mjs 20ms
+[90mscripts/test-api.mjs[39m 12ms (unchanged)
+[90mscripts/test-database.mjs[39m 11ms (unchanged)
+[90mscripts/test-integration.mjs[39m 4ms (unchanged)
+[90mscripts/test-mutation.mjs[39m 6ms (unchanged)
+stryker.config.json 3ms
+[90mtests/e2e/daily-use.spec.ts[39m 18ms (unchanged)
+tests/ui-harness/app.tsx 6ms
+tests/ui-harness/framework.tsx 9ms
+tests/ui/daily.spec.ts 31ms
+tests/ui/fixtures.ts 37ms

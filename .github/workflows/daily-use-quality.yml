@@ -1,0 +1,58 @@
+name: Daily use quality
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: daily_test
+        ports: ['55439:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d daily_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql://postgres@localhost:55439/daily_test
+      DAILY_INTEGRATION_TEST: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Configure synthetic build identity
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const key = 'pk_test_' + Buffer.from('devplanner-test.clerk.accounts.dev$').toString('base64');
+          fs.appendFileSync(process.env.GITHUB_ENV, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${key}\n`);
+          NODE
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:web
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui
+      - run: npm run lint -w @devplanner/web
+      - run: npm run format:check
+      - run: npm run build
+      - run: npm run test:coverage
+      - run: npm run test:mutation
+        if: ${{ !cancelled() }}
+        env:
+          DAILY_INTEGRATION_TEST: '0'
+      - run: npm audit --audit-level=high
+        if: ${{ !cancelled() }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daily-use-evidence
+          path: |
+            coverage/
+            reports/
+            docs/evidence/

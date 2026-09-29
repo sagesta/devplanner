@@ -1,0 +1,4617 @@
+
+> devplanner@0.1.0 test:mutation
+> stryker run
+
+[32m02:55:52 (33448) INFO ProjectReader[39m Found 5 of 393 file(s) to be mutated.
+[32m02:55:52 (33448) INFO Instrumenter[39m Instrumented 5 source file(s) with 737 mutant(s)
+[32m02:55:53 (33448) INFO ConcurrencyTokenProvider[39m Creating 4 test runner process(es).
+[32m02:55:54 (33448) INFO DryRunExecutor[39m Starting initial test run (command test runner with "off" coverage analysis). This may take a while.
+[32m02:55:57 (33448) INFO DryRunExecutor[39m Initial test run succeeded. Ran 1 tests in 2 seconds (net 2130 ms, overhead 0 ms).
+
+All tests
+  ✓ All tests (killed 129)
+
+[Survived] OptionalChaining
+apps/api/src/google/event-write.ts:5:5
+-       e?.response?.status ?? (typeof e?.code === "number" ? e.code : undefined)
++       e.response?.status ?? (typeof e?.code === "number" ? e.code : undefined)
+
+[Survived] ConditionalExpression
+apps/api/src/google/event-write.ts:5:29
+-       e?.response?.status ?? (typeof e?.code === "number" ? e.code : undefined)
++       e?.response?.status ?? (true ? e.code : undefined)
+
+[Survived] OptionalChaining
+apps/api/src/google/event-write.ts:5:36
+-       e?.response?.status ?? (typeof e?.code === "number" ? e.code : undefined)
++       e?.response?.status ?? (typeof e.code === "number" ? e.code : undefined)
+
+[Survived] ObjectLiteral
+apps/api/src/google/event-write.ts:43:32
+-       return (await client.patch({ calendarId, eventId, requestBody: content }))
++       return (await client.patch({}))
+
+[Survived] ArrowFunction
+apps/api/src/google/oauth-state.ts:8:31
+-   export const hashOAuthState = (state: string): string =>
+-     createHash("sha256").update(state).digest("hex");
++   export const hashOAuthState = () => undefined;
+
+[Survived] ArithmeticOperator
+apps/api/src/google/oauth-state.ts:7:29
+-   export const OAUTH_TTL_MS = 10 * 60 * 1000;
++   export const OAUTH_TTL_MS = 10 / 60 * 1000;
+
+[Survived] Regex
+apps/api/src/google/oauth-state.ts:31:37
+-     if (typeof state !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(state))
++     if (typeof state !== "string" || !/[A-Za-z0-9_-]{43}$/.test(state))
+
+[Survived] Regex
+apps/api/src/google/oauth-state.ts:31:37
+-     if (typeof state !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(state))
++     if (typeof state !== "string" || !/^[A-Za-z0-9_-]{43}/.test(state))
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:14:53
+-   export function requestHash(value: unknown): string {
+-     const canonical = (v: unknown): unknown =>
+-       Array.isArray(v)
+-         ? v.map(canonical)
+-         : v && typeof v === "object"
+-           ? Object.fromEntries(
+-               Object.keys(v)
+-                 .sort()
+-                 .map((k) => [k, canonical((v as Record<string, unknown>)[k])]),
+-             )
+-           : v;
+-     return createHash("sha256")
+-       .update(JSON.stringify(canonical(value)))
+-       .digest("hex");
+-   }
++   export function requestHash(value: unknown): string {}
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:22:27
+-                 .map((k) => [k, canonical((v as Record<string, unknown>)[k])]),
++                 .map((k) => []),
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:31:50
+-     isolation: "read committed" | "serializable" = "read committed",
++     isolation: "read committed" | "serializable" = "",
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:32:15
+-   ): Promise<T> {
+-     const c = await pool.connect();
+-     try {
+-       await c.query(
+-         isolation === "serializable"
+-           ? "BEGIN ISOLATION LEVEL SERIALIZABLE"
+-           : "BEGIN",
+-       );
+-       const result = await fn(c);
+-       await c.query("COMMIT");
+-       return result;
+-     } catch (e) {
+-       await c.query("ROLLBACK");
+-       throw e;
+-     } finally {
+-       c.release();
+-     }
+-   }
++   ): Promise<T> {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:36:7
+-         isolation === "serializable"
++         true
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:34:7
+-     try {
+-       await c.query(
+-         isolation === "serializable"
+-           ? "BEGIN ISOLATION LEVEL SERIALIZABLE"
+-           : "BEGIN",
+-       );
+-       const result = await fn(c);
+-       await c.query("COMMIT");
+-       return result;
+-     } catch (e) {
++     try {} catch (e) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:36:7
+-         isolation === "serializable"
++         false
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:36:7
+-         isolation === "serializable"
++         isolation !== "serializable"
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:36:21
+-         isolation === "serializable"
++         isolation === ""
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:41:19
+-       await c.query("COMMIT");
++       await c.query("");
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:38:11
+-           : "BEGIN",
++           : "",
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:37:11
+-           ? "BEGIN ISOLATION LEVEL SERIALIZABLE"
++           ? ""
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:44:19
+-       await c.query("ROLLBACK");
++       await c.query("");
+
+[Survived] CallExpression
+apps/api/src/services/daily.ts:47:5
+-       c.release();
++       ;
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:46:13
+-     } finally {
+-       c.release();
+-     }
++     } finally {}
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:43:15
+-     } catch (e) {
+-       await c.query("ROLLBACK");
+-       throw e;
+-     } finally {
++     } catch (e) {} finally {
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:56:50
+-     isolation: "read committed" | "serializable" = "read committed",
++     isolation: "read committed" | "serializable" = "",
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:58:3
+-     for (let attempt = 0; ; attempt++) {
+-       try {
+-         return await transaction(async (c) => {
+-           await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+-             `${userId}:${operation}:${key}`,
+-           ]);
+-           const hash = requestHash(payload);
+-           const prior = await c.query(
+-             "SELECT * FROM mutation_receipts WHERE user_id=$1 AND operation=$2 AND key=$3",
+-             [userId, operation, key],
+-           );
+-           if (prior.rows[0]) {
+-             if (prior.rows[0].request_hash !== hash)
+-               throw new DailyConflict(
+-                 "This retry key belongs to different changes.",
+-               );
+-             return prior.rows[0].result;
+-           }
+-           const result = await fn(c);
+-           await c.query(
+-             "INSERT INTO mutation_receipts(user_id,operation,key,request_hash,result) VALUES($1,$2,$3,$4,$5)",
+-             [userId, operation, key, hash, JSON.stringify(result)],
+-           );
+-           return result;
+-         }, isolation);
+-       } catch (e) {
+-         if (
+-           attempt < 2 &&
+-           ["40001", "40P01"].includes((e as { code?: string }).code ?? "")
+-         )
+-           continue;
+-         throw e;
+-       }
+-     }
++     for (let attempt = 0; false; attempt++) {
++     try {
++       return await transaction(async c => {
++         await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`${userId}:${operation}:${key}`]);
++         const hash = requestHash(payload);
++         const prior = await c.query("SELECT * FROM mutation_receipts WHERE user_id=$1 AND operation=$2 AND key=$3", [userId, operation, key]);
++         if (prior.rows[0]) {
++           if (prior.rows[0].request_hash !== hash) throw new DailyConflict("This retry key belongs to different changes.");
++           return prior.rows[0].result;
++         }
++         const result = await fn(c);
++         await c.query("INSERT INTO mutation_receipts(user_id,operation,key,request_hash,result) VALUES($1,$2,$3,$4,$5)", [userId, operation, key, hash, JSON.stringify(result)]);
++         return result;
++       }, isolation);
++     } catch (e) {
++       if (attempt < 2 && ["40001", "40P01"].includes((e as {
++         code?: string;
++       }).code ?? "")) continue;
++       throw e;
++     }
++   }
+
+[Survived] UpdateOperator
+apps/api/src/services/daily.ts:58:27
+-     for (let attempt = 0; ; attempt++) {
++     for (let attempt = 0; ; attempt--) {
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:57:15
+-   ): Promise<T> {
+-     for (let attempt = 0; ; attempt++) {
+-       try {
+-         return await transaction(async (c) => {
+-           await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+-             `${userId}:${operation}:${key}`,
+-           ]);
+-           const hash = requestHash(payload);
+-           const prior = await c.query(
+-             "SELECT * FROM mutation_receipts WHERE user_id=$1 AND operation=$2 AND key=$3",
+-             [userId, operation, key],
+-           );
+-           if (prior.rows[0]) {
+-             if (prior.rows[0].request_hash !== hash)
+-               throw new DailyConflict(
+-                 "This retry key belongs to different changes.",
+-               );
+-             return prior.rows[0].result;
+-           }
+-           const result = await fn(c);
+-           await c.query(
+-             "INSERT INTO mutation_receipts(user_id,operation,key,request_hash,result) VALUES($1,$2,$3,$4,$5)",
+-             [userId, operation, key, hash, JSON.stringify(result)],
+-           );
+-           return result;
+-         }, isolation);
+-       } catch (e) {
+-         if (
+-           attempt < 2 &&
+-           ["40001", "40P01"].includes((e as { code?: string }).code ?? "")
+-         )
+-           continue;
+-         throw e;
+-       }
+-     }
+-   }
++   ): Promise<T> {}
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:58:38
+-     for (let attempt = 0; ; attempt++) {
+-       try {
+-         return await transaction(async (c) => {
+-           await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+-             `${userId}:${operation}:${key}`,
+-           ]);
+-           const hash = requestHash(payload);
+-           const prior = await c.query(
+-             "SELECT * FROM mutation_receipts WHERE user_id=$1 AND operation=$2 AND key=$3",
+-             [userId, operation, key],
+-           );
+-           if (prior.rows[0]) {
+-             if (prior.rows[0].request_hash !== hash)
+-               throw new DailyConflict(
+-                 "This retry key belongs to different changes.",
+-               );
+-             return prior.rows[0].result;
+-           }
+-           const result = await fn(c);
+-           await c.query(
+-             "INSERT INTO mutation_receipts(user_id,operation,key,request_hash,result) VALUES($1,$2,$3,$4,$5)",
+-             [userId, operation, key, hash, JSON.stringify(result)],
+-           );
+-           return result;
+-         }, isolation);
+-       } catch (e) {
+-         if (
+-           attempt < 2 &&
+-           ["40001", "40P01"].includes((e as { code?: string }).code ?? "")
+-         )
+-           continue;
+-         throw e;
+-       }
+-     }
++     for (let attempt = 0; ; attempt++) {}
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:60:45
+-         return await transaction(async (c) => {
+-           await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+-             `${userId}:${operation}:${key}`,
+-           ]);
+-           const hash = requestHash(payload);
+-           const prior = await c.query(
+-             "SELECT * FROM mutation_receipts WHERE user_id=$1 AND operation=$2 AND key=$3",
+-             [userId, operation, key],
+-           );
+-           if (prior.rows[0]) {
+-             if (prior.rows[0].request_hash !== hash)
+-               throw new DailyConflict(
+-                 "This retry key belongs to different changes.",
+-               );
+-             return prior.rows[0].result;
+-           }
+-           const result = await fn(c);
+-           await c.query(
+-             "INSERT INTO mutation_receipts(user_id,operation,key,request_hash,result) VALUES($1,$2,$3,$4,$5)",
+-             [userId, operation, key, hash, JSON.stringify(result)],
+-           );
+-           return result;
+-         }, isolation);
++         return await transaction(async (c) => {}, isolation);
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:61:23
+-           await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
++           await c.query("", [
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:59:9
+-       try {
+-         return await transaction(async (c) => {
+-           await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+-             `${userId}:${operation}:${key}`,
+-           ]);
+-           const hash = requestHash(payload);
+-           const prior = await c.query(
+-             "SELECT * FROM mutation_receipts WHERE user_id=$1 AND operation=$2 AND key=$3",
+-             [userId, operation, key],
+-           );
+-           if (prior.rows[0]) {
+-             if (prior.rows[0].request_hash !== hash)
+-               throw new DailyConflict(
+-                 "This retry key belongs to different changes.",
+-               );
+-             return prior.rows[0].result;
+-           }
+-           const result = await fn(c);
+-           await c.query(
+-             "INSERT INTO mutation_receipts(user_id,operation,key,request_hash,result) VALUES($1,$2,$3,$4,$5)",
+-             [userId, operation, key, hash, JSON.stringify(result)],
+-           );
+-           return result;
+-         }, isolation);
+-       } catch (e) {
++       try {} catch (e) {
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:61:79
+-           await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+-             `${userId}:${operation}:${key}`,
+-           ]);
++           await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", []);
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:66:11
+-             "SELECT * FROM mutation_receipts WHERE user_id=$1 AND operation=$2 AND key=$3",
++             "",
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:62:11
+-             `${userId}:${operation}:${key}`,
++             ``,
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:67:11
+-             [userId, operation, key],
++             [],
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:69:13
+-           if (prior.rows[0]) {
++           if (false) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:70:15
+-             if (prior.rows[0].request_hash !== hash)
++             if (true)
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:69:28
+-           if (prior.rows[0]) {
+-             if (prior.rows[0].request_hash !== hash)
+-               throw new DailyConflict(
+-                 "This retry key belongs to different changes.",
+-               );
+-             return prior.rows[0].result;
+-           }
++           if (prior.rows[0]) {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:69:13
+-           if (prior.rows[0]) {
++           if (true) {
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:70:15
+-             if (prior.rows[0].request_hash !== hash)
++             if (prior.rows[0].request_hash === hash)
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:70:15
+-             if (prior.rows[0].request_hash !== hash)
++             if (false)
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:72:15
+-                 "This retry key belongs to different changes.",
++                 "",
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:78:11
+-             "INSERT INTO mutation_receipts(user_id,operation,key,request_hash,result) VALUES($1,$2,$3,$4,$5)",
++             "",
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:85:9
+-           attempt < 2 &&
+-           ["40001", "40P01"].includes((e as { code?: string }).code ?? "")
++           false
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:79:11
+-             [userId, operation, key, hash, JSON.stringify(result)],
++             [],
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:83:17
+-       } catch (e) {
+-         if (
+-           attempt < 2 &&
+-           ["40001", "40P01"].includes((e as { code?: string }).code ?? "")
+-         )
+-           continue;
+-         throw e;
+-       }
++       } catch (e) {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:85:9
+-           attempt < 2 &&
+-           ["40001", "40P01"].includes((e as { code?: string }).code ?? "")
++           true
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:85:9
+-           attempt < 2 &&
++           true &&
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:85:9
+-           attempt < 2 &&
++           attempt <= 2 &&
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:85:9
+-           attempt < 2 &&
+-           ["40001", "40P01"].includes((e as { code?: string }).code ?? "")
++           attempt < 2 || ["40001", "40P01"].includes((e as {
++     code?: string;
++   }).code ?? "")
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:85:9
+-           attempt < 2 &&
++           attempt >= 2 &&
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:86:10
+-           ["40001", "40P01"].includes((e as { code?: string }).code ?? "")
++           ["", "40P01"].includes((e as { code?: string }).code ?? "")
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:86:19
+-           ["40001", "40P01"].includes((e as { code?: string }).code ?? "")
++           ["40001", ""].includes((e as { code?: string }).code ?? "")
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:86:9
+-           ["40001", "40P01"].includes((e as { code?: string }).code ?? "")
++           [].includes((e as { code?: string }).code ?? "")
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:86:37
+-           ["40001", "40P01"].includes((e as { code?: string }).code ?? "")
++           ["40001", "40P01"].includes((e as {
++     code?: string;
++   }).code && "")
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:98:3
+-   ) {
+-     let areaId = requested;
+-     if (!areaId) {
+-       const existing = await c.query(
+-         "SELECT id FROM areas WHERE user_id=$1 AND system_key='general'",
+-         [userId],
+-       );
+-       areaId = existing.rows[0]?.id;
+-       if (!areaId) {
+-         const area = await c.query(
+-           "INSERT INTO areas(user_id,name,system_key) VALUES($1,'General','general') ON CONFLICT(user_id,system_key) WHERE system_key IS NOT NULL DO UPDATE SET system_key=EXCLUDED.system_key RETURNING id",
+-           [userId],
+-         );
+-         areaId = area.rows[0].id;
+-       }
+-     }
+-     const owned = await c.query(
+-       "SELECT id FROM areas WHERE id=$1 AND user_id=$2 FOR SHARE",
+-       [areaId, userId],
+-     );
+-     if (!owned.rowCount) throw new DailyConflict("Area is unavailable.");
+-     return areaId;
+-   }
++   ) {}
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:86:70
+-           ["40001", "40P01"].includes((e as { code?: string }).code ?? "")
++           ["40001", "40P01"].includes((e as { code?: string }).code ?? "Stryker was here!")
+
+[Survived] BooleanLiteral
+apps/api/src/services/daily.ts:100:7
+-     if (!areaId) {
++     if (areaId) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:100:7
+-     if (!areaId) {
++     if (true) {
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:100:16
+-     if (!areaId) {
+-       const existing = await c.query(
+-         "SELECT id FROM areas WHERE user_id=$1 AND system_key='general'",
+-         [userId],
+-       );
+-       areaId = existing.rows[0]?.id;
+-       if (!areaId) {
+-         const area = await c.query(
+-           "INSERT INTO areas(user_id,name,system_key) VALUES($1,'General','general') ON CONFLICT(user_id,system_key) WHERE system_key IS NOT NULL DO UPDATE SET system_key=EXCLUDED.system_key RETURNING id",
+-           [userId],
+-         );
+-         areaId = area.rows[0].id;
+-       }
+-     }
++     if (!areaId) {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:100:7
+-     if (!areaId) {
++     if (false) {
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:103:7
+-         [userId],
++         [],
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:102:7
+-         "SELECT id FROM areas WHERE user_id=$1 AND system_key='general'",
++         "",
+
+[Survived] BooleanLiteral
+apps/api/src/services/daily.ts:106:9
+-       if (!areaId) {
++       if (areaId) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:106:9
+-       if (!areaId) {
++       if (true) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:106:9
+-       if (!areaId) {
++       if (false) {
+
+[Survived] OptionalChaining
+apps/api/src/services/daily.ts:105:14
+-       areaId = existing.rows[0]?.id;
++       areaId = existing.rows[0].id;
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:106:18
+-       if (!areaId) {
+-         const area = await c.query(
+-           "INSERT INTO areas(user_id,name,system_key) VALUES($1,'General','general') ON CONFLICT(user_id,system_key) WHERE system_key IS NOT NULL DO UPDATE SET system_key=EXCLUDED.system_key RETURNING id",
+-           [userId],
+-         );
+-         areaId = area.rows[0].id;
+-       }
++       if (!areaId) {}
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:109:9
+-           [userId],
++           [],
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:108:9
+-           "INSERT INTO areas(user_id,name,system_key) VALUES($1,'General','general') ON CONFLICT(user_id,system_key) WHERE system_key IS NOT NULL DO UPDATE SET system_key=EXCLUDED.system_key RETURNING id",
++           "",
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:115:5
+-       "SELECT id FROM areas WHERE id=$1 AND user_id=$2 FOR SHARE",
++       "",
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:116:5
+-       [areaId, userId],
++       [],
+
+[Survived] BooleanLiteral
+apps/api/src/services/daily.ts:118:7
+-     if (!owned.rowCount) throw new DailyConflict("Area is unavailable.");
++     if (owned.rowCount) throw new DailyConflict("Area is unavailable.");
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:118:7
+-     if (!owned.rowCount) throw new DailyConflict("Area is unavailable.");
++     if (false) throw new DailyConflict("Area is unavailable.");
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:118:7
+-     if (!owned.rowCount) throw new DailyConflict("Area is unavailable.");
++     if (true) throw new DailyConflict("Area is unavailable.");
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:118:48
+-     if (!owned.rowCount) throw new DailyConflict("Area is unavailable.");
++     if (!owned.rowCount) throw new DailyConflict("");
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:126:10
+-     return [
+-       userId,
+-       areaId,
+-       item.title,
+-       item.scheduledDate ? "todo" : "backlog",
+-       item.scheduledDate ?? null,
+-       item.scheduledDate ? "scheduled" : "unscheduled",
+-       item.priority ?? "normal",
+-       item.energyLevel ?? "shallow",
+-       item.recurrenceRule ?? null,
+-     ];
++     return [];
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:125:3
+-   ) {
+-     return [
+-       userId,
+-       areaId,
+-       item.title,
+-       item.scheduledDate ? "todo" : "backlog",
+-       item.scheduledDate ?? null,
+-       item.scheduledDate ? "scheduled" : "unscheduled",
+-       item.priority ?? "normal",
+-       item.energyLevel ?? "shallow",
+-       item.recurrenceRule ?? null,
+-     ];
+-   }
++   ) {}
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:130:26
+-       item.scheduledDate ? "todo" : "backlog",
++       item.scheduledDate ? "" : "backlog",
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:130:35
+-       item.scheduledDate ? "todo" : "backlog",
++       item.scheduledDate ? "todo" : "",
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:131:5
+-       item.scheduledDate ?? null,
++       item.scheduledDate && null,
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:132:40
+-       item.scheduledDate ? "scheduled" : "unscheduled",
++       item.scheduledDate ? "scheduled" : "",
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:132:26
+-       item.scheduledDate ? "scheduled" : "unscheduled",
++       item.scheduledDate ? "" : "unscheduled",
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:133:5
+-       item.priority ?? "normal",
++       item.priority && "normal",
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:133:22
+-       item.priority ?? "normal",
++       item.priority ?? "",
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:134:5
+-       item.energyLevel ?? "shallow",
++       item.energyLevel && "shallow",
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:134:25
+-       item.energyLevel ?? "shallow",
++       item.energyLevel ?? "",
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:135:5
+-       item.recurrenceRule ?? null,
++       item.recurrenceRule && null,
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:138:45
+-   function captureDuration(item: CaptureItem) {
+-     if (item.estimatedMinutes != null) return item.estimatedMinutes;
+-     if (!item.scheduledStartTime || !item.scheduledEndTime) return null;
+-     const minutes = (time: string) =>
+-       Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
+-     return minutes(item.scheduledEndTime) - minutes(item.scheduledStartTime);
+-   }
++   function captureDuration(item: CaptureItem) {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:139:7
+-     if (item.estimatedMinutes != null) return item.estimatedMinutes;
++     if (false) return item.estimatedMinutes;
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:139:7
+-     if (item.estimatedMinutes != null) return item.estimatedMinutes;
++     if (true) return item.estimatedMinutes;
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:139:7
+-     if (item.estimatedMinutes != null) return item.estimatedMinutes;
++     if (item.estimatedMinutes == null) return item.estimatedMinutes;
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:140:7
+-     if (!item.scheduledStartTime || !item.scheduledEndTime) return null;
++     if (true) return null;
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:140:7
+-     if (!item.scheduledStartTime || !item.scheduledEndTime) return null;
++     if (!item.scheduledStartTime && !item.scheduledEndTime) return null;
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:140:7
+-     if (!item.scheduledStartTime || !item.scheduledEndTime) return null;
++     if (false) return null;
+
+[Survived] BooleanLiteral
+apps/api/src/services/daily.ts:140:7
+-     if (!item.scheduledStartTime || !item.scheduledEndTime) return null;
++     if (item.scheduledStartTime || !item.scheduledEndTime) return null;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/daily.ts:142:5
+-       Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
++       Number(time.slice(0, 2)) * 60 - Number(time.slice(3));
+
+[Survived] BooleanLiteral
+apps/api/src/services/daily.ts:140:35
+-     if (!item.scheduledStartTime || !item.scheduledEndTime) return null;
++     if (!item.scheduledStartTime || item.scheduledEndTime) return null;
+
+[Survived] ArrowFunction
+apps/api/src/services/daily.ts:141:19
+-     const minutes = (time: string) =>
+-       Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
++     const minutes = () => undefined;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/daily.ts:143:10
+-     return minutes(item.scheduledEndTime) - minutes(item.scheduledStartTime);
++     return minutes(item.scheduledEndTime) + minutes(item.scheduledStartTime);
+
+[Survived] ArithmeticOperator
+apps/api/src/services/daily.ts:142:5
+-       Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
++       Number(time.slice(0, 2)) / 60 + Number(time.slice(3));
+
+[Survived] MethodExpression
+apps/api/src/services/daily.ts:142:44
+-       Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
++       Number(time.slice(0, 2)) * 60 + Number(time);
+
+[Survived] MethodExpression
+apps/api/src/services/daily.ts:142:12
+-       Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
++       Number(time) * 60 + Number(time.slice(3));
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:149:3
+-   ) {
+-     if (item.estimatedMinutes == null && !item.scheduledStartTime) return;
+-     await c.query(
+-       "INSERT INTO subtasks(task_id,title,estimated_minutes,scheduled_date,scheduled_time) VALUES($1,$2,$3,$4,$5)",
+-       [
+-         taskId,
+-         item.title,
+-         captureDuration(item),
+-         item.scheduledDate ?? null,
+-         item.scheduledStartTime ?? null,
+-       ],
+-     );
+-   }
++   ) {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:150:7
+-     if (item.estimatedMinutes == null && !item.scheduledStartTime) return;
++     if (true) return;
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:150:7
+-     if (item.estimatedMinutes == null && !item.scheduledStartTime) return;
++     if (item.estimatedMinutes == null || !item.scheduledStartTime) return;
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:150:7
+-     if (item.estimatedMinutes == null && !item.scheduledStartTime) return;
++     if (false) return;
+
+[Survived] BooleanLiteral
+apps/api/src/services/daily.ts:150:40
+-     if (item.estimatedMinutes == null && !item.scheduledStartTime) return;
++     if (item.estimatedMinutes == null && item.scheduledStartTime) return;
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:150:7
+-     if (item.estimatedMinutes == null && !item.scheduledStartTime) return;
++     if (true && !item.scheduledStartTime) return;
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:150:7
+-     if (item.estimatedMinutes == null && !item.scheduledStartTime) return;
++     if (item.estimatedMinutes != null && !item.scheduledStartTime) return;
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:152:5
+-       "INSERT INTO subtasks(task_id,title,estimated_minutes,scheduled_date,scheduled_time) VALUES($1,$2,$3,$4,$5)",
++       "",
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:153:5
+-       [
+-         taskId,
+-         item.title,
+-         captureDuration(item),
+-         item.scheduledDate ?? null,
+-         item.scheduledStartTime ?? null,
+-       ],
++       [],
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:158:7
+-         item.scheduledStartTime ?? null,
++         item.scheduledStartTime && null,
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:157:7
+-         item.scheduledDate ?? null,
++         item.scheduledDate && null,
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:165:27
+-   ): Promise<CaptureResult> {
+-     return receipt(
+-       userId,
+-       "capture",
+-       input.idempotencyKey,
+-       input.items,
+-       async (c) => {
+-         const results = [];
+-         for (const item of input.items) {
+-           const areaId = await resolveCaptureArea(c, userId, item.areaId);
+-           const task = await c.query(
+-             `INSERT INTO tasks(user_id,area_id,title,status,scheduled_date,scheduling_state,priority,energy_level,recurrence_rule) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,revision,area_id AS "areaId"`,
+-             captureTaskValues(userId, areaId, item),
+-           );
+-           await captureExecutionUnit(c, task.rows[0].id, item);
+-           results.push(task.rows[0]);
+-         }
+-         return { tasks: results, created: results.length };
+-       },
+-     );
+-   }
++   ): Promise<CaptureResult> {}
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:168:5
+-       "capture",
++       "",
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:172:23
+-         const results = [];
++         const results = ["Stryker was here"];
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:173:39
+-         for (const item of input.items) {
+-           const areaId = await resolveCaptureArea(c, userId, item.areaId);
+-           const task = await c.query(
+-             `INSERT INTO tasks(user_id,area_id,title,status,scheduled_date,scheduling_state,priority,energy_level,recurrence_rule) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,revision,area_id AS "areaId"`,
+-             captureTaskValues(userId, areaId, item),
+-           );
+-           await captureExecutionUnit(c, task.rows[0].id, item);
+-           results.push(task.rows[0]);
+-         }
++         for (const item of input.items) {}
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:171:18
+-       async (c) => {
+-         const results = [];
+-         for (const item of input.items) {
+-           const areaId = await resolveCaptureArea(c, userId, item.areaId);
+-           const task = await c.query(
+-             `INSERT INTO tasks(user_id,area_id,title,status,scheduled_date,scheduling_state,priority,energy_level,recurrence_rule) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,revision,area_id AS "areaId"`,
+-             captureTaskValues(userId, areaId, item),
+-           );
+-           await captureExecutionUnit(c, task.rows[0].id, item);
+-           results.push(task.rows[0]);
+-         }
+-         return { tasks: results, created: results.length };
+-       },
++       async (c) => {},
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:176:11
+-             `INSERT INTO tasks(user_id,area_id,title,status,scheduled_date,scheduling_state,priority,energy_level,recurrence_rule) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,revision,area_id AS "areaId"`,
++             ``,
+
+[Survived] CallExpression
+apps/api/src/services/daily.ts:180:9
+-           results.push(task.rows[0]);
++           ;
+
+[Survived] ObjectLiteral
+apps/api/src/services/daily.ts:182:14
+-         return { tasks: results, created: results.length };
++         return {};
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:186:47
+-   function databaseCalendarDate(value: unknown) {
+-     if (!(value instanceof Date)) return String(value);
+-     return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+-   }
++   function databaseCalendarDate(value: unknown) {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:187:7
+-     if (!(value instanceof Date)) return String(value);
++     if (false) return String(value);
+
+[Survived] BooleanLiteral
+apps/api/src/services/daily.ts:187:7
+-     if (!(value instanceof Date)) return String(value);
++     if (value instanceof Date) return String(value);
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:188:10
+-     return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
++     return ``;
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:187:7
+-     if (!(value instanceof Date)) return String(value);
++     if (true) return String(value);
+
+[Survived] ArithmeticOperator
+apps/api/src/services/daily.ts:188:43
+-     return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
++     return `${value.getFullYear()}-${String(value.getMonth() - 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:188:77
+-     return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
++     return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "")}-${String(value.getDate()).padStart(2, "0")}`;
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:200:3
+-   ) {
+-     if (!row || row.completed || row.revision !== expectedRevision)
+-       throw new DailyConflict("An item changed. Refresh your plan.");
+-     if (
+-       fromDate !== undefined &&
+-       databaseCalendarDate(row.scheduled_date) !== fromDate
+-     )
+-       throw new DailyConflict("An item changed. Refresh your plan.");
+-   }
++   ) {}
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:188:121
+-     return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
++     return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "")}`;
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:201:7
+-     if (!row || row.completed || row.revision !== expectedRevision)
++     if (true)
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:201:7
+-     if (!row || row.completed || row.revision !== expectedRevision)
++     if ((!row || row.completed) && row.revision !== expectedRevision)
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:201:7
+-     if (!row || row.completed || row.revision !== expectedRevision)
++     if (false)
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:201:7
+-     if (!row || row.completed || row.revision !== expectedRevision)
++     if (false || row.revision !== expectedRevision)
+
+[Survived] BooleanLiteral
+apps/api/src/services/daily.ts:201:7
+-     if (!row || row.completed || row.revision !== expectedRevision)
++     if (row || row.completed || row.revision !== expectedRevision)
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:201:7
+-     if (!row || row.completed || row.revision !== expectedRevision)
++     if (!row && row.completed || row.revision !== expectedRevision)
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:201:32
+-     if (!row || row.completed || row.revision !== expectedRevision)
++     if (!row || row.completed || row.revision === expectedRevision)
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:201:32
+-     if (!row || row.completed || row.revision !== expectedRevision)
++     if (!row || row.completed || false)
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:202:29
+-       throw new DailyConflict("An item changed. Refresh your plan.");
++       throw new DailyConflict("");
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:204:5
+-       fromDate !== undefined &&
+-       databaseCalendarDate(row.scheduled_date) !== fromDate
++       true
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:204:5
+-       fromDate !== undefined &&
+-       databaseCalendarDate(row.scheduled_date) !== fromDate
++       fromDate !== undefined || databaseCalendarDate(row.scheduled_date) !== fromDate
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:204:5
+-       fromDate !== undefined &&
+-       databaseCalendarDate(row.scheduled_date) !== fromDate
++       false
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:204:5
+-       fromDate !== undefined &&
++       true &&
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:205:5
+-       databaseCalendarDate(row.scheduled_date) !== fromDate
++       databaseCalendarDate(row.scheduled_date) === fromDate
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:204:5
+-       fromDate !== undefined &&
++       fromDate === undefined &&
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:205:5
+-       databaseCalendarDate(row.scheduled_date) !== fromDate
++       true
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:207:29
+-       throw new DailyConflict("An item changed. Refresh your plan.");
++       throw new DailyConflict("");
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:217:5
+-       target.targetType === "task"
++       false
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:214:3
+-   ) {
+-     // Parent-first locking keeps subtask ownership stable and matches execution rollups.
+-     const parent =
+-       target.targetType === "task"
+-         ? target.targetId
+-         : (
+-             await c.query("SELECT task_id FROM subtasks WHERE id=$1", [
+-               target.targetId,
+-             ])
+-           ).rows[0]?.task_id;
+-     const task = (
+-       await c.query("SELECT * FROM tasks WHERE id=$1 AND user_id=$2 FOR UPDATE", [
+-         parent,
+-         userId,
+-       ])
+-     ).rows[0];
+-     if (!task || task.deleted_at || ["done", "cancelled"].includes(task.status))
+-       throw new DailyConflict(
+-         "An item is no longer available. Refresh your plan.",
+-       );
+-     const row =
+-       target.targetType === "task"
+-         ? task
+-         : (
+-             await c.query(
+-               "SELECT * FROM subtasks WHERE id=$1 AND task_id=$2 FOR UPDATE",
+-               [target.targetId, parent],
+-             )
+-           ).rows[0];
+-     assertTargetUnchanged(row, target.expectedRevision, fromDate);
+-     if (
+-       target.targetType === "task" &&
+-       (await c.query("SELECT 1 FROM subtasks WHERE task_id=$1 LIMIT 1", [parent]))
+-         .rowCount
+-     )
+-       throw new DailyConflict("Choose the individual steps to move.");
+-     return row;
+-   }
++   ) {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:217:5
+-       target.targetType === "task"
++       true
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:217:27
+-       target.targetType === "task"
++       target.targetType === ""
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:217:5
+-       target.targetType === "task"
++       target.targetType !== "task"
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:220:25
+-             await c.query("SELECT task_id FROM subtasks WHERE id=$1", [
++             await c.query("", [
+
+[Survived] OptionalChaining
+apps/api/src/services/daily.ts:219:9
+-         : (
+-             await c.query("SELECT task_id FROM subtasks WHERE id=$1", [
+-               target.targetId,
+-             ])
+-           ).rows[0]?.task_id;
++         : (await c.query("SELECT task_id FROM subtasks WHERE id=$1", [target.targetId])).rows[0].task_id;
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:220:69
+-             await c.query("SELECT task_id FROM subtasks WHERE id=$1", [
+-               target.targetId,
+-             ])
++             await c.query("SELECT task_id FROM subtasks WHERE id=$1", [])
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:225:19
+-       await c.query("SELECT * FROM tasks WHERE id=$1 AND user_id=$2 FOR UPDATE", [
++       await c.query("", [
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:230:7
+-     if (!task || task.deleted_at || ["done", "cancelled"].includes(task.status))
++     if (true)
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:225:80
+-       await c.query("SELECT * FROM tasks WHERE id=$1 AND user_id=$2 FOR UPDATE", [
+-         parent,
+-         userId,
+-       ])
++       await c.query("SELECT * FROM tasks WHERE id=$1 AND user_id=$2 FOR UPDATE", [])
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:230:7
+-     if (!task || task.deleted_at || ["done", "cancelled"].includes(task.status))
++     if ((!task || task.deleted_at) && ["done", "cancelled"].includes(task.status))
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:230:7
+-     if (!task || task.deleted_at || ["done", "cancelled"].includes(task.status))
++     if (false)
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:230:7
+-     if (!task || task.deleted_at || ["done", "cancelled"].includes(task.status))
++     if (false || ["done", "cancelled"].includes(task.status))
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:230:7
+-     if (!task || task.deleted_at || ["done", "cancelled"].includes(task.status))
++     if (!task && task.deleted_at || ["done", "cancelled"].includes(task.status))
+
+[Survived] BooleanLiteral
+apps/api/src/services/daily.ts:230:7
+-     if (!task || task.deleted_at || ["done", "cancelled"].includes(task.status))
++     if (task || task.deleted_at || ["done", "cancelled"].includes(task.status))
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:230:35
+-     if (!task || task.deleted_at || ["done", "cancelled"].includes(task.status))
++     if (!task || task.deleted_at || [].includes(task.status))
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:230:36
+-     if (!task || task.deleted_at || ["done", "cancelled"].includes(task.status))
++     if (!task || task.deleted_at || ["", "cancelled"].includes(task.status))
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:230:44
+-     if (!task || task.deleted_at || ["done", "cancelled"].includes(task.status))
++     if (!task || task.deleted_at || ["done", ""].includes(task.status))
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:235:5
+-       target.targetType === "task"
++       true
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:232:7
+-         "An item is no longer available. Refresh your plan.",
++         "",
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:235:5
+-       target.targetType === "task"
++       target.targetType !== "task"
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:235:5
+-       target.targetType === "task"
++       false
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:240:13
+-               [target.targetId, parent],
++               [],
+
+[Survived] CallExpression
+apps/api/src/services/daily.ts:243:3
+-     assertTargetUnchanged(row, target.expectedRevision, fromDate);
++     ;
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:239:13
+-               "SELECT * FROM subtasks WHERE id=$1 AND task_id=$2 FOR UPDATE",
++               "",
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:235:27
+-       target.targetType === "task"
++       target.targetType === ""
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:245:5
+-       target.targetType === "task" &&
+-       (await c.query("SELECT 1 FROM subtasks WHERE task_id=$1 LIMIT 1", [parent]))
+-         .rowCount
++       target.targetType === "task" || (await c.query("SELECT 1 FROM subtasks WHERE task_id=$1 LIMIT 1", [parent])).rowCount
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:245:5
+-       target.targetType === "task" &&
+-       (await c.query("SELECT 1 FROM subtasks WHERE task_id=$1 LIMIT 1", [parent]))
+-         .rowCount
++       true
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:245:5
+-       target.targetType === "task" &&
+-       (await c.query("SELECT 1 FROM subtasks WHERE task_id=$1 LIMIT 1", [parent]))
+-         .rowCount
++       false
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:245:5
+-       target.targetType === "task" &&
++       true &&
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:245:5
+-       target.targetType === "task" &&
++       target.targetType !== "task" &&
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:246:20
+-       (await c.query("SELECT 1 FROM subtasks WHERE task_id=$1 LIMIT 1", [parent]))
++       (await c.query("", [parent]))
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:245:27
+-       target.targetType === "task" &&
++       target.targetType === "" &&
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:246:71
+-       (await c.query("SELECT 1 FROM subtasks WHERE task_id=$1 LIMIT 1", [parent]))
++       (await c.query("SELECT 1 FROM subtasks WHERE task_id=$1 LIMIT 1", []))
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:249:29
+-       throw new DailyConflict("Choose the individual steps to move.");
++       throw new DailyConflict("");
+
+[Survived] ArrowFunction
+apps/api/src/services/daily.ts:260:23
+-       input.targets.map((t) => ({ ...t, date: input.scheduledDate })),
++       input.targets.map(() => undefined),
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:258:5
+-       "move",
++       "",
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:255:24
+-   ): Promise<MoveResult> {
+-     return receipt(
+-       userId,
+-       "move",
+-       input.idempotencyKey,
+-       input.targets.map((t) => ({ ...t, date: input.scheduledDate })),
+-       async (c) => {
+-         const targets = [...input.targets].sort((a, b) =>
+-           a.targetId.localeCompare(b.targetId),
+-         );
+-         for (const t of targets) await lockTarget(c, userId, t);
+-         const result = [];
+-         for (const t of targets) {
+-           const table = t.targetType === "task" ? "tasks" : "subtasks";
+-           const suffix =
+-             t.targetType === "task"
+-               ? ",scheduling_state='scheduled',status=CASE WHEN status='backlog' THEN 'todo'::task_status ELSE status END,updated_at=now()"
+-               : "";
+-           const row = await c.query(
+-             `UPDATE ${table} SET scheduled_date=$1${suffix} WHERE id=$2 RETURNING revision`,
+-             [input.scheduledDate, t.targetId],
+-           );
+-           result.push({ ...t, expectedRevision: row.rows[0].revision });
+-         }
+-         return { updated: result.length, targets: result };
+-       },
+-     );
+-   }
++   ): Promise<MoveResult> {}
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:262:23
+-         const targets = [...input.targets].sort((a, b) =>
++         const targets = [].sort((a, b) =>
+
+[Survived] ObjectLiteral
+apps/api/src/services/daily.ts:260:31
+-       input.targets.map((t) => ({ ...t, date: input.scheduledDate })),
++       input.targets.map((t) => ({})),
+
+[Survived] MethodExpression
+apps/api/src/services/daily.ts:262:23
+-         const targets = [...input.targets].sort((a, b) =>
+-           a.targetId.localeCompare(b.targetId),
+-         );
++         const targets = [...input.targets];
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:261:18
+-       async (c) => {
+-         const targets = [...input.targets].sort((a, b) =>
+-           a.targetId.localeCompare(b.targetId),
+-         );
+-         for (const t of targets) await lockTarget(c, userId, t);
+-         const result = [];
+-         for (const t of targets) {
+-           const table = t.targetType === "task" ? "tasks" : "subtasks";
+-           const suffix =
+-             t.targetType === "task"
+-               ? ",scheduling_state='scheduled',status=CASE WHEN status='backlog' THEN 'todo'::task_status ELSE status END,updated_at=now()"
+-               : "";
+-           const row = await c.query(
+-             `UPDATE ${table} SET scheduled_date=$1${suffix} WHERE id=$2 RETURNING revision`,
+-             [input.scheduledDate, t.targetId],
+-           );
+-           result.push({ ...t, expectedRevision: row.rows[0].revision });
+-         }
+-         return { updated: result.length, targets: result };
+-       },
++       async (c) => {},
+
+[Survived] ArrowFunction
+apps/api/src/services/daily.ts:262:47
+-         const targets = [...input.targets].sort((a, b) =>
+-           a.targetId.localeCompare(b.targetId),
++         const targets = [...input.targets].sort(() => undefined,
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:266:22
+-         const result = [];
++         const result = ["Stryker was here"];
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:268:23
+-           const table = t.targetType === "task" ? "tasks" : "subtasks";
++           const table = true ? "tasks" : "subtasks";
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:267:32
+-         for (const t of targets) {
+-           const table = t.targetType === "task" ? "tasks" : "subtasks";
+-           const suffix =
+-             t.targetType === "task"
+-               ? ",scheduling_state='scheduled',status=CASE WHEN status='backlog' THEN 'todo'::task_status ELSE status END,updated_at=now()"
+-               : "";
+-           const row = await c.query(
+-             `UPDATE ${table} SET scheduled_date=$1${suffix} WHERE id=$2 RETURNING revision`,
+-             [input.scheduledDate, t.targetId],
+-           );
+-           result.push({ ...t, expectedRevision: row.rows[0].revision });
+-         }
++         for (const t of targets) {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:268:23
+-           const table = t.targetType === "task" ? "tasks" : "subtasks";
++           const table = false ? "tasks" : "subtasks";
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:268:40
+-           const table = t.targetType === "task" ? "tasks" : "subtasks";
++           const table = t.targetType === "" ? "tasks" : "subtasks";
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:268:49
+-           const table = t.targetType === "task" ? "tasks" : "subtasks";
++           const table = t.targetType === "task" ? "" : "subtasks";
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:268:23
+-           const table = t.targetType === "task" ? "tasks" : "subtasks";
++           const table = t.targetType !== "task" ? "tasks" : "subtasks";
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:270:11
+-             t.targetType === "task"
++             true
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:270:11
+-             t.targetType === "task"
++             false
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:268:59
+-           const table = t.targetType === "task" ? "tasks" : "subtasks";
++           const table = t.targetType === "task" ? "tasks" : "";
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:270:11
+-             t.targetType === "task"
++             t.targetType !== "task"
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:271:15
+-               ? ",scheduling_state='scheduled',status=CASE WHEN status='backlog' THEN 'todo'::task_status ELSE status END,updated_at=now()"
++               ? ""
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:272:15
+-               : "";
++               : "Stryker was here!";
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:270:28
+-             t.targetType === "task"
++             t.targetType === ""
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:274:11
+-             `UPDATE ${table} SET scheduled_date=$1${suffix} WHERE id=$2 RETURNING revision`,
++             ``,
+
+[Survived] ObjectLiteral
+apps/api/src/services/daily.ts:277:21
+-           result.push({ ...t, expectedRevision: row.rows[0].revision });
++           result.push({});
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:275:11
+-             [input.scheduledDate, t.targetId],
++             [],
+
+[Survived] ObjectLiteral
+apps/api/src/services/daily.ts:279:14
+-         return { updated: result.length, targets: result };
++         return {};
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:286:25
+-   ): Promise<FocusResult> {
+-     const row = (
+-       await pool.query(
+-         `SELECT f.date::text,f.target_type AS "targetType",f.target_id AS "targetId" FROM daily_focus f WHERE f.user_id=$1 AND f.date=$2 AND ((f.target_type='task' AND EXISTS(SELECT 1 FROM tasks t WHERE t.id=f.target_id AND t.user_id=f.user_id AND t.deleted_at IS NULL AND t.status NOT IN ('done','cancelled') AND t.scheduled_date=f.date AND NOT EXISTS(SELECT 1 FROM subtasks s WHERE s.task_id=t.id))) OR (f.target_type='subtask' AND EXISTS(SELECT 1 FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE s.id=f.target_id AND t.user_id=f.user_id AND t.deleted_at IS NULL AND t.status NOT IN ('done','cancelled') AND NOT s.completed AND s.scheduled_date=f.date)))`,
+-         [userId, date],
+-       )
+-     ).rows[0];
+-     return { focus: row ?? null };
+-   }
++   ): Promise<FocusResult> {}
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:290:7
+-         [userId, date],
++         [],
+
+[Survived] ObjectLiteral
+apps/api/src/services/daily.ts:293:10
+-     return { focus: row ?? null };
++     return {};
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:289:7
+-         `SELECT f.date::text,f.target_type AS "targetType",f.target_id AS "targetId" FROM daily_focus f WHERE f.user_id=$1 AND f.date=$2 AND ((f.target_type='task' AND EXISTS(SELECT 1 FROM tasks t WHERE t.id=f.target_id AND t.user_id=f.user_id AND t.deleted_at IS NULL AND t.status NOT IN ('done','cancelled') AND t.scheduled_date=f.date AND NOT EXISTS(SELECT 1 FROM subtasks s WHERE s.task_id=t.id))) OR (f.target_type='subtask' AND EXISTS(SELECT 1 FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE s.id=f.target_id AND t.user_id=f.user_id AND t.deleted_at IS NULL AND t.status NOT IN ('done','cancelled') AND NOT s.completed AND s.scheduled_date=f.date)))`,
++         ``,
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:293:19
+-     return { focus: row ?? null };
++     return { focus: row && null };
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:298:25
+-   ): Promise<FocusResult> {
+-     return transaction(async (c) => {
+-       const row = await c.query(
+-         input.targetType === "task"
+-           ? `SELECT revision FROM tasks WHERE id=$1 AND user_id=$2`
+-           : `SELECT s.revision FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE s.id=$1 AND t.user_id=$2`,
+-         [input.targetId, userId],
+-       );
+-       await lockTarget(
+-         c,
+-         userId,
+-         { ...input, expectedRevision: row.rows[0]?.revision },
+-         input.date,
+-       );
+-       await c.query(
+-         "INSERT INTO daily_focus(user_id,date,target_type,target_id) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,date) DO UPDATE SET target_type=EXCLUDED.target_type,target_id=EXCLUDED.target_id",
+-         [userId, input.date, input.targetType, input.targetId],
+-       );
+-       return { focus: input };
+-     });
+-   }
++   ): Promise<FocusResult> {}
+
+[Survived] BlockStatement
+apps/api/src/services/daily.ts:299:35
+-     return transaction(async (c) => {
+-       const row = await c.query(
+-         input.targetType === "task"
+-           ? `SELECT revision FROM tasks WHERE id=$1 AND user_id=$2`
+-           : `SELECT s.revision FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE s.id=$1 AND t.user_id=$2`,
+-         [input.targetId, userId],
+-       );
+-       await lockTarget(
+-         c,
+-         userId,
+-         { ...input, expectedRevision: row.rows[0]?.revision },
+-         input.date,
+-       );
+-       await c.query(
+-         "INSERT INTO daily_focus(user_id,date,target_type,target_id) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,date) DO UPDATE SET target_type=EXCLUDED.target_type,target_id=EXCLUDED.target_id",
+-         [userId, input.date, input.targetType, input.targetId],
+-       );
+-       return { focus: input };
+-     });
++     return transaction(async (c) => {});
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:301:7
+-         input.targetType === "task"
++         true
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:301:7
+-         input.targetType === "task"
++         false
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:301:7
+-         input.targetType === "task"
++         input.targetType !== "task"
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:301:28
+-         input.targetType === "task"
++         input.targetType === ""
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:302:11
+-           ? `SELECT revision FROM tasks WHERE id=$1 AND user_id=$2`
++           ? ``
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:303:11
+-           : `SELECT s.revision FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE s.id=$1 AND t.user_id=$2`,
++           : ``,
+
+[Survived] ObjectLiteral
+apps/api/src/services/daily.ts:309:7
+-         { ...input, expectedRevision: row.rows[0]?.revision },
++         {},
+
+[Survived] OptionalChaining
+apps/api/src/services/daily.ts:309:37
+-         { ...input, expectedRevision: row.rows[0]?.revision },
++         { ...input, expectedRevision: row.rows[0].revision },
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:313:7
+-         "INSERT INTO daily_focus(user_id,date,target_type,target_id) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,date) DO UPDATE SET target_type=EXCLUDED.target_type,target_id=EXCLUDED.target_id",
++         "",
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:304:7
+-         [input.targetId, userId],
++         [],
+
+[Survived] ArrayDeclaration
+apps/api/src/services/daily.ts:314:7
+-         [userId, input.date, input.targetType, input.targetId],
++         [],
+
+[Survived] ObjectLiteral
+apps/api/src/services/daily.ts:316:12
+-       return { focus: input };
++       return {};
+
+[Survived] Regex
+apps/api/src/services/reviews.ts:3:16
+-   const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
++   const YMD_RE = /\d{4}-\d{2}-\d{2}$/;
+
+[Survived] Regex
+apps/api/src/services/reviews.ts:3:16
+-   const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
++   const YMD_RE = /^\d{4}-\d{2}-\d{2}/;
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:6:7
+-     if (!YMD_RE.test(ymd)) throw new Error("date must use YYYY-MM-DD");
++     if (false) throw new Error("date must use YYYY-MM-DD");
+
+[Survived] StringLiteral
+apps/api/src/services/reviews.ts:6:42
+-     if (!YMD_RE.test(ymd)) throw new Error("date must use YYYY-MM-DD");
++     if (!YMD_RE.test(ymd)) throw new Error("");
+
+[Survived] StringLiteral
+apps/api/src/services/reviews.ts:8:53
+-     if (Number.isNaN(date.getTime())) throw new Error("invalid date");
++     if (Number.isNaN(date.getTime())) throw new Error("");
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:8:7
+-     if (Number.isNaN(date.getTime())) throw new Error("invalid date");
++     if (false) throw new Error("invalid date");
+
+[Survived] StringLiteral
+apps/api/src/services/reviews.ts:45:60
+-       const goal = item.goalLabel ? ` [${item.goalLabel}]` : "";
++       const goal = item.goalLabel ? ` [${item.goalLabel}]` : "Stryker was here!";
+
+[Survived] MethodExpression
+apps/api/src/services/reviews.ts:48:17
+-     const notes = sprintNotes.trim();
++     const notes = sprintNotes;
+
+[Survived] StringLiteral
+apps/api/src/services/reviews.ts:51:49
+-         ? `Top intentions:\n${intentionLines.join("\n")}`
++         ? `Top intentions:\n${intentionLines.join("")}`
+
+[Survived] BooleanLiteral
+apps/api/src/services/reviews.ts:72:16
+-     createdNow = false,
++     createdNow = true,
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:74:44
+-     if (expected === 0) return createdNow && actual === 1;
++     if (expected === 0) return createdNow && true;
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:97:5
+-       left.weekStart === right.weekStart &&
+-       left.weekEnd === right.weekEnd &&
++       true &&
+
+[Survived] LogicalOperator
+apps/api/src/services/reviews.ts:97:5
+-       left.weekStart === right.weekStart &&
+-       left.weekEnd === right.weekEnd &&
++       left.weekStart === right.weekStart || left.weekEnd === right.weekEnd &&
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:97:5
+-       left.weekStart === right.weekStart &&
++       true &&
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:98:5
+-       left.weekEnd === right.weekEnd &&
++       true &&
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:100:5
+-       left.carryover === right.carryover &&
++       true &&
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:102:5
+-       JSON.stringify(left.intentions) === JSON.stringify(right.intentions)
++       true
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:101:5
+-       left.sprintNotes === right.sprintNotes &&
++       true &&
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:19:7
+-     if (!user) return 0;
++     if (true) return 0;
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:17:20
+-   ): Promise<number> {
+-     const [user] = await db.select().from(users).where(eq(users.id, userId));
+-     if (!user) return 0;
+-     // configured = dailyCapacityMinutes * efficiencyFactor * (1 - bufferFactor)
+-     const baseMinutes = user.dailyCapacityMinutes ?? 240;
+-     const eff = user.efficiencyFactor ?? 0.8;
+-     const buffer = user.bufferFactor ?? 0.2;
+-     const configured = Math.floor(baseMinutes * eff * (1 - buffer));
+-     const observed = await getObservedDailyMinutes(db, userId);
+-     if (observed == null) return configured;
+-     const blended = Math.round(configured * 0.6 + observed * 0.4);
+-     const lower = Math.floor(configured * 0.5);
+-     const upper = Math.ceil(configured * 1.5);
+-     return Math.max(lower, Math.min(upper, blended));
+-   }
++   ): Promise<number> {}
+
+[Survived] BooleanLiteral
+apps/api/src/services/scheduler.ts:19:7
+-     if (!user) return 0;
++     if (user) return 0;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:19:7
+-     if (!user) return 0;
++     if (false) return 0;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:21:23
+-     const baseMinutes = user.dailyCapacityMinutes ?? 240;
++     const baseMinutes = user.dailyCapacityMinutes && 240;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:22:15
+-     const eff = user.efficiencyFactor ?? 0.8;
++     const eff = user.efficiencyFactor && 0.8;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:23:18
+-     const buffer = user.bufferFactor ?? 0.2;
++     const buffer = user.bufferFactor && 0.2;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:24:33
+-     const configured = Math.floor(baseMinutes * eff * (1 - buffer));
++     const configured = Math.floor(baseMinutes * eff / (1 - buffer));
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:24:33
+-     const configured = Math.floor(baseMinutes * eff * (1 - buffer));
++     const configured = Math.floor(baseMinutes / eff * (1 - buffer));
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:24:54
+-     const configured = Math.floor(baseMinutes * eff * (1 - buffer));
++     const configured = Math.floor(baseMinutes * eff * (1 + buffer));
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:27:7
+-     if (observed == null) return configured;
++     if (true) return configured;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:27:7
+-     if (observed == null) return configured;
++     if (observed != null) return configured;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:29:30
+-     const blended = Math.round(configured * 0.6 + observed * 0.4);
++     const blended = Math.round(configured * 0.6 - observed * 0.4);
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:27:7
+-     if (observed == null) return configured;
++     if (false) return configured;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:29:30
+-     const blended = Math.round(configured * 0.6 + observed * 0.4);
++     const blended = Math.round(configured / 0.6 + observed * 0.4);
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:29:49
+-     const blended = Math.round(configured * 0.6 + observed * 0.4);
++     const blended = Math.round(configured * 0.6 + observed / 0.4);
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:31:27
+-     const upper = Math.ceil(configured * 1.5);
++     const upper = Math.ceil(configured / 1.5);
+
+[Survived] MethodExpression
+apps/api/src/services/scheduler.ts:32:10
+-     return Math.max(lower, Math.min(upper, blended));
++     return Math.min(lower, Math.min(upper, blended));
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:30:28
+-     const lower = Math.floor(configured * 0.5);
++     const lower = Math.floor(configured / 0.5);
+
+[Survived] MethodExpression
+apps/api/src/services/scheduler.ts:32:26
+-     return Math.max(lower, Math.min(upper, blended));
++     return Math.max(lower, Math.max(upper, blended));
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:43:27
+-   ): Promise<number | null> {
+-     const result = (await db.execute(sql`
+-       WITH done_units AS (
+-         SELECT (st.completed_at AT TIME ZONE COALESCE((SELECT timezone FROM users WHERE id = ${userId}), 'UTC'))::date AS day, COALESCE(st.estimated_minutes, 30) AS minutes
+-         FROM subtasks st
+-         JOIN tasks tk ON tk.id = st.task_id
+-         WHERE tk.user_id = ${userId}
+-           AND tk.deleted_at IS NULL
+-           AND st.completed_at IS NOT NULL
+-           AND st.completed_at > NOW() - INTERVAL '28 days'
+-         UNION ALL
+-         SELECT (tk.completed_at AT TIME ZONE COALESCE((SELECT timezone FROM users WHERE id = ${userId}), 'UTC'))::date AS day, 30 AS minutes
+-         FROM tasks tk
+-         LEFT JOIN subtasks st ON st.task_id = tk.id
+-         WHERE tk.user_id = ${userId}
+-           AND tk.deleted_at IS NULL
+-           AND tk.completed_at IS NOT NULL
+-           AND tk.completed_at > NOW() - INTERVAL '28 days'
+-           AND st.id IS NULL
+-       ),
+-       per_day AS (
+-         SELECT day, SUM(minutes)::float AS total FROM done_units GROUP BY day
+-       )
+-       SELECT
+-         COUNT(*)::int AS active_days,
+-         PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY total) AS median_minutes
+-       FROM per_day
+-     `)) as {
+-       rows: Array<{ active_days: number; median_minutes: number | null }>;
+-     };
+-     const row = result.rows[0];
+-     if (!row || Number(row.active_days) < 5 || row.median_minutes == null)
+-       return null;
+-     return Math.round(Number(row.median_minutes));
+-   }
++   ): Promise<number | null> {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:75:7
+-     if (!row || Number(row.active_days) < 5 || row.median_minutes == null)
++     if (false)
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:75:7
+-     if (!row || Number(row.active_days) < 5 || row.median_minutes == null)
++     if (true)
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:75:7
+-     if (!row || Number(row.active_days) < 5 || row.median_minutes == null)
++     if (false || row.median_minutes == null)
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:75:7
+-     if (!row || Number(row.active_days) < 5 || row.median_minutes == null)
++     if ((!row || Number(row.active_days) < 5) && row.median_minutes == null)
+
+[Survived] BooleanLiteral
+apps/api/src/services/scheduler.ts:75:7
+-     if (!row || Number(row.active_days) < 5 || row.median_minutes == null)
++     if (row || Number(row.active_days) < 5 || row.median_minutes == null)
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:75:7
+-     if (!row || Number(row.active_days) < 5 || row.median_minutes == null)
++     if (!row && Number(row.active_days) < 5 || row.median_minutes == null)
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:75:15
+-     if (!row || Number(row.active_days) < 5 || row.median_minutes == null)
++     if (!row || false || row.median_minutes == null)
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:75:15
+-     if (!row || Number(row.active_days) < 5 || row.median_minutes == null)
++     if (!row || Number(row.active_days) <= 5 || row.median_minutes == null)
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:75:15
+-     if (!row || Number(row.active_days) < 5 || row.median_minutes == null)
++     if (!row || Number(row.active_days) >= 5 || row.median_minutes == null)
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:75:46
+-     if (!row || Number(row.active_days) < 5 || row.median_minutes == null)
++     if (!row || Number(row.active_days) < 5 || false)
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:75:46
+-     if (!row || Number(row.active_days) < 5 || row.median_minutes == null)
++     if (!row || Number(row.active_days) < 5 || row.median_minutes != null)
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:80:60
+-   function getPriorityScore(priority: string | null): number {
+-     if (priority === "urgent") return 4;
+-     if (priority === "high") return 3;
+-     if (priority === "normal") return 2;
+-     return 1;
+-   }
++   function getPriorityScore(priority: string | null): number {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:81:7
+-     if (priority === "urgent") return 4;
++     if (false) return 4;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:81:7
+-     if (priority === "urgent") return 4;
++     if (true) return 4;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:81:20
+-     if (priority === "urgent") return 4;
++     if (priority === "") return 4;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:81:7
+-     if (priority === "urgent") return 4;
++     if (priority !== "urgent") return 4;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:82:7
+-     if (priority === "high") return 3;
++     if (true) return 3;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:82:7
+-     if (priority === "high") return 3;
++     if (false) return 3;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:82:7
+-     if (priority === "high") return 3;
++     if (priority !== "high") return 3;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:82:20
+-     if (priority === "high") return 3;
++     if (priority === "") return 3;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:83:7
+-     if (priority === "normal") return 2;
++     if (true) return 2;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:83:7
+-     if (priority === "normal") return 2;
++     if (false) return 2;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:83:7
+-     if (priority === "normal") return 2;
++     if (priority !== "normal") return 2;
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:91:3
+-   ) {
+-     // Find all active tasks assigned to this date
+-     const todayTasks = await db.query.tasks.findMany({
+-       where: and(
+-         eq(tasks.userId, userId),
+-         isNull(tasks.deletedAt),
+-         eq(tasks.scheduledDate, dateIso),
+-         ne(tasks.status, "done"),
+-       ),
+-     });
+-     if (todayTasks.length === 0) return { displaced: 0, dailyCapacity: 0 };
+-     const dailyCapacity = await calculateDailyCapacity(db, userId);
+-     let usedMinutes = 0;
+-     // Sort tasks by priority descending (urgent first), then by status (in_progress first)
+-     const sorted = [...todayTasks].sort((a, b) => {
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
+-       const pA = getPriorityScore(a.priority);
+-       const pB = getPriorityScore(b.priority);
+-       return pB - pA;
+-     });
+-     const displacedTaskIds: string[] = [];
+-     const scheduledTaskIds: string[] = [];
+-     for (const t of sorted) {
+-       const mins = (t as any).estimatedMinutes || 30; // Default 30 min assumed
+-       if (usedMinutes + mins > dailyCapacity) {
+-         // Cannot fit this task, displacement begins
+-         if (t.status === "in_progress" || t.priority === "urgent") {
+-           // Anchor in-progress and urgent absolute Must-Do P0 tasks, force fit even over capacity!
+-           usedMinutes += mins;
+-           scheduledTaskIds.push(t.id);
+-         } else {
+-           displacedTaskIds.push(t.id);
+-         }
+-       } else {
+-         usedMinutes += mins;
+-         scheduledTaskIds.push(t.id);
+-       }
+-     }
+-     // Handle displaced tasks: move to tomorrow, increment rescheduleCount.
+-     // If rescheduleCount > 3, put in needs_rescheduling
+-     let overflowCount = 0;
+-     for (const id of displacedTaskIds) {
+-       const t = todayTasks.find((x: any) => x.id === id)!;
+-       const nextCount = (t.rescheduleCount || 0) + 1;
+-       const tomorrow = new Date(dateIso);
+-       tomorrow.setDate(tomorrow.getDate() + 1);
+-       const tomorrowStr = tomorrow.toISOString().split("T")[0]!;
+-       const state = nextCount > 3 ? "needs_rescheduling" : "overflow";
+-       await db
+-         .update(tasks)
+-         .set({
+-           scheduledDate: tomorrowStr,
+-           rescheduleCount: nextCount,
+-           schedulingState: state,
+-           isAutoScheduled: true,
+-         })
+-         .where(eq(tasks.id, id));
+-       overflowCount++;
+-     }
+-     return {
+-       dailyCapacity,
+-       scheduled: scheduledTaskIds,
+-       displaced: overflowCount,
+-       usedMinutes,
+-     };
+-   }
++   ) {}
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:83:20
+-     if (priority === "normal") return 2;
++     if (priority === "") return 2;
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:93:52
+-     const todayTasks = await db.query.tasks.findMany({
+-       where: and(
+-         eq(tasks.userId, userId),
+-         isNull(tasks.deletedAt),
+-         eq(tasks.scheduledDate, dateIso),
+-         ne(tasks.status, "done"),
+-       ),
+-     });
++     const todayTasks = await db.query.tasks.findMany({});
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:102:7
+-     if (todayTasks.length === 0) return { displaced: 0, dailyCapacity: 0 };
++     if (true) return { displaced: 0, dailyCapacity: 0 };
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:98:24
+-         ne(tasks.status, "done"),
++         ne(tasks.status, ""),
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:102:7
+-     if (todayTasks.length === 0) return { displaced: 0, dailyCapacity: 0 };
++     if (todayTasks.length !== 0) return { displaced: 0, dailyCapacity: 0 };
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:102:7
+-     if (todayTasks.length === 0) return { displaced: 0, dailyCapacity: 0 };
++     if (false) return { displaced: 0, dailyCapacity: 0 };
+
+[Survived] MethodExpression
+apps/api/src/services/scheduler.ts:108:18
+-     const sorted = [...todayTasks].sort((a, b) => {
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
+-       const pA = getPriorityScore(a.priority);
+-       const pB = getPriorityScore(b.priority);
+-       return pB - pA;
+-     });
++     const sorted = [...todayTasks];
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:108:18
+-     const sorted = [...todayTasks].sort((a, b) => {
++     const sorted = [].sort((a, b) => {
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:102:39
+-     if (todayTasks.length === 0) return { displaced: 0, dailyCapacity: 0 };
++     if (todayTasks.length === 0) return {};
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:108:49
+-     const sorted = [...todayTasks].sort((a, b) => {
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
+-       const pA = getPriorityScore(a.priority);
+-       const pB = getPriorityScore(b.priority);
+-       return pB - pA;
+-     });
++     const sorted = [...todayTasks].sort((a, b) => {});
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:109:9
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (false) return -1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:109:9
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (true) return -1;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:109:9
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (a.status === "in_progress" || b.status !== "in_progress") return -1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:109:9
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (true && b.status !== "in_progress") return -1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:109:39
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (a.status === "in_progress" && true) return -1;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:109:22
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (a.status === "" && b.status !== "in_progress") return -1;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:109:9
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (a.status !== "in_progress" && b.status !== "in_progress") return -1;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:109:39
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (a.status === "in_progress" && b.status === "in_progress") return -1;
+
+[Survived] UnaryOperator
+apps/api/src/services/scheduler.ts:109:74
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (a.status === "in_progress" && b.status !== "in_progress") return +1;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:109:52
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (a.status === "in_progress" && b.status !== "") return -1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:110:9
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (true) return 1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:110:9
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (false) return 1;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:110:9
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (b.status === "in_progress" || a.status !== "in_progress") return 1;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:110:9
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (b.status !== "in_progress" && a.status !== "in_progress") return 1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:110:9
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (true && a.status !== "in_progress") return 1;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:110:22
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (b.status === "" && a.status !== "in_progress") return 1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:110:39
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (b.status === "in_progress" && true) return 1;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:110:39
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (b.status === "in_progress" && a.status === "in_progress") return 1;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:110:52
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (b.status === "in_progress" && a.status !== "") return 1;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:114:12
+-       return pB - pA;
++       return pB + pA;
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:117:38
+-     const displacedTaskIds: string[] = [];
++     const displacedTaskIds: string[] = ["Stryker was here"];
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:118:38
+-     const scheduledTaskIds: string[] = [];
++     const scheduledTaskIds: string[] = ["Stryker was here"];
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:121:18
+-       const mins = (t as any).estimatedMinutes || 30; // Default 30 min assumed
++       const mins = true; // Default 30 min assumed
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:120:27
+-     for (const t of sorted) {
+-       const mins = (t as any).estimatedMinutes || 30; // Default 30 min assumed
+-       if (usedMinutes + mins > dailyCapacity) {
+-         // Cannot fit this task, displacement begins
+-         if (t.status === "in_progress" || t.priority === "urgent") {
+-           // Anchor in-progress and urgent absolute Must-Do P0 tasks, force fit even over capacity!
+-           usedMinutes += mins;
+-           scheduledTaskIds.push(t.id);
+-         } else {
+-           displacedTaskIds.push(t.id);
+-         }
+-       } else {
+-         usedMinutes += mins;
+-         scheduledTaskIds.push(t.id);
+-       }
+-     }
++     for (const t of sorted) {}
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:121:18
+-       const mins = (t as any).estimatedMinutes || 30; // Default 30 min assumed
++       const mins = (t as any).estimatedMinutes && 30; // Default 30 min assumed
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:121:18
+-       const mins = (t as any).estimatedMinutes || 30; // Default 30 min assumed
++       const mins = false; // Default 30 min assumed
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:122:9
+-       if (usedMinutes + mins > dailyCapacity) {
++       if (true) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:122:9
+-       if (usedMinutes + mins > dailyCapacity) {
++       if (false) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:122:9
+-       if (usedMinutes + mins > dailyCapacity) {
++       if (usedMinutes + mins >= dailyCapacity) {
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:122:9
+-       if (usedMinutes + mins > dailyCapacity) {
++       if (usedMinutes - mins > dailyCapacity) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:122:9
+-       if (usedMinutes + mins > dailyCapacity) {
++       if (usedMinutes + mins <= dailyCapacity) {
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:122:45
+-       if (usedMinutes + mins > dailyCapacity) {
+-         // Cannot fit this task, displacement begins
+-         if (t.status === "in_progress" || t.priority === "urgent") {
+-           // Anchor in-progress and urgent absolute Must-Do P0 tasks, force fit even over capacity!
+-           usedMinutes += mins;
+-           scheduledTaskIds.push(t.id);
+-         } else {
+-           displacedTaskIds.push(t.id);
+-         }
+-       } else {
++       if (usedMinutes + mins > dailyCapacity) {} else {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:124:11
+-         if (t.status === "in_progress" || t.priority === "urgent") {
++         if (true) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:124:11
+-         if (t.status === "in_progress" || t.priority === "urgent") {
++         if (false) {
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:124:11
+-         if (t.status === "in_progress" || t.priority === "urgent") {
++         if (t.status === "in_progress" && t.priority === "urgent") {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:124:11
+-         if (t.status === "in_progress" || t.priority === "urgent") {
++         if (false || t.priority === "urgent") {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:124:41
+-         if (t.status === "in_progress" || t.priority === "urgent") {
++         if (t.status === "in_progress" || t.priority !== "urgent") {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:124:11
+-         if (t.status === "in_progress" || t.priority === "urgent") {
++         if (t.status !== "in_progress" || t.priority === "urgent") {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:124:41
+-         if (t.status === "in_progress" || t.priority === "urgent") {
++         if (t.status === "in_progress" || false) {
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:124:24
+-         if (t.status === "in_progress" || t.priority === "urgent") {
++         if (t.status === "" || t.priority === "urgent") {
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:124:56
+-         if (t.status === "in_progress" || t.priority === "urgent") {
++         if (t.status === "in_progress" || t.priority === "") {
+
+[Survived] AssignmentOperator
+apps/api/src/services/scheduler.ts:126:9
+-           usedMinutes += mins;
++           usedMinutes -= mins;
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:124:66
+-         if (t.status === "in_progress" || t.priority === "urgent") {
+-           // Anchor in-progress and urgent absolute Must-Do P0 tasks, force fit even over capacity!
+-           usedMinutes += mins;
+-           scheduledTaskIds.push(t.id);
+-         } else {
++         if (t.status === "in_progress" || t.priority === "urgent") {} else {
+
+[Survived] CallExpression
+apps/api/src/services/scheduler.ts:127:9
+-           scheduledTaskIds.push(t.id);
++           ;
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:128:14
+-         } else {
+-           displacedTaskIds.push(t.id);
+-         }
++         } else {}
+
+[Survived] CallExpression
+apps/api/src/services/scheduler.ts:129:9
+-           displacedTaskIds.push(t.id);
++           ;
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:131:12
+-       } else {
+-         usedMinutes += mins;
+-         scheduledTaskIds.push(t.id);
+-       }
++       } else {}
+
+[Survived] AssignmentOperator
+apps/api/src/services/scheduler.ts:132:7
+-         usedMinutes += mins;
++         usedMinutes -= mins;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:141:43
+-       const t = todayTasks.find((x: any) => x.id === id)!;
++       const t = todayTasks.find((x: any) => true)!;
+
+[Survived] ArrowFunction
+apps/api/src/services/scheduler.ts:141:31
+-       const t = todayTasks.find((x: any) => x.id === id)!;
++       const t = todayTasks.find(() => undefined)!;
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:140:38
+-     for (const id of displacedTaskIds) {
+-       const t = todayTasks.find((x: any) => x.id === id)!;
+-       const nextCount = (t.rescheduleCount || 0) + 1;
+-       const tomorrow = new Date(dateIso);
+-       tomorrow.setDate(tomorrow.getDate() + 1);
+-       const tomorrowStr = tomorrow.toISOString().split("T")[0]!;
+-       const state = nextCount > 3 ? "needs_rescheduling" : "overflow";
+-       await db
+-         .update(tasks)
+-         .set({
+-           scheduledDate: tomorrowStr,
+-           rescheduleCount: nextCount,
+-           schedulingState: state,
+-           isAutoScheduled: true,
+-         })
+-         .where(eq(tasks.id, id));
+-       overflowCount++;
+-     }
++     for (const id of displacedTaskIds) {}
+
+[Survived] CallExpression
+apps/api/src/services/scheduler.ts:133:7
+-         scheduledTaskIds.push(t.id);
++         ;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:141:43
+-       const t = todayTasks.find((x: any) => x.id === id)!;
++       const t = todayTasks.find((x: any) => x.id !== id)!;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:142:23
+-       const nextCount = (t.rescheduleCount || 0) + 1;
++       const nextCount = (t.rescheduleCount || 0) - 1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:141:43
+-       const t = todayTasks.find((x: any) => x.id === id)!;
++       const t = todayTasks.find((x: any) => false)!;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:142:24
+-       const nextCount = (t.rescheduleCount || 0) + 1;
++       const nextCount = (true) + 1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:142:24
+-       const nextCount = (t.rescheduleCount || 0) + 1;
++       const nextCount = (false) + 1;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:142:24
+-       const nextCount = (t.rescheduleCount || 0) + 1;
++       const nextCount = (t.rescheduleCount && 0) + 1;
+
+[Survived] MethodExpression
+apps/api/src/services/scheduler.ts:145:5
+-       tomorrow.setDate(tomorrow.getDate() + 1);
++       tomorrow.setTime(tomorrow.getDate() + 1);
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:145:22
+-       tomorrow.setDate(tomorrow.getDate() + 1);
++       tomorrow.setDate(tomorrow.getDate() - 1);
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:146:54
+-       const tomorrowStr = tomorrow.toISOString().split("T")[0]!;
++       const tomorrowStr = tomorrow.toISOString().split("")[0]!;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:148:19
+-       const state = nextCount > 3 ? "needs_rescheduling" : "overflow";
++       const state = true ? "needs_rescheduling" : "overflow";
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:148:19
+-       const state = nextCount > 3 ? "needs_rescheduling" : "overflow";
++       const state = false ? "needs_rescheduling" : "overflow";
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:148:19
+-       const state = nextCount > 3 ? "needs_rescheduling" : "overflow";
++       const state = nextCount >= 3 ? "needs_rescheduling" : "overflow";
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:148:19
+-       const state = nextCount > 3 ? "needs_rescheduling" : "overflow";
++       const state = nextCount <= 3 ? "needs_rescheduling" : "overflow";
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:148:35
+-       const state = nextCount > 3 ? "needs_rescheduling" : "overflow";
++       const state = nextCount > 3 ? "" : "overflow";
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:148:58
+-       const state = nextCount > 3 ? "needs_rescheduling" : "overflow";
++       const state = nextCount > 3 ? "needs_rescheduling" : "";
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:152:12
+-         .set({
+-           scheduledDate: tomorrowStr,
+-           rescheduleCount: nextCount,
+-           schedulingState: state,
+-           isAutoScheduled: true,
+-         })
++         .set({})
+
+[Survived] UpdateOperator
+apps/api/src/services/scheduler.ts:160:5
+-       overflowCount++;
++       overflowCount--;
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:163:10
+-     return {
+-       dailyCapacity,
+-       scheduled: scheduledTaskIds,
+-       displaced: overflowCount,
+-       usedMinutes,
+-     };
++     return {};
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:194:33
+-   function toYmd(d: Date): string {
+-     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+-   }
++   function toYmd(d: Date): string {}
+
+[Survived] BooleanLiteral
+apps/api/src/services/scheduler.ts:156:26
+-           isAutoScheduled: true,
++           isAutoScheduled: false,
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:195:39
+-     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
++     return `${d.getFullYear()}-${String(d.getMonth() - 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:195:69
+-     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
++     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "")}-${String(d.getDate()).padStart(2, "0")}`;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:195:109
+-     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
++     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "")}`;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:195:10
+-     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
++     return ``;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:200:13
+-     d.setDate(d.getDate() + days);
++     d.setDate(d.getDate() - days);
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:198:53
+-   function addDays(ymd: string, days: number): string {
+-     const d = new Date(`${ymd}T12:00:00`);
+-     d.setDate(d.getDate() + days);
+-     return toYmd(d);
+-   }
++   function addDays(ymd: string, days: number): string {}
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:199:22
+-     const d = new Date(`${ymd}T12:00:00`);
++     const d = new Date(``);
+
+[Survived] MethodExpression
+apps/api/src/services/scheduler.ts:200:3
+-     d.setDate(d.getDate() + days);
++     d.setTime(d.getDate() + days);
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:207:10
+-     while (cursor <= end && out.length < 370) {
++     while (false) {
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:205:25
+-     const out: string[] = [];
++     const out: string[] = ["Stryker was here"];
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:204:60
+-   function daysBetween(start: string, end: string): string[] {
+-     const out: string[] = [];
+-     let cursor = start;
+-     while (cursor <= end && out.length < 370) {
+-       out.push(cursor);
+-       cursor = addDays(cursor, 1);
+-     }
+-     return out;
+-   }
++   function daysBetween(start: string, end: string): string[] {}
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:207:10
+-     while (cursor <= end && out.length < 370) {
++     while (cursor <= end || out.length < 370) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:207:10
+-     while (cursor <= end && out.length < 370) {
++     while (true && out.length < 370) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:207:10
+-     while (cursor <= end && out.length < 370) {
++     while (cursor < end && out.length < 370) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:207:10
+-     while (cursor <= end && out.length < 370) {
++     while (cursor > end && out.length < 370) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:207:27
+-     while (cursor <= end && out.length < 370) {
++     while (cursor <= end && true) {
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:207:45
+-     while (cursor <= end && out.length < 370) {
+-       out.push(cursor);
+-       cursor = addDays(cursor, 1);
+-     }
++     while (cursor <= end && out.length < 370) {}
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:207:27
+-     while (cursor <= end && out.length < 370) {
++     while (cursor <= end && out.length <= 370) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:207:27
+-     while (cursor <= end && out.length < 370) {
++     while (cursor <= end && out.length >= 370) {
+
+[Survived] CallExpression
+apps/api/src/services/scheduler.ts:208:5
+-       out.push(cursor);
++       ;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:216:10
+-     return Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 480) : 30;
++     return true ? Math.min(Math.round(n), 480) : 30;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:216:10
+-     return Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 480) : 30;
++     return false ? Math.min(Math.round(n), 480) : 30;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:216:10
+-     return Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 480) : 30;
++     return Number.isFinite(n) || n > 0 ? Math.min(Math.round(n), 480) : 30;
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:214:46
+-   function estimateMinutes(v: unknown): number {
+-     const n = Number(v);
+-     return Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 480) : 30;
+-   }
++   function estimateMinutes(v: unknown): number {}
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:216:32
+-     return Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 480) : 30;
++     return Number.isFinite(n) && n <= 0 ? Math.min(Math.round(n), 480) : 30;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:216:32
+-     return Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 480) : 30;
++     return Number.isFinite(n) && true ? Math.min(Math.round(n), 480) : 30;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:216:32
+-     return Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 480) : 30;
++     return Number.isFinite(n) && n >= 0 ? Math.min(Math.round(n), 480) : 30;
+
+[Survived] MethodExpression
+apps/api/src/services/scheduler.ts:216:40
+-     return Number.isFinite(n) && n > 0 ? Math.min(Math.round(n), 480) : 30;
++     return Number.isFinite(n) && n > 0 ? Math.max(Math.round(n), 480) : 30;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:226:5
+-       item.workDepth === "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
++       false ? 2 : item.workDepth === "normal" ? 1 : 0;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:226:5
+-       item.workDepth === "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
++       item.workDepth !== "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:224:4
+-   }) {
+-     const depthScore =
+-       item.workDepth === "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
+-     const physicalScore =
+-       item.physicalEnergy === "high"
+-         ? 2
+-         : item.physicalEnergy === "medium"
+-           ? 1
+-           : 0;
+-     return (
+-       getPriorityScore(item.priority) * 100 +
+-       depthScore * 10 +
+-       physicalScore * 4 -
+-       (item.rescheduleCount ?? 0) * 2
+-     );
+-   }
++   }) {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:226:5
+-       item.workDepth === "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
++       true ? 2 : item.workDepth === "normal" ? 1 : 0;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:226:37
+-       item.workDepth === "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
++       item.workDepth === "deep" ? 2 : item.workDepth !== "normal" ? 1 : 0;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:226:37
+-       item.workDepth === "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
++       item.workDepth === "deep" ? 2 : false ? 1 : 0;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:226:24
+-       item.workDepth === "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
++       item.workDepth === "" ? 2 : item.workDepth === "normal" ? 1 : 0;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:226:37
+-       item.workDepth === "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
++       item.workDepth === "deep" ? 2 : true ? 1 : 0;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:228:5
+-       item.physicalEnergy === "high"
++       item.physicalEnergy !== "high"
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:226:56
+-       item.workDepth === "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
++       item.workDepth === "deep" ? 2 : item.workDepth === "" ? 1 : 0;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:228:5
+-       item.physicalEnergy === "high"
++       true
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:228:5
+-       item.physicalEnergy === "high"
++       false
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:230:9
+-         : item.physicalEnergy === "medium"
++         : true
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:230:9
+-         : item.physicalEnergy === "medium"
++         : item.physicalEnergy !== "medium"
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:230:9
+-         : item.physicalEnergy === "medium"
++         : false
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:228:29
+-       item.physicalEnergy === "high"
++       item.physicalEnergy === ""
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:234:5
+-       getPriorityScore(item.priority) * 100 +
+-       depthScore * 10 +
+-       physicalScore * 4 -
+-       (item.rescheduleCount ?? 0) * 2
++       getPriorityScore(item.priority) * 100 + depthScore * 10 + physicalScore * 4 + (item.rescheduleCount ?? 0) * 2
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:234:5
+-       getPriorityScore(item.priority) * 100 +
+-       depthScore * 10 +
++       getPriorityScore(item.priority) * 100 - depthScore * 10 +
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:234:5
+-       getPriorityScore(item.priority) * 100 +
+-       depthScore * 10 +
+-       physicalScore * 4 -
++       getPriorityScore(item.priority) * 100 + depthScore * 10 - physicalScore * 4 -
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:230:33
+-         : item.physicalEnergy === "medium"
++         : item.physicalEnergy === ""
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:235:5
+-       depthScore * 10 +
++       depthScore / 10 +
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:234:5
+-       getPriorityScore(item.priority) * 100 +
++       getPriorityScore(item.priority) / 100 +
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:236:5
+-       physicalScore * 4 -
++       physicalScore / 4 -
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:237:5
+-       (item.rescheduleCount ?? 0) * 2
++       (item.rescheduleCount ?? 0) / 2
+
+[Survived] UnaryOperator
+apps/api/src/services/scheduler.ts:276:19
+-     let peakScore = -1;
++     let peakScore = +1;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:237:6
+-       (item.rescheduleCount ?? 0) * 2
++       (item.rescheduleCount && 0) * 2
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:244:37
+-   ): Promise<ScheduleLearningSummary> {
+-     const dailyCapacity = await calculateDailyCapacity(db, userId);
+-     const rows = (await db.execute(sql`
+-       WITH signals AS (
+-         SELECT st.completed_at AS occurred_at, 0::float AS minutes, 1 AS completions
+-         FROM subtasks st JOIN tasks tk ON tk.id=st.task_id
+-         WHERE tk.user_id=${userId} AND tk.deleted_at IS NULL AND st.completed=true AND st.completed_at>NOW()-INTERVAL '90 days'
+-         UNION ALL
+-         SELECT bucket.hour, GREATEST(EXTRACT(EPOCH FROM LEAST(tl.ended_at,bucket.hour+interval '1 hour')-GREATEST(tl.started_at,bucket.hour)),0)::float/60, 0
+-         FROM task_time_logs tl JOIN tasks tk ON tk.id=tl.task_id
+-         CROSS JOIN LATERAL generate_series(date_trunc('hour',GREATEST(tl.started_at,NOW()-interval '90 days')),tl.ended_at-interval '1 microsecond',interval '1 hour') AS bucket(hour)
+-         WHERE tk.user_id=${userId} AND tk.deleted_at IS NULL AND tl.ended_at>NOW()-INTERVAL '90 days'
+-         UNION ALL
+-         SELECT tk.completed_at,0::float,1 FROM tasks tk
+-         WHERE tk.user_id=${userId} AND tk.deleted_at IS NULL AND tk.status='done' AND tk.completed_at>NOW()-INTERVAL '90 days'
+-         AND NOT EXISTS(SELECT 1 FROM subtasks st WHERE st.task_id=tk.id)
+-       )
+-       SELECT EXTRACT(HOUR FROM occurred_at AT TIME ZONE COALESCE((SELECT timezone FROM users WHERE id=${userId}),'UTC'))::int AS hour,
+-         SUM(minutes)::float AS total_minutes, SUM(completions)::int AS completions,
+-         (SELECT COUNT(DISTINCT (occurred_at AT TIME ZONE COALESCE((SELECT timezone FROM users WHERE id=${userId}),'UTC'))::date)::int FROM signals) AS active_days
+-       FROM signals GROUP BY hour ORDER BY hour
+-     `)) as {
+-       rows: Array<{
+-         hour: number;
+-         total_minutes: number;
+-         completions: number;
+-         active_days: number;
+-       }>;
+-     };
+-     let peakHour: number | null = null;
+-     let peakScore = -1;
+-     for (const row of rows.rows) {
+-       const score =
+-         Number(row.total_minutes ?? 0) + Number(row.completions ?? 0) * 15;
+-       if (Number(row.active_days) >= 5 && score > peakScore) {
+-         peakScore = score;
+-         peakHour = Number(row.hour);
+-       }
+-     }
+-     return {
+-       dailyCapacity,
+-       peakHour,
+-       deepWorkHours:
+-         peakHour == null ? [] : [peakHour, Math.min(23, peakHour + 1)],
+-       observedCompletionCount: rows.rows.reduce(
+-         (sum: number, row: { completions: number }) =>
+-           sum + Number(row.completions ?? 0),
+-         0,
+-       ),
+-     };
+-   }
++   ): Promise<ScheduleLearningSummary> {}
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:277:32
+-     for (const row of rows.rows) {
+-       const score =
+-         Number(row.total_minutes ?? 0) + Number(row.completions ?? 0) * 15;
+-       if (Number(row.active_days) >= 5 && score > peakScore) {
+-         peakScore = score;
+-         peakHour = Number(row.hour);
+-       }
+-     }
++     for (const row of rows.rows) {}
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:279:40
+-         Number(row.total_minutes ?? 0) + Number(row.completions ?? 0) * 15;
++         Number(row.total_minutes ?? 0) + Number(row.completions ?? 0) / 15;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:279:7
+-         Number(row.total_minutes ?? 0) + Number(row.completions ?? 0) * 15;
++         Number(row.total_minutes ?? 0) - Number(row.completions ?? 0) * 15;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:279:14
+-         Number(row.total_minutes ?? 0) + Number(row.completions ?? 0) * 15;
++         Number(row.total_minutes && 0) + Number(row.completions ?? 0) * 15;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:279:47
+-         Number(row.total_minutes ?? 0) + Number(row.completions ?? 0) * 15;
++         Number(row.total_minutes ?? 0) + Number(row.completions && 0) * 15;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:280:9
+-       if (Number(row.active_days) >= 5 && score > peakScore) {
++       if (true) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:280:9
+-       if (Number(row.active_days) >= 5 && score > peakScore) {
++       if (true && score > peakScore) {
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:280:9
+-       if (Number(row.active_days) >= 5 && score > peakScore) {
++       if (Number(row.active_days) >= 5 || score > peakScore) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:280:9
+-       if (Number(row.active_days) >= 5 && score > peakScore) {
++       if (false) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:280:9
+-       if (Number(row.active_days) >= 5 && score > peakScore) {
++       if (Number(row.active_days) > 5 && score > peakScore) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:280:41
+-       if (Number(row.active_days) >= 5 && score > peakScore) {
++       if (Number(row.active_days) >= 5 && score >= peakScore) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:280:41
+-       if (Number(row.active_days) >= 5 && score > peakScore) {
++       if (Number(row.active_days) >= 5 && true) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:280:9
+-       if (Number(row.active_days) >= 5 && score > peakScore) {
++       if (Number(row.active_days) < 5 && score > peakScore) {
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:280:60
+-       if (Number(row.active_days) >= 5 && score > peakScore) {
+-         peakScore = score;
+-         peakHour = Number(row.hour);
+-       }
++       if (Number(row.active_days) >= 5 && score > peakScore) {}
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:280:41
+-       if (Number(row.active_days) >= 5 && score > peakScore) {
++       if (Number(row.active_days) >= 5 && score <= peakScore) {
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:286:10
+-     return {
+-       dailyCapacity,
+-       peakHour,
+-       deepWorkHours:
+-         peakHour == null ? [] : [peakHour, Math.min(23, peakHour + 1)],
+-       observedCompletionCount: rows.rows.reduce(
+-         (sum: number, row: { completions: number }) =>
+-           sum + Number(row.completions ?? 0),
+-         0,
+-       ),
+-     };
++     return {};
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:290:7
+-         peakHour == null ? [] : [peakHour, Math.min(23, peakHour + 1)],
++         true ? [] : [peakHour, Math.min(23, peakHour + 1)],
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:290:26
+-         peakHour == null ? [] : [peakHour, Math.min(23, peakHour + 1)],
++         peakHour == null ? ["Stryker was here"] : [peakHour, Math.min(23, peakHour + 1)],
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:290:7
+-         peakHour == null ? [] : [peakHour, Math.min(23, peakHour + 1)],
++         false ? [] : [peakHour, Math.min(23, peakHour + 1)],
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:290:31
+-         peakHour == null ? [] : [peakHour, Math.min(23, peakHour + 1)],
++         peakHour == null ? [] : [],
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:290:7
+-         peakHour == null ? [] : [peakHour, Math.min(23, peakHour + 1)],
++         peakHour != null ? [] : [peakHour, Math.min(23, peakHour + 1)],
+
+[Survived] MethodExpression
+apps/api/src/services/scheduler.ts:290:42
+-         peakHour == null ? [] : [peakHour, Math.min(23, peakHour + 1)],
++         peakHour == null ? [] : [peakHour, Math.max(23, peakHour + 1)],
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:290:55
+-         peakHour == null ? [] : [peakHour, Math.min(23, peakHour + 1)],
++         peakHour == null ? [] : [peakHour, Math.min(23, peakHour - 1)],
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:293:9
+-           sum + Number(row.completions ?? 0),
++           sum - Number(row.completions ?? 0),
+
+[Survived] ArrowFunction
+apps/api/src/services/scheduler.ts:292:7
+-         (sum: number, row: { completions: number }) =>
+-           sum + Number(row.completions ?? 0),
++         () => undefined,
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:309:45
+-     const dayLoad = new Map(days.map((day) => [day, 0]));
++     const dayLoad = new Map(days.map((day) => []));
+
+[Survived] ArrowFunction
+apps/api/src/services/scheduler.ts:309:36
+-     const dayLoad = new Map(days.map((day) => [day, 0]));
++     const dayLoad = new Map(days.map(() => undefined));
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:306:4
+-   }> {
+-     const learning = await getScheduleLearningSummary(db, userId);
+-     const days = daysBetween(opts.fromDate, opts.horizonEnd);
+-     const dayLoad = new Map(days.map((day) => [day, 0]));
+-     const futureSubtasks = await db
+-       .select({
+-         id: subtasks.id,
+-         scheduledDate: subtasks.scheduledDate,
+-         estimatedMinutes: subtasks.estimatedMinutes,
+-       })
+-       .from(subtasks)
+-       .innerJoin(tasks, eq(tasks.id, subtasks.taskId))
+-       .where(
+-         and(
+-           eq(tasks.userId, userId),
+-           isNull(tasks.deletedAt),
+-           eq(subtasks.completed, false),
+-           ne(tasks.status, "done"),
+-           ne(tasks.status, "cancelled"),
+-           or(
+-             eq(subtasks.scheduledDate, opts.fromDate),
+-             sql`${subtasks.scheduledDate} > ${opts.fromDate} AND ${subtasks.scheduledDate} <= ${opts.horizonEnd}`,
+-           ),
+-         ),
+-       );
+-     for (const item of futureSubtasks) {
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
+-       dayLoad.set(
+-         item.scheduledDate,
+-         (dayLoad.get(item.scheduledDate) ?? 0) +
+-           estimateMinutes(item.estimatedMinutes),
+-       );
+-     }
+-     const futureTasks = await db
+-       .select({
+-         id: tasks.id,
+-         scheduledDate: tasks.scheduledDate,
+-       })
+-       .from(tasks)
+-       .where(
+-         and(
+-           eq(tasks.userId, userId),
+-           isNull(tasks.deletedAt),
+-           ne(tasks.status, "done"),
+-           ne(tasks.status, "cancelled"),
+-           or(
+-             eq(tasks.scheduledDate, opts.fromDate),
+-             sql`${tasks.scheduledDate} > ${opts.fromDate} AND ${tasks.scheduledDate} <= ${opts.horizonEnd}`,
+-           ),
+-           sql`NOT EXISTS (SELECT 1 FROM subtasks st WHERE st.task_id = ${tasks.id})`,
+-         ),
+-       );
+-     for (const item of futureTasks) {
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
+-       dayLoad.set(
+-         item.scheduledDate,
+-         (dayLoad.get(item.scheduledDate) ?? 0) + 30,
+-       );
+-     }
+-     const unfinishedSubtasks = await db
+-       .select({
+-         revision: subtasks.revision,
+-         id: subtasks.id,
+-         taskId: subtasks.taskId,
+-         title: subtasks.title,
+-         scheduledDate: subtasks.scheduledDate,
+-         estimatedMinutes: subtasks.estimatedMinutes,
+-         parentTitle: tasks.title,
+-         priority: tasks.priority,
+-         workDepth: tasks.workDepth,
+-         physicalEnergy: tasks.physicalEnergy,
+-         rescheduleCount: tasks.rescheduleCount,
+-       })
+-       .from(subtasks)
+-       .innerJoin(tasks, eq(tasks.id, subtasks.taskId))
+-       .where(
+-         and(
+-           eq(tasks.userId, userId),
+-           isNull(tasks.deletedAt),
+-           eq(subtasks.completed, false),
+-           ne(tasks.status, "done"),
+-           ne(tasks.status, "cancelled"),
+-           lt(subtasks.scheduledDate, opts.fromDate),
+-         ),
+-       )
+-       .orderBy(asc(subtasks.scheduledDate), asc(subtasks.createdAt));
+-     const unfinishedTasks = await db
+-       .select({
+-         revision: tasks.revision,
+-         id: tasks.id,
+-         title: tasks.title,
+-         scheduledDate: tasks.scheduledDate,
+-         priority: tasks.priority,
+-         workDepth: tasks.workDepth,
+-         physicalEnergy: tasks.physicalEnergy,
+-         rescheduleCount: tasks.rescheduleCount,
+-       })
+-       .from(tasks)
+-       .where(
+-         and(
+-           eq(tasks.userId, userId),
+-           isNull(tasks.deletedAt),
+-           ne(tasks.status, "done"),
+-           ne(tasks.status, "cancelled"),
+-           lt(tasks.scheduledDate, opts.fromDate),
+-           sql`NOT EXISTS (SELECT 1 FROM subtasks st WHERE st.task_id = ${tasks.id})`,
+-         ),
+-       )
+-       .orderBy(asc(tasks.scheduledDate), asc(tasks.createdAt));
+-     const candidates = [
+-       ...unfinishedSubtasks.map(
+-         (s: {
+-           revision: number;
+-           id: string;
+-           title: string;
+-           scheduledDate: string | null;
+-           estimatedMinutes: number | null;
+-           priority: string;
+-           workDepth: string | null;
+-           physicalEnergy: string | null;
+-           rescheduleCount: number | null;
+-         }) => ({
+-           targetType: "subtask" as const,
+-           expectedRevision: s.revision,
+-           targetId: s.id,
+-           title: s.title,
+-           fromDate: s.scheduledDate!,
+-           estimatedMinutes: estimateMinutes(s.estimatedMinutes),
+-           priority: s.priority,
+-           workDepth: s.workDepth,
+-           physicalEnergy: s.physicalEnergy,
+-           rescheduleCount: s.rescheduleCount,
+-         }),
+-       ),
+-       ...unfinishedTasks.map(
+-         (t: {
+-           revision: number;
+-           id: string;
+-           title: string;
+-           scheduledDate: string | null;
+-           priority: string;
+-           workDepth: string | null;
+-           physicalEnergy: string | null;
+-           rescheduleCount: number | null;
+-         }) => ({
+-           targetType: "task" as const,
+-           expectedRevision: t.revision,
+-           targetId: t.id,
+-           title: t.title,
+-           fromDate: t.scheduledDate!,
+-           estimatedMinutes: 30,
+-           priority: t.priority,
+-           workDepth: t.workDepth,
+-           physicalEnergy: t.physicalEnergy,
+-           rescheduleCount: t.rescheduleCount,
+-         }),
+-       ),
+-     ].sort((a, b) => scheduleScore(b) - scheduleScore(a));
+-     const proposals: ScheduleProposal[] = [];
+-     for (const item of candidates) {
+-       let pickedDay = days[0] ?? opts.fromDate;
+-       let bestLoad = Number.POSITIVE_INFINITY;
+-       for (const day of days) {
+-         const load = dayLoad.get(day) ?? 0;
+-         if (load + item.estimatedMinutes <= learning.dailyCapacity) {
+-           pickedDay = day;
+-           bestLoad = load;
+-           break;
+-         }
+-         if (load < bestLoad) {
+-           bestLoad = load;
+-           pickedDay = day;
+-         }
+-       }
+-       dayLoad.set(
+-         pickedDay,
+-         (dayLoad.get(pickedDay) ?? 0) + item.estimatedMinutes,
+-       );
+-       const overCapacity = (dayLoad.get(pickedDay) ?? 0) > learning.dailyCapacity;
+-       const preferredWindow =
+-         item.workDepth === "deep" && learning.peakHour != null
+-           ? ` near your usual deep-work window around ${learning.peakHour}:00`
+-           : "";
+-       proposals.push({
+-         id: `${item.targetType}:${item.targetId}:${item.fromDate}:${pickedDay}`,
+-         targetType: item.targetType,
+-         targetId: item.targetId,
+-         expectedRevision: item.expectedRevision,
+-         title: item.title,
+-         fromDate: item.fromDate,
+-         toDate: pickedDay,
+-         estimatedMinutes: item.estimatedMinutes,
+-         priority: item.priority,
+-         workDepth: item.workDepth,
+-         physicalEnergy: item.physicalEnergy,
+-         reason: overCapacity
+-           ? "No fully open day remains, so this is placed on the least-loaded day for review."
+-           : `Moved unfinished work into available capacity${preferredWindow}.`,
+-         risk:
+-           item.priority === "urgent" || overCapacity
+-             ? "high"
+-             : item.priority === "high"
+-               ? "medium"
+-               : "low",
+-       });
+-     }
+-     return { proposals, learning };
+-   }
++   }> {}
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:293:22
+-           sum + Number(row.completions ?? 0),
++           sum + Number(row.completions && 0),
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:324:26
+-           ne(tasks.status, "done"),
++           ne(tasks.status, ""),
+
+[Survived] BooleanLiteral
+apps/api/src/services/scheduler.ts:323:32
+-           eq(subtasks.completed, false),
++           eq(subtasks.completed, true),
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:312:13
+-       .select({
+-         id: subtasks.id,
+-         scheduledDate: subtasks.scheduledDate,
+-         estimatedMinutes: subtasks.estimatedMinutes,
+-       })
++       .select({})
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:325:26
+-           ne(tasks.status, "cancelled"),
++           ne(tasks.status, ""),
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:328:14
+-             sql`${subtasks.scheduledDate} > ${opts.fromDate} AND ${subtasks.scheduledDate} <= ${opts.horizonEnd}`,
++             sql``,
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:333:38
+-     for (const item of futureSubtasks) {
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
+-       dayLoad.set(
+-         item.scheduledDate,
+-         (dayLoad.get(item.scheduledDate) ?? 0) +
+-           estimateMinutes(item.estimatedMinutes),
+-       );
+-     }
++     for (const item of futureSubtasks) {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:334:9
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (true) continue;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:334:9
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (false) continue;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:337:7
+-         (dayLoad.get(item.scheduledDate) ?? 0) +
+-           estimateMinutes(item.estimatedMinutes),
++         (dayLoad.get(item.scheduledDate) ?? 0) - estimateMinutes(item.estimatedMinutes),
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:334:9
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (!item.scheduledDate && !dayLoad.has(item.scheduledDate)) continue;
+
+[Survived] BooleanLiteral
+apps/api/src/services/scheduler.ts:334:9
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
+
+[Survived] BooleanLiteral
+apps/api/src/services/scheduler.ts:334:32
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (!item.scheduledDate || dayLoad.has(item.scheduledDate)) continue;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:352:26
+-           ne(tasks.status, "done"),
++           ne(tasks.status, ""),
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:337:8
+-         (dayLoad.get(item.scheduledDate) ?? 0) +
++         (dayLoad.get(item.scheduledDate) && 0) +
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:353:26
+-           ne(tasks.status, "cancelled"),
++           ne(tasks.status, ""),
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:343:13
+-       .select({
+-         id: tasks.id,
+-         scheduledDate: tasks.scheduledDate,
+-       })
++       .select({})
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:356:14
+-             sql`${tasks.scheduledDate} > ${opts.fromDate} AND ${tasks.scheduledDate} <= ${opts.horizonEnd}`,
++             sql``,
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:358:12
+-           sql`NOT EXISTS (SELECT 1 FROM subtasks st WHERE st.task_id = ${tasks.id})`,
++           sql``,
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:362:35
+-     for (const item of futureTasks) {
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
+-       dayLoad.set(
+-         item.scheduledDate,
+-         (dayLoad.get(item.scheduledDate) ?? 0) + 30,
+-       );
+-     }
++     for (const item of futureTasks) {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:363:9
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (true) continue;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:363:9
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (false) continue;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:363:9
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (!item.scheduledDate && !dayLoad.has(item.scheduledDate)) continue;
+
+[Survived] BooleanLiteral
+apps/api/src/services/scheduler.ts:363:32
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (!item.scheduledDate || dayLoad.has(item.scheduledDate)) continue;
+
+[Survived] BooleanLiteral
+apps/api/src/services/scheduler.ts:363:9
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:371:13
+-       .select({
+-         revision: subtasks.revision,
+-         id: subtasks.id,
+-         taskId: subtasks.taskId,
+-         title: subtasks.title,
+-         scheduledDate: subtasks.scheduledDate,
+-         estimatedMinutes: subtasks.estimatedMinutes,
+-         parentTitle: tasks.title,
+-         priority: tasks.priority,
+-         workDepth: tasks.workDepth,
+-         physicalEnergy: tasks.physicalEnergy,
+-         rescheduleCount: tasks.rescheduleCount,
+-       })
++       .select({})
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:366:8
+-         (dayLoad.get(item.scheduledDate) ?? 0) + 30,
++         (dayLoad.get(item.scheduledDate) && 0) + 30,
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:366:7
+-         (dayLoad.get(item.scheduledDate) ?? 0) + 30,
++         (dayLoad.get(item.scheduledDate) ?? 0) - 30,
+
+[Survived] BooleanLiteral
+apps/api/src/services/scheduler.ts:390:32
+-           eq(subtasks.completed, false),
++           eq(subtasks.completed, true),
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:399:13
+-       .select({
+-         revision: tasks.revision,
+-         id: tasks.id,
+-         title: tasks.title,
+-         scheduledDate: tasks.scheduledDate,
+-         priority: tasks.priority,
+-         workDepth: tasks.workDepth,
+-         physicalEnergy: tasks.physicalEnergy,
+-         rescheduleCount: tasks.rescheduleCount,
+-       })
++       .select({})
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:391:26
+-           ne(tasks.status, "done"),
++           ne(tasks.status, ""),
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:392:26
+-           ne(tasks.status, "cancelled"),
++           ne(tasks.status, ""),
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:414:26
+-           ne(tasks.status, "done"),
++           ne(tasks.status, ""),
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:415:26
+-           ne(tasks.status, "cancelled"),
++           ne(tasks.status, ""),
+
+[Survived] MethodExpression
+apps/api/src/services/scheduler.ts:422:22
+-     const candidates = [
+-       ...unfinishedSubtasks.map(
+-         (s: {
+-           revision: number;
+-           id: string;
+-           title: string;
+-           scheduledDate: string | null;
+-           estimatedMinutes: number | null;
+-           priority: string;
+-           workDepth: string | null;
+-           physicalEnergy: string | null;
+-           rescheduleCount: number | null;
+-         }) => ({
+-           targetType: "subtask" as const,
+-           expectedRevision: s.revision,
+-           targetId: s.id,
+-           title: s.title,
+-           fromDate: s.scheduledDate!,
+-           estimatedMinutes: estimateMinutes(s.estimatedMinutes),
+-           priority: s.priority,
+-           workDepth: s.workDepth,
+-           physicalEnergy: s.physicalEnergy,
+-           rescheduleCount: s.rescheduleCount,
+-         }),
+-       ),
+-       ...unfinishedTasks.map(
+-         (t: {
+-           revision: number;
+-           id: string;
+-           title: string;
+-           scheduledDate: string | null;
+-           priority: string;
+-           workDepth: string | null;
+-           physicalEnergy: string | null;
+-           rescheduleCount: number | null;
+-         }) => ({
+-           targetType: "task" as const,
+-           expectedRevision: t.revision,
+-           targetId: t.id,
+-           title: t.title,
+-           fromDate: t.scheduledDate!,
+-           estimatedMinutes: 30,
+-           priority: t.priority,
+-           workDepth: t.workDepth,
+-           physicalEnergy: t.physicalEnergy,
+-           rescheduleCount: t.rescheduleCount,
+-         }),
+-       ),
+-     ].sort((a, b) => scheduleScore(b) - scheduleScore(a));
++     const candidates = [...unfinishedSubtasks.map((s: {
++     revision: number;
++     id: string;
++     title: string;
++     scheduledDate: string | null;
++     estimatedMinutes: number | null;
++     priority: string;
++     workDepth: string | null;
++     physicalEnergy: string | null;
++     rescheduleCount: number | null;
++   }) => ({
++     targetType: "subtask" as const,
++     expectedRevision: s.revision,
++     targetId: s.id,
++     title: s.title,
++     fromDate: s.scheduledDate!,
++     estimatedMinutes: estimateMinutes(s.estimatedMinutes),
++     priority: s.priority,
++     workDepth: s.workDepth,
++     physicalEnergy: s.physicalEnergy,
++     rescheduleCount: s.rescheduleCount
++   })), ...unfinishedTasks.map((t: {
++     revision: number;
++     id: string;
++     title: string;
++     scheduledDate: string | null;
++     priority: string;
++     workDepth: string | null;
++     physicalEnergy: string | null;
++     rescheduleCount: number | null;
++   }) => ({
++     targetType: "task" as const,
++     expectedRevision: t.revision,
++     targetId: t.id,
++     title: t.title,
++     fromDate: t.scheduledDate!,
++     estimatedMinutes: 30,
++     priority: t.priority,
++     workDepth: t.workDepth,
++     physicalEnergy: t.physicalEnergy,
++     rescheduleCount: t.rescheduleCount
++   }))];
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:417:12
+-           sql`NOT EXISTS (SELECT 1 FROM subtasks st WHERE st.task_id = ${tasks.id})`,
++           sql``,
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:422:22
+-     const candidates = [
+-       ...unfinishedSubtasks.map(
+-         (s: {
+-           revision: number;
+-           id: string;
+-           title: string;
+-           scheduledDate: string | null;
+-           estimatedMinutes: number | null;
+-           priority: string;
+-           workDepth: string | null;
+-           physicalEnergy: string | null;
+-           rescheduleCount: number | null;
+-         }) => ({
+-           targetType: "subtask" as const,
+-           expectedRevision: s.revision,
+-           targetId: s.id,
+-           title: s.title,
+-           fromDate: s.scheduledDate!,
+-           estimatedMinutes: estimateMinutes(s.estimatedMinutes),
+-           priority: s.priority,
+-           workDepth: s.workDepth,
+-           physicalEnergy: s.physicalEnergy,
+-           rescheduleCount: s.rescheduleCount,
+-         }),
+-       ),
+-       ...unfinishedTasks.map(
+-         (t: {
+-           revision: number;
+-           id: string;
+-           title: string;
+-           scheduledDate: string | null;
+-           priority: string;
+-           workDepth: string | null;
+-           physicalEnergy: string | null;
+-           rescheduleCount: number | null;
+-         }) => ({
+-           targetType: "task" as const,
+-           expectedRevision: t.revision,
+-           targetId: t.id,
+-           title: t.title,
+-           fromDate: t.scheduledDate!,
+-           estimatedMinutes: 30,
+-           priority: t.priority,
+-           workDepth: t.workDepth,
+-           physicalEnergy: t.physicalEnergy,
+-           rescheduleCount: t.rescheduleCount,
+-         }),
+-       ),
+-     ].sort((a, b) => scheduleScore(b) - scheduleScore(a));
++     const candidates = [].sort((a, b) => scheduleScore(b) - scheduleScore(a));
+
+[Survived] ArrowFunction
+apps/api/src/services/scheduler.ts:424:7
+-         (s: {
+-           revision: number;
+-           id: string;
+-           title: string;
+-           scheduledDate: string | null;
+-           estimatedMinutes: number | null;
+-           priority: string;
+-           workDepth: string | null;
+-           physicalEnergy: string | null;
+-           rescheduleCount: number | null;
+-         }) => ({
+-           targetType: "subtask" as const,
+-           expectedRevision: s.revision,
+-           targetId: s.id,
+-           title: s.title,
+-           fromDate: s.scheduledDate!,
+-           estimatedMinutes: estimateMinutes(s.estimatedMinutes),
+-           priority: s.priority,
+-           workDepth: s.workDepth,
+-           physicalEnergy: s.physicalEnergy,
+-           rescheduleCount: s.rescheduleCount,
+-         }),
++         () => undefined,
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:457:14
+-         }) => ({
+-           targetType: "task" as const,
+-           expectedRevision: t.revision,
+-           targetId: t.id,
+-           title: t.title,
+-           fromDate: t.scheduledDate!,
+-           estimatedMinutes: 30,
+-           priority: t.priority,
+-           workDepth: t.workDepth,
+-           physicalEnergy: t.physicalEnergy,
+-           rescheduleCount: t.rescheduleCount,
+-         }),
++         }) => ({}),
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:434:14
+-         }) => ({
+-           targetType: "subtask" as const,
+-           expectedRevision: s.revision,
+-           targetId: s.id,
+-           title: s.title,
+-           fromDate: s.scheduledDate!,
+-           estimatedMinutes: estimateMinutes(s.estimatedMinutes),
+-           priority: s.priority,
+-           workDepth: s.workDepth,
+-           physicalEnergy: s.physicalEnergy,
+-           rescheduleCount: s.rescheduleCount,
+-         }),
++         }) => ({}),
+
+[Survived] ArrowFunction
+apps/api/src/services/scheduler.ts:448:7
+-         (t: {
+-           revision: number;
+-           id: string;
+-           title: string;
+-           scheduledDate: string | null;
+-           priority: string;
+-           workDepth: string | null;
+-           physicalEnergy: string | null;
+-           rescheduleCount: number | null;
+-         }) => ({
+-           targetType: "task" as const,
+-           expectedRevision: t.revision,
+-           targetId: t.id,
+-           title: t.title,
+-           fromDate: t.scheduledDate!,
+-           estimatedMinutes: 30,
+-           priority: t.priority,
+-           workDepth: t.workDepth,
+-           physicalEnergy: t.physicalEnergy,
+-           rescheduleCount: t.rescheduleCount,
+-         }),
++         () => undefined,
+
+[Survived] ArrowFunction
+apps/api/src/services/scheduler.ts:470:10
+-     ].sort((a, b) => scheduleScore(b) - scheduleScore(a));
++     ].sort(() => undefined);
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:470:20
+-     ].sort((a, b) => scheduleScore(b) - scheduleScore(a));
++     ].sort((a, b) => scheduleScore(b) + scheduleScore(a));
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:472:41
+-     const proposals: ScheduleProposal[] = [];
++     const proposals: ScheduleProposal[] = ["Stryker was here"];
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:473:34
+-     for (const item of candidates) {
+-       let pickedDay = days[0] ?? opts.fromDate;
+-       let bestLoad = Number.POSITIVE_INFINITY;
+-       for (const day of days) {
+-         const load = dayLoad.get(day) ?? 0;
+-         if (load + item.estimatedMinutes <= learning.dailyCapacity) {
+-           pickedDay = day;
+-           bestLoad = load;
+-           break;
+-         }
+-         if (load < bestLoad) {
+-           bestLoad = load;
+-           pickedDay = day;
+-         }
+-       }
+-       dayLoad.set(
+-         pickedDay,
+-         (dayLoad.get(pickedDay) ?? 0) + item.estimatedMinutes,
+-       );
+-       const overCapacity = (dayLoad.get(pickedDay) ?? 0) > learning.dailyCapacity;
+-       const preferredWindow =
+-         item.workDepth === "deep" && learning.peakHour != null
+-           ? ` near your usual deep-work window around ${learning.peakHour}:00`
+-           : "";
+-       proposals.push({
+-         id: `${item.targetType}:${item.targetId}:${item.fromDate}:${pickedDay}`,
+-         targetType: item.targetType,
+-         targetId: item.targetId,
+-         expectedRevision: item.expectedRevision,
+-         title: item.title,
+-         fromDate: item.fromDate,
+-         toDate: pickedDay,
+-         estimatedMinutes: item.estimatedMinutes,
+-         priority: item.priority,
+-         workDepth: item.workDepth,
+-         physicalEnergy: item.physicalEnergy,
+-         reason: overCapacity
+-           ? "No fully open day remains, so this is placed on the least-loaded day for review."
+-           : `Moved unfinished work into available capacity${preferredWindow}.`,
+-         risk:
+-           item.priority === "urgent" || overCapacity
+-             ? "high"
+-             : item.priority === "high"
+-               ? "medium"
+-               : "low",
+-       });
+-     }
++     for (const item of candidates) {}
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:476:29
+-       for (const day of days) {
+-         const load = dayLoad.get(day) ?? 0;
+-         if (load + item.estimatedMinutes <= learning.dailyCapacity) {
+-           pickedDay = day;
+-           bestLoad = load;
+-           break;
+-         }
+-         if (load < bestLoad) {
+-           bestLoad = load;
+-           pickedDay = day;
+-         }
+-       }
++       for (const day of days) {}
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:474:21
+-       let pickedDay = days[0] ?? opts.fromDate;
++       let pickedDay = days[0] && opts.fromDate;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:478:11
+-         if (load + item.estimatedMinutes <= learning.dailyCapacity) {
++         if (true) {
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:477:20
+-         const load = dayLoad.get(day) ?? 0;
++         const load = dayLoad.get(day) && 0;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:478:11
+-         if (load + item.estimatedMinutes <= learning.dailyCapacity) {
++         if (load - item.estimatedMinutes <= learning.dailyCapacity) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:478:11
+-         if (load + item.estimatedMinutes <= learning.dailyCapacity) {
++         if (false) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:478:11
+-         if (load + item.estimatedMinutes <= learning.dailyCapacity) {
++         if (load + item.estimatedMinutes > learning.dailyCapacity) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:478:11
+-         if (load + item.estimatedMinutes <= learning.dailyCapacity) {
++         if (load + item.estimatedMinutes < learning.dailyCapacity) {
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:478:67
+-         if (load + item.estimatedMinutes <= learning.dailyCapacity) {
+-           pickedDay = day;
+-           bestLoad = load;
+-           break;
+-         }
++         if (load + item.estimatedMinutes <= learning.dailyCapacity) {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:483:11
+-         if (load < bestLoad) {
++         if (true) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:483:11
+-         if (load < bestLoad) {
++         if (false) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:483:11
+-         if (load < bestLoad) {
++         if (load <= bestLoad) {
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:491:8
+-         (dayLoad.get(pickedDay) ?? 0) + item.estimatedMinutes,
++         (dayLoad.get(pickedDay) && 0) + item.estimatedMinutes,
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:483:28
+-         if (load < bestLoad) {
+-           bestLoad = load;
+-           pickedDay = day;
+-         }
++         if (load < bestLoad) {}
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:483:11
+-         if (load < bestLoad) {
++         if (load >= bestLoad) {
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:491:7
+-         (dayLoad.get(pickedDay) ?? 0) + item.estimatedMinutes,
++         (dayLoad.get(pickedDay) ?? 0) - item.estimatedMinutes,
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:493:26
+-       const overCapacity = (dayLoad.get(pickedDay) ?? 0) > learning.dailyCapacity;
++       const overCapacity = false;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:493:26
+-       const overCapacity = (dayLoad.get(pickedDay) ?? 0) > learning.dailyCapacity;
++       const overCapacity = (dayLoad.get(pickedDay) ?? 0) <= learning.dailyCapacity;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:493:26
+-       const overCapacity = (dayLoad.get(pickedDay) ?? 0) > learning.dailyCapacity;
++       const overCapacity = (dayLoad.get(pickedDay) ?? 0) >= learning.dailyCapacity;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:493:26
+-       const overCapacity = (dayLoad.get(pickedDay) ?? 0) > learning.dailyCapacity;
++       const overCapacity = true;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:495:7
+-         item.workDepth === "deep" && learning.peakHour != null
++         false
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:495:7
+-         item.workDepth === "deep" && learning.peakHour != null
++         true
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:493:27
+-       const overCapacity = (dayLoad.get(pickedDay) ?? 0) > learning.dailyCapacity;
++       const overCapacity = (dayLoad.get(pickedDay) && 0) > learning.dailyCapacity;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:495:7
+-         item.workDepth === "deep" && learning.peakHour != null
++         item.workDepth === "deep" || learning.peakHour != null
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:495:26
+-         item.workDepth === "deep" && learning.peakHour != null
++         item.workDepth === "" && learning.peakHour != null
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:495:7
+-         item.workDepth === "deep" && learning.peakHour != null
++         true && learning.peakHour != null
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:495:7
+-         item.workDepth === "deep" && learning.peakHour != null
++         item.workDepth !== "deep" && learning.peakHour != null
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:495:36
+-         item.workDepth === "deep" && learning.peakHour != null
++         item.workDepth === "deep" && true
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:495:36
+-         item.workDepth === "deep" && learning.peakHour != null
++         item.workDepth === "deep" && learning.peakHour == null
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:496:11
+-           ? ` near your usual deep-work window around ${learning.peakHour}:00`
++           ? ``
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:497:11
+-           : "";
++           : "Stryker was here!";
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:499:20
+-       proposals.push({
+-         id: `${item.targetType}:${item.targetId}:${item.fromDate}:${pickedDay}`,
+-         targetType: item.targetType,
+-         targetId: item.targetId,
+-         expectedRevision: item.expectedRevision,
+-         title: item.title,
+-         fromDate: item.fromDate,
+-         toDate: pickedDay,
+-         estimatedMinutes: item.estimatedMinutes,
+-         priority: item.priority,
+-         workDepth: item.workDepth,
+-         physicalEnergy: item.physicalEnergy,
+-         reason: overCapacity
+-           ? "No fully open day remains, so this is placed on the least-loaded day for review."
+-           : `Moved unfinished work into available capacity${preferredWindow}.`,
+-         risk:
+-           item.priority === "urgent" || overCapacity
+-             ? "high"
+-             : item.priority === "high"
+-               ? "medium"
+-               : "low",
+-       });
++       proposals.push({});
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:500:11
+-         id: `${item.targetType}:${item.targetId}:${item.fromDate}:${pickedDay}`,
++         id: ``,
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:512:11
+-           ? "No fully open day remains, so this is placed on the least-loaded day for review."
++           ? ""
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:515:9
+-           item.priority === "urgent" || overCapacity
++           true
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:513:11
+-           : `Moved unfinished work into available capacity${preferredWindow}.`,
++           : ``,
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:515:9
+-           item.priority === "urgent" || overCapacity
++           false
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:515:9
+-           item.priority === "urgent" || overCapacity
++           item.priority === "urgent" && overCapacity
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:515:9
+-           item.priority === "urgent" || overCapacity
++           false || overCapacity
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:515:9
+-           item.priority === "urgent" || overCapacity
++           item.priority !== "urgent" || overCapacity
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:517:13
+-             : item.priority === "high"
++             : false
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:517:13
+-             : item.priority === "high"
++             : true
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:515:27
+-           item.priority === "urgent" || overCapacity
++           item.priority === "" || overCapacity
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:516:13
+-             ? "high"
++             ? ""
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:517:13
+-             : item.priority === "high"
++             : item.priority !== "high"
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:518:15
+-               ? "medium"
++               ? ""
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:517:31
+-             : item.priority === "high"
++             : item.priority === ""
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:519:15
+-               : "low",
++               : "",
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:523:10
+-     return { proposals, learning };
++     return {};
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:530:3
+-   ) {
+-     return db.transaction(
+-       async (tx: any) => {
+-         const result = await calculateSchedulePreview(tx, userId, opts);
+-         const context = (
+-           await tx.execute(
+-             sql`SELECT jsonb_build_object('tasks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(id,revision) ORDER BY id),'[]'::jsonb) FROM tasks WHERE user_id=${userId}), 'subtasks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(s.id,s.revision) ORDER BY s.id),'[]'::jsonb) FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE t.user_id=${userId}), 'preferences',(SELECT to_jsonb(u) FROM users u WHERE id=${userId})) AS value`,
+-           )
+-         ).rows[0].value;
+-         const saved = (
+-           await tx.execute(
+-             sql`INSERT INTO schedule_previews(user_id,proposals,context) VALUES(${userId},${JSON.stringify(result.proposals)}::jsonb,${JSON.stringify(context)}::jsonb) RETURNING id,expires_at`,
+-           )
+-         ).rows[0];
+-         return { ...result, previewId: saved.id, expiresAt: saved.expires_at };
+-       },
+-       { isolationLevel: "repeatable read" },
+-     );
+-   }
++   ) {}
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:532:24
+-       async (tx: any) => {
+-         const result = await calculateSchedulePreview(tx, userId, opts);
+-         const context = (
+-           await tx.execute(
+-             sql`SELECT jsonb_build_object('tasks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(id,revision) ORDER BY id),'[]'::jsonb) FROM tasks WHERE user_id=${userId}), 'subtasks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(s.id,s.revision) ORDER BY s.id),'[]'::jsonb) FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE t.user_id=${userId}), 'preferences',(SELECT to_jsonb(u) FROM users u WHERE id=${userId})) AS value`,
+-           )
+-         ).rows[0].value;
+-         const saved = (
+-           await tx.execute(
+-             sql`INSERT INTO schedule_previews(user_id,proposals,context) VALUES(${userId},${JSON.stringify(result.proposals)}::jsonb,${JSON.stringify(context)}::jsonb) RETURNING id,expires_at`,
+-           )
+-         ).rows[0];
+-         return { ...result, previewId: saved.id, expiresAt: saved.expires_at };
+-       },
++       async (tx: any) => {},
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:536:14
+-             sql`SELECT jsonb_build_object('tasks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(id,revision) ORDER BY id),'[]'::jsonb) FROM tasks WHERE user_id=${userId}), 'subtasks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(s.id,s.revision) ORDER BY s.id),'[]'::jsonb) FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE t.user_id=${userId}), 'preferences',(SELECT to_jsonb(u) FROM users u WHERE id=${userId})) AS value`,
++             sql``,
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:541:14
+-             sql`INSERT INTO schedule_previews(user_id,proposals,context) VALUES(${userId},${JSON.stringify(result.proposals)}::jsonb,${JSON.stringify(context)}::jsonb) RETURNING id,expires_at`,
++             sql``,
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:544:14
+-         return { ...result, previewId: saved.id, expiresAt: saved.expires_at };
++         return {};
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:546:5
+-       { isolationLevel: "repeatable read" },
++       {},
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:546:23
+-       { isolationLevel: "repeatable read" },
++       { isolationLevel: "" },
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:556:5
+-       "schedule",
++       "",
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:553:3
+-   ) {
+-     return receipt(
+-       userId,
+-       "schedule",
+-       input.idempotencyKey,
+-       { previewId: input.previewId, selectedIds: [...input.selectedIds].sort() },
+-       async (c) => {
+-         const preview = (
+-           await c.query(
+-             "SELECT * FROM schedule_previews WHERE id=$1 AND user_id=$2 AND expires_at>now() FOR UPDATE",
+-             [input.previewId, userId],
+-           )
+-         ).rows[0];
+-         if (!preview)
+-           throw new DailyConflict("Preview expired. Refresh your plan.");
+-         // Lock the complete capacity context, not just selected rows. Additions are caught by SERIALIZABLE isolation below.
+-         await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [userId]);
+-         await c.query(
+-           "SELECT id FROM tasks WHERE user_id=$1 ORDER BY id FOR UPDATE",
+-           [userId],
+-         );
+-         await c.query(
+-           "SELECT s.id FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE t.user_id=$1 ORDER BY s.id FOR UPDATE OF s",
+-           [userId],
+-         );
+-         const context = (
+-           await c.query(
+-             `SELECT jsonb_build_object('tasks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(id,revision) ORDER BY id),'[]'::jsonb) FROM tasks WHERE user_id=$1), 'subtasks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(s.id,s.revision) ORDER BY s.id),'[]'::jsonb) FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE t.user_id=$1), 'preferences',(SELECT to_jsonb(u) FROM users u WHERE id=$1)) AS value`,
+-             [userId],
+-           )
+-         ).rows[0].value;
+-         if (JSON.stringify(context) !== JSON.stringify(preview.context))
+-           throw new DailyConflict(
+-             "Your plan or capacity changed. Refresh the preview.",
+-           );
+-         const proposals: ScheduleProposal[] = preview.proposals;
+-         const selected = input.selectedIds.map((id) =>
+-           proposals.find((p) => p.id === id),
+-         );
+-         if (
+-           selected.some((p) => !p) ||
+-           new Set(input.selectedIds).size !== input.selectedIds.length
+-         )
+-           throw new DailyConflict("Invalid preview selection.");
+-         for (const p of selected as ScheduleProposal[])
+-           await lockTarget(c, userId, p, p.fromDate);
+-         for (const p of selected as ScheduleProposal[]) {
+-           if (p.targetType === "task")
+-             await c.query(
+-               "UPDATE tasks SET scheduled_date=$1,reschedule_count=reschedule_count+1,scheduling_state='scheduled',is_auto_scheduled=true,updated_at=now() WHERE id=$2",
+-               [p.toDate, p.targetId],
+-             );
+-           else
+-             await c.query("UPDATE subtasks SET scheduled_date=$1 WHERE id=$2", [
+-               p.toDate,
+-               p.targetId,
+-             ]);
+-         }
+-         return { applied: selected.length, skipped: 0 };
+-       },
+-       "serializable",
+-     );
+-   }
++   ) {}
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:558:5
+-       { previewId: input.previewId, selectedIds: [...input.selectedIds].sort() },
++       {},
+
+[Survived] MethodExpression
+apps/api/src/services/scheduler.ts:558:48
+-       { previewId: input.previewId, selectedIds: [...input.selectedIds].sort() },
++       { previewId: input.previewId, selectedIds: [...input.selectedIds] },
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:563:11
+-             [input.previewId, userId],
++             [],
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:558:48
+-       { previewId: input.previewId, selectedIds: [...input.selectedIds].sort() },
++       { previewId: input.previewId, selectedIds: [].sort() },
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:562:11
+-             "SELECT * FROM schedule_previews WHERE id=$1 AND user_id=$2 AND expires_at>now() FOR UPDATE",
++             "",
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:559:18
+-       async (c) => {
+-         const preview = (
+-           await c.query(
+-             "SELECT * FROM schedule_previews WHERE id=$1 AND user_id=$2 AND expires_at>now() FOR UPDATE",
+-             [input.previewId, userId],
+-           )
+-         ).rows[0];
+-         if (!preview)
+-           throw new DailyConflict("Preview expired. Refresh your plan.");
+-         // Lock the complete capacity context, not just selected rows. Additions are caught by SERIALIZABLE isolation below.
+-         await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [userId]);
+-         await c.query(
+-           "SELECT id FROM tasks WHERE user_id=$1 ORDER BY id FOR UPDATE",
+-           [userId],
+-         );
+-         await c.query(
+-           "SELECT s.id FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE t.user_id=$1 ORDER BY s.id FOR UPDATE OF s",
+-           [userId],
+-         );
+-         const context = (
+-           await c.query(
+-             `SELECT jsonb_build_object('tasks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(id,revision) ORDER BY id),'[]'::jsonb) FROM tasks WHERE user_id=$1), 'subtasks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(s.id,s.revision) ORDER BY s.id),'[]'::jsonb) FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE t.user_id=$1), 'preferences',(SELECT to_jsonb(u) FROM users u WHERE id=$1)) AS value`,
+-             [userId],
+-           )
+-         ).rows[0].value;
+-         if (JSON.stringify(context) !== JSON.stringify(preview.context))
+-           throw new DailyConflict(
+-             "Your plan or capacity changed. Refresh the preview.",
+-           );
+-         const proposals: ScheduleProposal[] = preview.proposals;
+-         const selected = input.selectedIds.map((id) =>
+-           proposals.find((p) => p.id === id),
+-         );
+-         if (
+-           selected.some((p) => !p) ||
+-           new Set(input.selectedIds).size !== input.selectedIds.length
+-         )
+-           throw new DailyConflict("Invalid preview selection.");
+-         for (const p of selected as ScheduleProposal[])
+-           await lockTarget(c, userId, p, p.fromDate);
+-         for (const p of selected as ScheduleProposal[]) {
+-           if (p.targetType === "task")
+-             await c.query(
+-               "UPDATE tasks SET scheduled_date=$1,reschedule_count=reschedule_count+1,scheduling_state='scheduled',is_auto_scheduled=true,updated_at=now() WHERE id=$2",
+-               [p.toDate, p.targetId],
+-             );
+-           else
+-             await c.query("UPDATE subtasks SET scheduled_date=$1 WHERE id=$2", [
+-               p.toDate,
+-               p.targetId,
+-             ]);
+-         }
+-         return { applied: selected.length, skipped: 0 };
+-       },
++       async (c) => {},
+
+[Survived] BooleanLiteral
+apps/api/src/services/scheduler.ts:566:11
+-         if (!preview)
++         if (preview)
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:566:11
+-         if (!preview)
++         if (true)
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:566:11
+-         if (!preview)
++         if (false)
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:567:33
+-           throw new DailyConflict("Preview expired. Refresh your plan.");
++           throw new DailyConflict("");
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:569:21
+-         await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [userId]);
++         await c.query("", [userId]);
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:571:9
+-           "SELECT id FROM tasks WHERE user_id=$1 ORDER BY id FOR UPDATE",
++           "",
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:572:9
+-           [userId],
++           [],
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:569:68
+-         await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [userId]);
++         await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", []);
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:575:9
+-           "SELECT s.id FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE t.user_id=$1 ORDER BY s.id FOR UPDATE OF s",
++           "",
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:576:9
+-           [userId],
++           [],
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:581:11
+-             [userId],
++             [],
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:580:11
+-             `SELECT jsonb_build_object('tasks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(id,revision) ORDER BY id),'[]'::jsonb) FROM tasks WHERE user_id=$1), 'subtasks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(s.id,s.revision) ORDER BY s.id),'[]'::jsonb) FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE t.user_id=$1), 'preferences',(SELECT to_jsonb(u) FROM users u WHERE id=$1)) AS value`,
++             ``,
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:584:11
+-         if (JSON.stringify(context) !== JSON.stringify(preview.context))
++         if (true)
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:584:11
+-         if (JSON.stringify(context) !== JSON.stringify(preview.context))
++         if (JSON.stringify(context) === JSON.stringify(preview.context))
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:584:11
+-         if (JSON.stringify(context) !== JSON.stringify(preview.context))
++         if (false)
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:586:11
+-             "Your plan or capacity changed. Refresh the preview.",
++             "",
+
+[Survived] ArrowFunction
+apps/api/src/services/scheduler.ts:589:46
+-         const selected = input.selectedIds.map((id) =>
+-           proposals.find((p) => p.id === id),
++         const selected = input.selectedIds.map(() => undefined,
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:590:31
+-           proposals.find((p) => p.id === id),
++           proposals.find((p) => true),
+
+[Survived] ArrowFunction
+apps/api/src/services/scheduler.ts:590:24
+-           proposals.find((p) => p.id === id),
++           proposals.find(() => undefined),
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:590:31
+-           proposals.find((p) => p.id === id),
++           proposals.find((p) => false),
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:593:9
+-           selected.some((p) => !p) ||
+-           new Set(input.selectedIds).size !== input.selectedIds.length
++           true
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:593:9
+-           selected.some((p) => !p) ||
+-           new Set(input.selectedIds).size !== input.selectedIds.length
++           false
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:590:31
+-           proposals.find((p) => p.id === id),
++           proposals.find((p) => p.id !== id),
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:593:9
+-           selected.some((p) => !p) ||
+-           new Set(input.selectedIds).size !== input.selectedIds.length
++           selected.some(p => !p) && new Set(input.selectedIds).size !== input.selectedIds.length
+
+[Survived] MethodExpression
+apps/api/src/services/scheduler.ts:593:9
+-           selected.some((p) => !p) ||
++           selected.every(p => !p) ||
+
+[Survived] ArrowFunction
+apps/api/src/services/scheduler.ts:593:23
+-           selected.some((p) => !p) ||
++           selected.some(() => undefined) ||
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:594:9
+-           new Set(input.selectedIds).size !== input.selectedIds.length
++           false
+
+[Survived] BooleanLiteral
+apps/api/src/services/scheduler.ts:593:30
+-           selected.some((p) => !p) ||
++           selected.some((p) => p) ||
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:594:9
+-           new Set(input.selectedIds).size !== input.selectedIds.length
++           new Set(input.selectedIds).size === input.selectedIds.length
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:599:55
+-         for (const p of selected as ScheduleProposal[]) {
+-           if (p.targetType === "task")
+-             await c.query(
+-               "UPDATE tasks SET scheduled_date=$1,reschedule_count=reschedule_count+1,scheduling_state='scheduled',is_auto_scheduled=true,updated_at=now() WHERE id=$2",
+-               [p.toDate, p.targetId],
+-             );
+-           else
+-             await c.query("UPDATE subtasks SET scheduled_date=$1 WHERE id=$2", [
+-               p.toDate,
+-               p.targetId,
+-             ]);
+-         }
++         for (const p of selected as ScheduleProposal[]) {}
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:600:13
+-           if (p.targetType === "task")
++           if (true)
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:596:33
+-           throw new DailyConflict("Invalid preview selection.");
++           throw new DailyConflict("");
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:600:13
+-           if (p.targetType === "task")
++           if (false)
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:602:13
+-               "UPDATE tasks SET scheduled_date=$1,reschedule_count=reschedule_count+1,scheduling_state='scheduled',is_auto_scheduled=true,updated_at=now() WHERE id=$2",
++               "",
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:600:30
+-           if (p.targetType === "task")
++           if (p.targetType === "")
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:600:13
+-           if (p.targetType === "task")
++           if (p.targetType !== "task")
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:606:78
+-             await c.query("UPDATE subtasks SET scheduled_date=$1 WHERE id=$2", [
+-               p.toDate,
+-               p.targetId,
+-             ]);
++             await c.query("UPDATE subtasks SET scheduled_date=$1 WHERE id=$2", []);
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:603:13
+-               [p.toDate, p.targetId],
++               [],
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:611:14
+-         return { applied: selected.length, skipped: 0 };
++         return {};
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:606:25
+-             await c.query("UPDATE subtasks SET scheduled_date=$1 WHERE id=$2", [
++             await c.query("", [
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:613:5
+-       "serializable",
++       "",
+
+Ran 1.00 tests per mutant on average.
+-----------------|------------------|----------|-----------|------------|----------|----------|
+                 | % Mutation score |          |           |            |          |          |
+File             |  total | covered | # killed | # timeout | # survived | # no cov | # errors |
+-----------------|--------|---------|----------|-----------|------------|----------|----------|
+All files        |  17.50 |   17.50 |      129 |         0 |        608 |        0 |        0 |
+ google          |  82.22 |   82.22 |       37 |         0 |          8 |        0 |        0 |
+  event-write.ts |  83.33 |   83.33 |       20 |         0 |          4 |        0 |        0 |
+  oauth-state.ts |  80.95 |   80.95 |       17 |         0 |          4 |        0 |        0 |
+ services        |  13.29 |   13.29 |       92 |         0 |        600 |        0 |        0 |
+  daily.ts       |   4.72 |    4.72 |       11 |         0 |        222 |        0 |        0 |
+  reviews.ts     |  81.82 |   81.82 |       81 |         0 |         18 |        0 |        0 |
+  scheduler.ts   |   0.00 |    0.00 |        0 |         0 |        360 |        0 |        0 |
+-----------------|--------|---------|----------|-----------|------------|----------|----------|
+[91m03:11:43 (33448) ERROR MutationTestReportHelper[39m Final mutation score 17.50 under breaking threshold 70, setting exit code to 1 (failure).
+[32m03:11:43 (33448) INFO MutationTestReportHelper[39m (improve mutation score or set `thresholds.break = null` to prevent this error in the future)
+[32m03:11:43 (33448) INFO JsonReporter[39m Your report can be found at: file:///C:/Users/adebo/PROJECTS/devplanner/reports/mutation/mutation.json
+[32m03:11:43 (33448) INFO HtmlReporter[39m Your report can be found at: file:///C:/Users/adebo/PROJECTS/devplanner/reports/mutation/mutation.html
+[32m03:11:43 (33448) INFO MutationTestExecutor[39m Done in 15 minutes and 51 seconds.

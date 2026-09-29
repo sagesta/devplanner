@@ -24,7 +24,11 @@ function todayYmd(): string {
 
 function formatDate(ymd: string): string {
   const d = new Date(`${ymd}T12:00:00`);
-  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function monthKey(ymd: string): string {
@@ -42,8 +46,8 @@ function parseSkills(input: string): string[] {
       input
         .split(",")
         .map((s) => s.trim())
-        .filter(Boolean)
-    )
+        .filter(Boolean),
+    ),
   );
 }
 
@@ -69,7 +73,9 @@ const EMPTY_FORM: FormState = {
 
 function toCsv(rows: AccomplishmentRow[]): string {
   const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  const header = ["Date", "What you did", "Impact", "Metric", "Skills"].map(esc).join(",");
+  const header = ["Date", "What you did", "Impact", "Metric", "Skills"]
+    .map(esc)
+    .join(",");
   const lines = rows.map((r) =>
     [
       r.date,
@@ -79,7 +85,7 @@ function toCsv(rows: AccomplishmentRow[]): string {
       (r.skills ?? []).join("; "),
     ]
       .map((v) => esc(String(v)))
-      .join(",")
+      .join(","),
   );
   return [header, ...lines].join("\r\n");
 }
@@ -137,18 +143,25 @@ export function AccomplishmentsPanel() {
   const rows = useMemo(() => listQ.data ?? [], [listQ.data]);
 
   // Prefill from a "Log win" nudge: /review?view=accomplishments&title=…&taskId=…
+  /* eslint-disable react-hooks/set-state-in-effect -- Consume a one-time router prefill into the editable form, then clear those external URL parameters. */
   useEffect(() => {
     if (consumedPrefill.current) return;
     const title = searchParams.get("title");
     const taskId = searchParams.get("taskId");
     if (!title && !taskId) return;
     consumedPrefill.current = true;
-    setForm({ ...EMPTY_FORM, date: todayYmd(), title: title ?? "", taskId: taskId || null });
+    setForm({
+      ...EMPTY_FORM,
+      date: todayYmd(),
+      title: title ?? "",
+      taskId: taskId || null,
+    });
     setFormOpen(true);
     // Drop the prefill params so a refresh doesn't re-open the form.
     router.replace("/review?view=accomplishments");
     setTimeout(() => titleRef.current?.focus(), 80);
   }, [searchParams, router]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const saveMut = useMutation({
     mutationFn: async (state: FormState) => {
@@ -226,9 +239,12 @@ export function AccomplishmentsPanel() {
       <div className="min-w-0">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="font-display text-[26px] font-normal leading-tight text-[var(--ink)]">Accomplishments</h1>
+            <h1 className="font-display text-[26px] font-normal leading-tight text-[var(--ink)]">
+              Accomplishments
+            </h1>
             <p className="mt-1 text-sm text-muted">
-              What you did, the impact, and the proof. Your record for reviews, CVs, and promotions.
+              What you did, the impact, and the proof. Your record for reviews,
+              CVs, and promotions.
             </p>
           </div>
           {!formOpen && (
@@ -269,7 +285,9 @@ export function AccomplishmentsPanel() {
                   <input
                     type="date"
                     value={form.date}
-                    onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, date: e.target.value }))
+                    }
                     className="mt-1 w-full rounded-xl border border-[var(--hairline)] bg-background px-3 py-2 text-sm font-normal text-[var(--ink)]"
                   />
                 </label>
@@ -278,7 +296,9 @@ export function AccomplishmentsPanel() {
                   <input
                     ref={titleRef}
                     value={form.title}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, title: e.target.value }))
+                    }
                     placeholder="Led the Q3 planning meeting"
                     className="mt-1 w-full rounded-xl border border-[var(--hairline)] bg-background px-3 py-2 text-sm font-normal text-[var(--ink)] placeholder:text-[var(--muted-soft)]"
                     onKeyDown={(e) => {
@@ -292,10 +312,15 @@ export function AccomplishmentsPanel() {
               </div>
 
               <label className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-                Impact <span className="font-normal normal-case text-muted/85">— what changed because of it</span>
+                Impact{" "}
+                <span className="font-normal normal-case text-muted/85">
+                  — what changed because of it
+                </span>
                 <textarea
                   value={form.impact}
-                  onChange={(e) => setForm((f) => ({ ...f, impact: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, impact: e.target.value }))
+                  }
                   placeholder="Team had clear priorities before the quarter started"
                   rows={2}
                   className="mt-1 w-full resize-none rounded-xl border border-[var(--hairline)] bg-background px-3 py-2 text-sm font-normal text-[var(--ink)] placeholder:text-[var(--muted-soft)]"
@@ -307,16 +332,23 @@ export function AccomplishmentsPanel() {
                   Proof / metric
                   <input
                     value={form.metric}
-                    onChange={(e) => setForm((f) => ({ ...f, metric: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, metric: e.target.value }))
+                    }
                     placeholder="Roadmap approved on time"
                     className="mt-1 w-full rounded-xl border border-[var(--hairline)] bg-background px-3 py-2 text-sm font-normal text-[var(--ink)] placeholder:text-[var(--muted-soft)]"
                   />
                 </label>
                 <label className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-                  Skills <span className="font-normal normal-case text-muted/85">— comma separated</span>
+                  Skills{" "}
+                  <span className="font-normal normal-case text-muted/85">
+                    — comma separated
+                  </span>
                   <input
                     value={form.skills}
-                    onChange={(e) => setForm((f) => ({ ...f, skills: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, skills: e.target.value }))
+                    }
                     placeholder="Project management, Communication"
                     className="mt-1 w-full rounded-xl border border-[var(--hairline)] bg-background px-3 py-2 text-sm font-normal text-[var(--ink)] placeholder:text-[var(--muted-soft)]"
                   />
@@ -340,7 +372,11 @@ export function AccomplishmentsPanel() {
                   disabled={saveMut.isPending}
                   className="rounded-full bg-[var(--ink-btn-bg)] px-5 py-[9px] text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-60"
                 >
-                  {saveMut.isPending ? "Saving…" : form.id ? "Save changes" : "Save"}
+                  {saveMut.isPending
+                    ? "Saving…"
+                    : form.id
+                      ? "Save changes"
+                      : "Save"}
                 </button>
               </div>
             </div>
@@ -351,13 +387,34 @@ export function AccomplishmentsPanel() {
         <div className="mt-6">
           {listQ.isLoading ? (
             <p className="text-sm text-muted">Loading…</p>
+          ) : listQ.isError ? (
+            <div
+              role="alert"
+              className="rounded-2xl border border-danger/30 bg-danger/5 p-6 text-sm text-danger"
+            >
+              <p>
+                Accomplishments could not be loaded. Your saved records may
+                still be available.
+              </p>
+              <button
+                type="button"
+                onClick={() => void listQ.refetch()}
+                disabled={listQ.isFetching}
+                className="mt-3 rounded-full border border-danger/40 px-4 py-2 font-semibold disabled:opacity-50"
+              >
+                Retry loading
+              </button>
+            </div>
           ) : rows.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[var(--hairline)] p-8 text-center">
               <Award size={28} className="mx-auto mb-3 text-[var(--teal)]" />
-              <p className="text-sm font-medium text-[var(--ink)]">No accomplishments yet</p>
+              <p className="text-sm font-medium text-[var(--ink)]">
+                No accomplishments yet
+              </p>
               <p className="mx-auto mt-1 max-w-sm text-xs text-muted">
-                Every time you finish something that mattered, log it here. In a few weeks
-                you&apos;ll have proof of your progress ready for any review or application.
+                Every time you finish something that mattered, log it here. In a
+                few weeks you&apos;ll have proof of your progress ready for any
+                review or application.
               </p>
               {!formOpen && (
                 <button
@@ -385,8 +442,12 @@ export function AccomplishmentsPanel() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-[var(--ink)]">{r.title}</p>
-                            <p className="mt-0.5 text-[11px] text-muted">{formatDate(r.date)}</p>
+                            <p className="text-sm font-semibold text-[var(--ink)]">
+                              {r.title}
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-muted">
+                              {formatDate(r.date)}
+                            </p>
                           </div>
                           <div className="flex shrink-0 items-center gap-1 hover-actions opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                             <button
@@ -444,17 +505,32 @@ export function AccomplishmentsPanel() {
       {/* Right: margin notes — summary + export + tip */}
       <aside className="flex flex-col gap-7 lg:border-l lg:border-[var(--hairline-soft)] lg:pl-8">
         <div>
-          <h3 className="font-display text-[19px] font-normal italic text-[var(--ink)]">This record</h3>
+          <h3 className="font-display text-[19px] font-normal italic text-[var(--ink)]">
+            This record
+          </h3>
           <p className="mt-2.5 font-display text-[34px] leading-none text-[var(--ink)]">
-            {rows.length}
-            <span className="text-xl text-muted"> {rows.length === 1 ? "win" : "wins"}</span>
+            {listQ.isError ? "—" : rows.length}
+            <span className="text-xl text-muted">
+              {" "}
+              {listQ.isError ? "wins" : rows.length === 1 ? "win" : "wins"}
+            </span>
           </p>
-          <p className="mt-1 text-[13px] text-muted">logged so far</p>
+          <p className="mt-1 text-[13px] text-muted">
+            {listQ.isError
+              ? "Count unavailable until records load"
+              : "logged so far"}
+          </p>
           <div className="mt-4 flex flex-col items-start gap-2">
             <button
               type="button"
               disabled={rows.length === 0}
-              onClick={() => downloadFile("accomplishments.md", toMarkdown(rows), "text/markdown;charset=utf-8")}
+              onClick={() =>
+                downloadFile(
+                  "accomplishments.md",
+                  toMarkdown(rows),
+                  "text/markdown;charset=utf-8",
+                )
+              }
               className="inline-flex items-center gap-2 rounded-full border border-[var(--hairline)] px-[18px] py-[9px] text-[13px] font-semibold text-[var(--ink)] transition-colors hover:bg-[var(--teal-a08)] disabled:opacity-40"
             >
               <Download size={14} />
@@ -463,7 +539,13 @@ export function AccomplishmentsPanel() {
             <button
               type="button"
               disabled={rows.length === 0}
-              onClick={() => downloadFile("accomplishments.csv", toCsv(rows), "text/csv;charset=utf-8")}
+              onClick={() =>
+                downloadFile(
+                  "accomplishments.csv",
+                  toCsv(rows),
+                  "text/csv;charset=utf-8",
+                )
+              }
               className="inline-flex items-center gap-2 rounded-full border border-[var(--hairline)] px-[18px] py-[9px] text-[13px] font-semibold text-[var(--ink)] transition-colors hover:bg-[var(--teal-a08)] disabled:opacity-40"
             >
               <Download size={14} />
@@ -473,11 +555,14 @@ export function AccomplishmentsPanel() {
         </div>
 
         <div>
-          <h3 className="font-display text-[19px] font-normal italic text-[var(--ink)]">Tip</h3>
+          <h3 className="font-display text-[19px] font-normal italic text-[var(--ink)]">
+            Tip
+          </h3>
           <p className="mt-2.5 text-[13px] leading-relaxed text-muted">
             Finish a high-priority task on{" "}
-            <span className="text-[var(--ink)]">Today</span> and you&apos;ll be offered a
-            one-tap way to log it here — so proof builds itself as you work.
+            <span className="text-[var(--ink)]">Today</span> and you&apos;ll be
+            offered a one-tap way to log it here — so proof builds itself as you
+            work.
           </p>
         </div>
       </aside>

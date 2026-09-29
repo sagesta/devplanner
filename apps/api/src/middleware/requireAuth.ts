@@ -8,7 +8,13 @@ import {
 
 function isPublicPath(path: string, method: string): boolean {
   if (method === "OPTIONS") return true;
-  if (path === "/" || path === "/health" || path === "/health/db" || path === "/health/vector") return true;
+  if (
+    path === "/" ||
+    path === "/health" ||
+    path === "/health/db" ||
+    path === "/health/vector"
+  )
+    return true;
   if (path === "/api/health") return true;
   if (path === "/metrics") return true;
   return false;
@@ -21,7 +27,10 @@ function isPublicPath(path: string, method: string): boolean {
  * EventSource connections only, which cannot set headers — from an
  * `auth_token` query parameter on /api/events/*.
  */
-export async function requireAuth(c: Context, next: Next) {
+export async function requireAuth(
+  c: Context,
+  next: Next,
+): Promise<Response | void> {
   const path = c.req.path;
   const method = c.req.method;
   if (isPublicPath(path, method)) {
@@ -44,7 +53,10 @@ export async function requireAuth(c: Context, next: Next) {
     c.set("userId", userId);
   } catch (err) {
     if (err instanceof NotAllowedError) {
-      return c.json({ error: "This account is not allowed on this instance." }, 403);
+      return c.json(
+        { error: "This account is not allowed on this instance." },
+        403,
+      );
     }
     throw err;
   }

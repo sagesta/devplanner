@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "mutate": [
+    "apps/api/src/services/daily.ts",
+    "apps/api/src/services/scheduler.ts",
+    "apps/api/src/services/reviews.ts",
+    "apps/api/src/google/oauth-state.ts",
+    "apps/api/src/google/event-write.ts"
+  ],
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "node scripts/test-api.mjs --integration"
+  },
+  "coverageAnalysis": "off",
+  "concurrency": 4,
+  "thresholds": {
+    "high": 90,
+    "low": 70,
+    "break": 70
+  },
+  "reporters": ["clear-text", "json", "html"],
+  "timeoutMS": 20000,
+  "ignorePatterns": [
+    ".claude",
+    "devplanner new design",
+    "docs/evidence",
+    ".next",
+    "apps/web/.next",
+    "apps/api/dist"
+  ]
+}

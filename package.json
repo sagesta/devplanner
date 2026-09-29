@@ -5,13 +5,13 @@
     "apps/*"
   ],
   "engines": {
-    "node": ">=18.18.0",
+    "node": ">=22",
     "npm": ">=10"
   },
   "scripts": {
     "dev": "concurrently -i -n web,api -c green,blue \"npm run dev -w @devplanner/web\" \"npm run dev -w @devplanner/api\"",
     "build": "npm run build -w @devplanner/api && npm run build -w @devplanner/web",
-    "test": "npm run test -w @devplanner/api",
+    "test": "node scripts/test-api.mjs",
     "db:generate": "npm run db:generate -w @devplanner/api",
     "db:migrate": "npm run db:migrate -w @devplanner/api",
     "db:studio": "npm run db:studio -w @devplanner/api",
@@ -21,10 +21,37 @@
     "seed": "npm run seed -w @devplanner/api",
     "docker:up": "docker compose up -d --build",
     "docker:infra": "docker compose up -d devplanner-db devplanner-redis radicale",
-    "docker:migrate": "docker compose --profile tools run --rm migrate"
+    "docker:migrate": "docker compose --profile tools run --rm migrate",
+    "test:web": "npm run test -w @devplanner/web",
+    "typecheck": "npm run build -w @devplanner/api && npm run typecheck -w @devplanner/web",
+    "test:e2e": "playwright test",
+    "audit:dependencies": "npm audit --audit-level=high",
+    "test:coverage": "npm run test:coverage -w @devplanner/web",
+    "test:mutation": "node scripts/test-mutation.mjs",
+    "sbom": "npm sbom --sbom-format cyclonedx > docs/evidence/sbom.cdx.json",
+    "test:integration": "node scripts/test-integration.mjs",
+    "format:check": "node scripts/check-format.mjs",
+    "test:ui": "playwright test --config playwright.ui.config.ts"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.60.0",
-    "concurrently": "^9.2.1"
+    "@stryker-mutator/core": "^10.0.0",
+    "concurrently": "^9.2.1",
+    "fast-check": "^4.10.2",
+    "prettier": "^3.9.9",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "version": "0.1.0",
+  "overrides": {
+    "react": "$react",
+    "react-dom": "$react-dom",
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.28.2"
+    }
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.3"
   }
 }

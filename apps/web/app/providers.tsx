@@ -1,6 +1,6 @@
 "use client";
 
-import { ClerkProvider, useAuth } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
@@ -27,25 +27,25 @@ export function Providers({ children }: { children: React.ReactNode }) {
             refetchOnReconnect: true,
           },
         },
-      })
+      }),
   );
   return (
-    <ClerkProvider>
+    <>
       <AuthTokenBridge />
       <QueryClientProvider client={client}>
         {children}
         <Toaster
-        richColors
-        position="top-center"
-        toastOptions={{
-          style: {
-            background: "#1c1b19",
-            border: "1px solid rgba(255,255,255,0.1)",
-            color: "#f7f6f2",
-          },
-        }}
+          richColors
+          position="top-center"
+          toastOptions={{
+            style: {
+              background: "var(--surface)",
+              border: "1px solid var(--hairline)",
+              color: "var(--foreground)",
+            },
+          }}
         />
       </QueryClientProvider>
-    </ClerkProvider>
+    </>
   );
 }

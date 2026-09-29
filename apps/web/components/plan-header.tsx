@@ -14,11 +14,10 @@ export type PlanViewKey = "sprints" | "board" | "timeline" | "table" | "goals";
  * room (the matrix also stays reachable at /plan?view=goals for old links).
  */
 const VIEW_PILLS: Array<{ key: PlanViewKey; label: string; href: string }> = [
-  { key: "sprints", label: "Sprint", href: "/plan?view=sprints" },
+  { key: "sprints", label: "This week", href: "/plan?view=sprints" },
   { key: "board", label: "Board", href: "/plan?view=board" },
   { key: "timeline", label: "Timeline", href: "/plan?view=timeline" },
   { key: "table", label: "Table", href: "/plan?view=table" },
-  { key: "goals", label: "Goals", href: "/goals" },
 ];
 
 /** Parse YYYY-MM-DD as a LOCAL date (avoid UTC day-shift). */
@@ -32,7 +31,10 @@ function sprintWeekLine(sprint: SprintRow): string | null {
   const start = localDate(sprint.startDate);
   const end = localDate(sprint.endDate);
   if (!start || !end) return null;
-  const weekOf = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const weekOf = start.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
   const durationDays = Math.round((end.getTime() - start.getTime()) / 86400000);
   // Week-length sprints read "ends Friday"; longer ones get an explicit date.
   const ends =
@@ -53,7 +55,7 @@ export function PlanHeader({ activeView }: { activeView: PlanViewKey }) {
 
   const activeSprint = useMemo(
     () => sprintsQ.data?.sprints.find((s) => s.status === "active") ?? null,
-    [sprintsQ.data?.sprints]
+    [sprintsQ.data?.sprints],
   );
   const weekLine = activeSprint ? sprintWeekLine(activeSprint) : null;
 
@@ -65,19 +67,26 @@ export function PlanHeader({ activeView }: { activeView: PlanViewKey }) {
         </p>
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
           <h1 className="mt-1.5 font-display text-[32px] leading-[1.05] text-[var(--ink)] md:text-[52px]">
-            One sprint, honestly scoped.
+            Plan at your pace.
           </h1>
-          {weekLine && <p className="shrink-0 text-sm text-muted">{weekLine}</p>}
+          {weekLine && (
+            <p className="shrink-0 text-sm text-muted">{weekLine}</p>
+          )}
         </div>
         {activeSprint?.goal && (
           <p className="mt-2.5 text-sm text-muted">
-            Sprint goal: <span className="font-medium text-[var(--ink)]">{activeSprint.goal}</span>
-            {typeof activeSprint.taskCount === "number" && activeSprint.taskCount > 0 && (
-              <>
-                {" "}
-                · {activeSprint.taskCount} task{activeSprint.taskCount === 1 ? "" : "s"} in scope
-              </>
-            )}
+            Sprint goal:{" "}
+            <span className="font-medium text-[var(--ink)]">
+              {activeSprint.goal}
+            </span>
+            {typeof activeSprint.taskCount === "number" &&
+              activeSprint.taskCount > 0 && (
+                <>
+                  {" "}
+                  · {activeSprint.taskCount} task
+                  {activeSprint.taskCount === 1 ? "" : "s"} in scope
+                </>
+              )}
           </p>
         )}
       </header>
@@ -97,7 +106,7 @@ export function PlanHeader({ activeView }: { activeView: PlanViewKey }) {
                 "rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors",
                 selected
                   ? "border border-transparent bg-[var(--ink-btn-bg)] text-[var(--ink-btn-fg)]"
-                  : "border border-[var(--hairline)] text-muted hover:bg-[var(--teal-a08)] hover:text-[var(--teal)]"
+                  : "border border-[var(--hairline)] text-muted hover:bg-[var(--teal-a08)] hover:text-[var(--teal)]",
               )}
             >
               {label}

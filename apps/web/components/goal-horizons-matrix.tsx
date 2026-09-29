@@ -62,15 +62,23 @@ const EMPTY_GOALS: GoalMatrix = {
 };
 
 const STARTER_GOALS: GoalMatrix = {
-  "short:personal": "Protect sleep and morning planning rhythm\nClear one home admin item",
-  "short:professional": "Choose one skill to sharpen this month\nPublish one proof-of-work update",
-  "short:work": "Ship the next highest-value task\nFollow up on one important commitment",
-  "mid:personal": "Build a reliable weekly reset\nCreate a sustainable exercise cadence",
-  "mid:professional": "Complete a focused learning project\nDocument a repeatable workflow",
+  "short:personal":
+    "Protect sleep and morning planning rhythm\nClear one home admin item",
+  "short:professional":
+    "Choose one skill to sharpen this month\nPublish one proof-of-work update",
+  "short:work":
+    "Ship the next highest-value task\nFollow up on one important commitment",
+  "mid:personal":
+    "Build a reliable weekly reset\nCreate a sustainable exercise cadence",
+  "mid:professional":
+    "Complete a focused learning project\nDocument a repeatable workflow",
   "mid:work": "Finish the current sprint outcome\nDocument the delivery system",
-  "long:personal": "Design a calmer default week\nReduce recurring friction points",
-  "long:professional": "Build a stronger public portfolio\nDeepen domain expertise",
-  "long:work": "Build a predictable delivery cadence\nCreate leverage through systems",
+  "long:personal":
+    "Design a calmer default week\nReduce recurring friction points",
+  "long:professional":
+    "Build a stronger public portfolio\nDeepen domain expertise",
+  "long:work":
+    "Build a predictable delivery cadence\nCreate leverage through systems",
 };
 
 function cellKey(horizon: HorizonKey, area: AreaKey): GoalCellKey {
@@ -78,11 +86,17 @@ function cellKey(horizon: HorizonKey, area: AreaKey): GoalCellKey {
 }
 
 /** Hand a goal cell to the AI assistant to turn into concrete tasks. */
-function breakGoalIntoTasks(horizonLabel: string, areaLabel: string, text: string) {
+function breakGoalIntoTasks(
+  horizonLabel: string,
+  areaLabel: string,
+  text: string,
+) {
   const clean = text.trim();
   if (!clean) return;
   const prompt = `Break this goal into concrete weekly and daily tasks I can actually act on.\n\nGoal — ${horizonLabel}, ${areaLabel}:\n${clean}\n\nGive me a short, ordered list of tasks with rough time estimates (and subtasks if useful). If I have "Can edit" turned on, add them to my backlog; otherwise just propose them and I'll switch it on.`;
-  window.dispatchEvent(new CustomEvent("devplanner:ai-prompt", { detail: { prompt } }));
+  window.dispatchEvent(
+    new CustomEvent("devplanner:ai-prompt", { detail: { prompt } }),
+  );
   toast.info("Sent to the AI assistant — review it and press send.");
 }
 
@@ -112,7 +126,10 @@ function goalsToMarkdown(ownerName: string, goals: GoalMatrix): string {
         lines.push("- _No goals yet._", "");
         continue;
       }
-      for (const goal of value.split("\n").map((line) => line.trim()).filter(Boolean)) {
+      for (const goal of value
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)) {
         lines.push(`- ${goal}`);
       }
       lines.push("");
@@ -126,12 +143,16 @@ function goalsAreEmpty(goals: GoalMatrix): boolean {
   return goalCount(goals) === 0;
 }
 
-function readLocalDraft(defaultOwnerName: string): { goals: GoalMatrix; ownerName: string } | null {
+function readLocalDraft(
+  defaultOwnerName: string,
+): { goals: GoalMatrix; ownerName: string } | null {
   try {
     const rawGoals = localStorage.getItem(STORAGE_KEY);
     const rawOwner = localStorage.getItem(OWNER_STORAGE_KEY);
     if (!rawGoals && !rawOwner) return null;
-    const parsed = rawGoals ? (JSON.parse(rawGoals) as Partial<GoalMatrix>) : {};
+    const parsed = rawGoals
+      ? (JSON.parse(rawGoals) as Partial<GoalMatrix>)
+      : {};
     return {
       goals: { ...EMPTY_GOALS, ...parsed },
       ownerName: rawOwner?.trim() || defaultOwnerName,
@@ -145,8 +166,9 @@ function writeLocalDraft(ownerName: string, goals: GoalMatrix) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
     localStorage.setItem(OWNER_STORAGE_KEY, ownerName);
+    return true;
   } catch {
-    /* local cache is best-effort only */
+    return false;
   }
 }
 
@@ -175,9 +197,13 @@ export function GoalHorizonsMatrix({
   const [goals, setGoals] = useState<GoalMatrix>(EMPTY_GOALS);
   const [ownerDraft, setOwnerDraft] = useState(defaultOwnerName);
   const [hydrated, setHydrated] = useState(false);
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
+    "idle",
+  );
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveState, setSaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const loadedRef = useRef(false);
   const skipAutosaveRef = useRef(false);
   const filledCount = useMemo(() => goalCount(goals), [goals]);
@@ -192,7 +218,10 @@ export function GoalHorizonsMatrix({
     mutationFn: saveGoalHorizons,
     onSuccess: (data) => {
       writeLocalDraft(data.ownerName?.trim() || ownerDraft, data.goals);
-      setLastSavedAt(formatSavedTime(data.updatedAt) ?? formatSavedTime(new Date().toISOString()));
+      setLastSavedAt(
+        formatSavedTime(data.updatedAt) ??
+          formatSavedTime(new Date().toISOString()),
+      );
       setSaveState("saved");
       qc.setQueryData(["goal-horizons", userId], data);
     },
@@ -207,6 +236,7 @@ export function GoalHorizonsMatrix({
     saveGoalRef.current = saveMut.mutate;
   }, [saveMut.mutate]);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- One-time hydration reconciles external server/local recovery data after authentication resolves. */
   useEffect(() => {
     if (loadedRef.current) return;
     // Clerk resolves userId asynchronously — a momentarily-undefined userId right
@@ -231,7 +261,9 @@ export function GoalHorizonsMatrix({
       const serverGoals = { ...EMPTY_GOALS, ...goalsQ.data.goals };
       const serverHasGoals = !goalsAreEmpty(serverGoals);
       const localDraft = readLocalDraft(defaultOwnerName);
-      const localHasGoals = localDraft ? !goalsAreEmpty(localDraft.goals) : false;
+      const localHasGoals = localDraft
+        ? !goalsAreEmpty(localDraft.goals)
+        : false;
 
       if (!serverHasGoals && localDraft && localHasGoals) {
         setGoals(localDraft.goals);
@@ -261,13 +293,16 @@ export function GoalHorizonsMatrix({
       loadedRef.current = true;
     }
   }, [authLoaded, defaultOwnerName, goalsQ.data, goalsQ.isError, userId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
+  /* eslint-disable react-hooks/set-state-in-effect -- Synchronize browser persistence and publish its result while debouncing the remote save. */
   useEffect(() => {
     if (!hydrated) return;
-    writeLocalDraft(ownerDraft, goals);
+    const locallySaved = writeLocalDraft(ownerDraft, goals);
     if (!userId) {
-      setLastSavedAt(formatSavedTime(new Date().toISOString()));
-      setSaveState("saved");
+      if (locallySaved)
+        setLastSavedAt(formatSavedTime(new Date().toISOString()));
+      setSaveState(locallySaved ? "saved" : "error");
       return;
     }
     if (skipAutosaveRef.current) {
@@ -281,6 +316,7 @@ export function GoalHorizonsMatrix({
     }, 700);
     return () => window.clearTimeout(timeout);
   }, [goals, hydrated, ownerDraft, userId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (copyState === "idle") return;
@@ -288,14 +324,17 @@ export function GoalHorizonsMatrix({
     return () => window.clearTimeout(timeout);
   }, [copyState]);
 
-  const markdown = useMemo(() => goalsToMarkdown(ownerDraft, goals), [goals, ownerDraft]);
+  const markdown = useMemo(
+    () => goalsToMarkdown(ownerDraft, goals),
+    [goals, ownerDraft],
+  );
   const statusLabel =
     goalsQ.isLoading && !hydrated
       ? "loading…"
       : saveState === "saving" || saveMut.isPending
         ? "saving…"
         : saveState === "error"
-          ? "local draft only"
+          ? "save unavailable"
           : lastSavedAt
             ? `saved ${lastSavedAt}`
             : "not saved yet";
@@ -347,7 +386,9 @@ export function GoalHorizonsMatrix({
     return (
       <textarea
         value={goals[key]}
-        onChange={(event) => setGoals((current) => ({ ...current, [key]: event.target.value }))}
+        onChange={(event) =>
+          setGoals((current) => ({ ...current, [key]: event.target.value }))
+        }
         placeholder={prompt}
         rows={rows}
         className="w-full flex-1 resize-none border-0 bg-transparent p-0 text-sm leading-[1.45] text-foreground placeholder:text-[var(--muted-soft)] focus:outline-none focus:ring-0"
@@ -355,7 +396,11 @@ export function GoalHorizonsMatrix({
     );
   }
 
-  function renderBreakLink(horizonLabel: string, areaLabel: string, key: GoalCellKey) {
+  function renderBreakLink(
+    horizonLabel: string,
+    areaLabel: string,
+    key: GoalCellKey,
+  ) {
     if (!goals[key].trim()) return null;
     return (
       <button
@@ -392,7 +437,9 @@ export function GoalHorizonsMatrix({
         </header>
       ) : (
         <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-          <h2 className="font-display text-[22px] text-foreground">Goal horizons</h2>
+          <h2 className="font-display text-[22px] text-foreground">
+            Goal horizons
+          </h2>
           <p className="shrink-0 text-sm text-muted">
             {filledCount} of 9 set · {statusLabel}
           </p>
@@ -404,16 +451,21 @@ export function GoalHorizonsMatrix({
         {/* column headers */}
         <div className="py-4" />
         {AREAS.map((area) => (
-          <div key={area.key} className="border-l border-[var(--hairline-soft)] py-4 pl-5 pr-4">
+          <div
+            key={area.key}
+            className="border-l border-[var(--hairline-soft)] py-4 pl-5 pr-4"
+          >
             <p
               className={cn(
                 "text-[11px] font-semibold uppercase tracking-[0.08em]",
-                area.colorClass
+                area.colorClass,
               )}
             >
               {area.label}
             </p>
-            <p className="mt-0.5 text-xs text-[var(--muted-soft)]">{area.micro}</p>
+            <p className="mt-0.5 text-xs text-[var(--muted-soft)]">
+              {area.micro}
+            </p>
           </div>
         ))}
 
@@ -423,7 +475,9 @@ export function GoalHorizonsMatrix({
               <p className="font-display text-[19px] italic leading-tight text-foreground">
                 {horizon.label}
               </p>
-              <p className="mt-0.5 text-xs text-[var(--muted-soft)]">{horizon.range}</p>
+              <p className="mt-0.5 text-xs text-[var(--muted-soft)]">
+                {horizon.range}
+              </p>
             </div>
             {AREAS.map((area) => {
               const key = cellKey(horizon.key, area.key);
@@ -447,11 +501,16 @@ export function GoalHorizonsMatrix({
       {/* ── Stacked matrix (mobile / tablet) ───────────────────────── */}
       <div className="flex flex-col lg:hidden">
         {HORIZONS.map((horizon) => (
-          <section key={horizon.key} className="border-t border-[var(--hairline)] py-4">
+          <section
+            key={horizon.key}
+            className="border-t border-[var(--hairline)] py-4"
+          >
             <p className="font-display text-[19px] italic leading-tight text-foreground">
               {horizon.label}
             </p>
-            <p className="mt-0.5 text-xs text-[var(--muted-soft)]">{horizon.range}</p>
+            <p className="mt-0.5 text-xs text-[var(--muted-soft)]">
+              {horizon.range}
+            </p>
             <div className="mt-3 flex flex-col">
               {AREAS.map((area, index) => {
                 const key = cellKey(horizon.key, area.key);
@@ -460,13 +519,13 @@ export function GoalHorizonsMatrix({
                     key={key}
                     className={cn(
                       "flex flex-col py-4",
-                      index > 0 && "border-t border-[var(--hairline-soft)]"
+                      index > 0 && "border-t border-[var(--hairline-soft)]",
                     )}
                   >
                     <span
                       className={cn(
                         "text-[11px] font-semibold uppercase tracking-[0.08em]",
-                        area.colorClass
+                        area.colorClass,
                       )}
                     >
                       {area.label}
@@ -508,7 +567,11 @@ export function GoalHorizonsMatrix({
           title="Copy the matrix as markdown"
           className="text-[13px] text-[var(--teal)] hover:underline"
         >
-          {copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy Markdown"}
+          {copyState === "copied"
+            ? "Copied"
+            : copyState === "failed"
+              ? "Copy failed"
+              : "Copy Markdown"}
         </button>
         <button
           type="button"
@@ -529,7 +592,8 @@ export function GoalHorizonsMatrix({
       </div>
 
       <p className="text-[13px] text-muted">
-        Weekly win conditions on Today should ladder up to these. Export as Markdown from Settings.
+        Weekly win conditions on Today should ladder up to these. Export as
+        Markdown from Settings.
       </p>
     </section>
   );

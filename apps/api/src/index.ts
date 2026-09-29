@@ -2,12 +2,16 @@ import "./lib/loadRootEnv.js";
 import { serve } from "@hono/node-server";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { Hono } from "hono";
-import { cors } from "hono/cors";
+import { appCors } from "./middleware/appCors.js";
 import { pool } from "./db/client.js";
 import { runMigrations } from "./db/migrate.js";
 import { validateEnv } from "./lib/validateEnv.js";
 import { logger } from "./lib/logger.js";
-import { registry, httpRequestsTotal, httpRequestDurationMs } from "./lib/metrics.js";
+import {
+  registry,
+  httpRequestsTotal,
+  httpRequestDurationMs,
+} from "./lib/metrics.js";
 import { aiRateLimit } from "./middleware/aiRateLimit.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 import { accomplishmentRoutes } from "./routes/accomplishments.js";
@@ -27,6 +31,8 @@ import { timeLogRoutes } from "./routes/time-logs.js";
 import { insightsRoutes } from "./routes/insights.js";
 import { priorityRoutes } from "./routes/priorities.js";
 import { reviewRoutes } from "./routes/reviews.js";
+import { createHealthRoutes } from "./routes/health.js";
+import { dailyRoutes } from "./routes/daily.js";
 import { scheduleRoutes } from "./routes/schedule.js";
 import { createRedisConnection } from "./queues/connection.js";
 import type { AppEnv } from "./types.js";
@@ -44,33 +50,23 @@ app.use("*", async (c, next) => {
   const durationMs = Date.now() - start;
   const connectionIp = getConnInfo(c).remote.address;
   const forwardedIp = c.req.header("x-forwarded-for")?.split(",", 1)[0]?.trim();
-  const trustProxy = ["1", "true", "yes"].includes((process.env.TRUST_PROXY ?? "").toLowerCase());
+  const trustProxy = ["1", "true", "yes"].includes(
+    (process.env.TRUST_PROXY ?? "").toLowerCase(),
+  );
   const sourceIp = trustProxy && forwardedIp ? forwardedIp : connectionIp;
-  logger.info({
-    method: c.req.method,
-    path: c.req.path,
-    statusCode: c.res.status,
-    durationMs,
-    sourceIp,
-  }, "request");
+  logger.info(
+    {
+      method: c.req.method,
+      path: c.req.path,
+      statusCode: c.res.status,
+      durationMs,
+      sourceIp,
+    },
+    "request",
+  );
 });
 
-app.use(
-  "*",
-  cors({
-    origin: (origin) => {
-      const raw = process.env.CORS_ORIGIN ?? "http://localhost:3000";
-      const list = raw.split(",").map((s) => s.trim()).filter(Boolean);
-      if (!origin) return list[0] ?? "http://localhost:3000";
-      return list.includes(origin) ? origin : null;
-    },
-    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    // Authorization carries the Clerk Bearer token on every request —
-    // omitting it here fails the preflight and blocks ALL browser calls.
-    allowHeaders: ["Content-Type", "Cookie", "Authorization"],
-    credentials: true,
-  })
-);
+app.use("*", appCors());
 
 app.use("*", requireAuth);
 app.use("*", aiRateLimit);
@@ -94,10 +90,16 @@ app.use("*", async (c, next) => {
 
 // Global error handler — catch unhandled exceptions → 500 JSON
 app.onError((err, c) => {
-  logger.error({ err, stack: err.stack, path: c.req.path }, "[API Error]");
+  logger.error({ err, path: c.req.path }, "[API Error]");
   return c.json(
-    { error: err.message ?? "Internal server error", stack: process.env.NODE_ENV === "development" ? err.stack : undefined },
-    500
+    {
+      error:
+        process.env.NODE_ENV === "development"
+          ? err.message
+          : "Internal server error",
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    },
+    500,
   );
 });
 
@@ -112,75 +114,32 @@ app.get("/", (c) =>
     service: "DevPlanner API",
     health: "/health",
     hint: "The web UI runs on port 3000 (Next.js). Open http://localhost:3000 after npm run dev.",
-  })
+  }),
 );
 
-app.get("/health", async (c) => {
-  const uptime = process.uptime();
-  const mem = process.memoryUsage();
-
-  // DB check
-  let dbStatus: "ok" | "error" = "ok";
-  let dbError: string | undefined;
-  try {
-    await pool.query("SELECT 1");
-  } catch (e) {
-    dbStatus = "error";
-    dbError = String(e);
-  }
-
-  // Redis check
-  let redisStatus: "ok" | "error" = "ok";
-  let redisError: string | undefined;
-  let redisClient: ReturnType<typeof createRedisConnection> | null = null;
-  try {
-    redisClient = createRedisConnection();
-    await redisClient.ping();
-  } catch (e) {
-    redisStatus = "error";
-    redisError = String(e);
-  } finally {
-    redisClient?.disconnect();
-  }
-
-  const overallStatus = dbStatus === "ok" && redisStatus === "ok" ? "ok" : "degraded";
-
-  return c.json(
-    {
-      status: overallStatus,
-      uptime,
-      version: process.env.npm_package_version ?? "0.1.0",
-      db: { status: dbStatus, ...(dbError ? { error: dbError } : {}) },
-      redis: { status: redisStatus, ...(redisError ? { error: redisError } : {}) },
-      memory: {
-        heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
-        heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024),
-        rssMb: Math.round(mem.rss / 1024 / 1024),
-      },
+app.route(
+  "/health",
+  createHealthRoutes({
+    database: async () => {
+      await pool.query("SELECT 1");
     },
-    overallStatus === "ok" ? 200 : 503
-  );
-});
-
+    redis: async () => {
+      const client = createRedisConnection();
+      try {
+        await client.ping();
+      } finally {
+        client.disconnect();
+      }
+    },
+    vector: async () => {
+      const result = await pool.query(
+        "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname='vector') AS enabled",
+      );
+      return result.rows[0]?.enabled === true;
+    },
+  }),
+);
 app.get("/api/health", (c) => c.json({ ok: true, uptime: process.uptime() }));
-
-app.get("/health/db", async (c) => {
-  try {
-    const { rows } = await pool.query("SELECT NOW() as time");
-    return c.json({ ok: true, time: rows[0]?.time });
-  } catch (e) {
-    return c.json({ ok: false, error: String(e) }, 503);
-  }
-});
-
-app.get("/health/vector", async (c) => {
-  try {
-    await pool.query("CREATE EXTENSION IF NOT EXISTS vector");
-    return c.json({ ok: true });
-  } catch (e) {
-    return c.json({ ok: false, error: String(e) }, 503);
-  }
-});
 
 // ─── Metrics (public — no auth) ───────────────────────────────────
 app.get("/metrics", async (c) => {
@@ -191,6 +150,7 @@ app.get("/metrics", async (c) => {
 });
 
 // ─── Routes ───────────────────────────────────────────────────────
+app.route("/api/daily", dailyRoutes);
 app.route("/api/tasks", taskRoutes);
 app.route("/api/areas", areaRoutes);
 app.route("/api/sprints", sprintRoutes);
@@ -218,5 +178,8 @@ const hostname = process.env.HOST?.trim() || "0.0.0.0";
 // Safe to run on every boot — all statements use IF NOT EXISTS.
 await runMigrations(pool);
 
-logger.info({ port, hostname }, `DevPlanner API listening on http://${hostname}:${port}`);
+logger.info(
+  { port, hostname },
+  `DevPlanner API listening on http://${hostname}:${port}`,
+);
 serve({ fetch: app.fetch, port, hostname });

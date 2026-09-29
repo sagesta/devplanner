@@ -17,32 +17,46 @@ function getRedis() {
 }
 
 /** Per-user RPM for /api/ai/* (after requireAuth). */
-export async function aiRateLimit(c: Context, next: Next) {
-  if (!c.req.path.startsWith("/api/ai")) {
+export function createAiRateLimit(connection = getRedis) {
+  return async function aiRateLimit(
+    c: Context,
+    next: Next,
+  ): Promise<Response | void> {
+    if (!c.req.path.startsWith("/api/ai")) {
+      return next();
+    }
+
+    const userId = c.get("userId");
+    if (!userId) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const key = `ai:ratelimit:${userId}`;
+    const limit = limitPerMinute();
+
+    try {
+      const r = connection();
+      const count = await r.incr(key);
+      if (count === 1) {
+        await r.expire(key, WINDOW_SEC);
+      }
+      if (count > limit) {
+        return c.json(
+          { error: "Rate limit exceeded", retryAfter: WINDOW_SEC },
+          429,
+        );
+      }
+    } catch {
+      // Do not bypass the cost guard when its backing store is unavailable.
+      c.header("Retry-After", String(WINDOW_SEC));
+      return c.json(
+        { error: "AI is temporarily unavailable. Please retry shortly." },
+        503,
+      );
+    }
+
     return next();
-  }
-
-  const userId = c.get("userId");
-  if (!userId) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  const key = `ai:ratelimit:${userId}`;
-  const limit = limitPerMinute();
-
-  try {
-    const r = getRedis();
-    const count = await r.incr(key);
-    if (count === 1) {
-      await r.expire(key, WINDOW_SEC);
-    }
-    if (count > limit) {
-      return c.json({ error: "Rate limit exceeded", retryAfter: WINDOW_SEC }, 429);
-    }
-  } catch (e) {
-    console.error("[aiRateLimit] Redis error:", e);
-    // fail open if Redis down so AI still works in degraded mode
-  }
-
-  return next();
+  };
 }
+
+export const aiRateLimit = createAiRateLimit();

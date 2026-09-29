@@ -7,4 +7,16 @@ dist
 *.log
 .gemini/
 .gsd/
-.claude/worktrees/
+.claude/worktrees/
+
+# Generated test artifacts and mutation sandboxes
+coverage/
+coverage-*/
+reports/
+.stryker-tmp/
+playwright-report/
+test-results/
+
+# Personal database backups (never commit task content or calendar credentials)
+backups/
+*.dump

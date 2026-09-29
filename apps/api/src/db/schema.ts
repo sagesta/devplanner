@@ -34,35 +34,72 @@ export const taskStatusEnum = pgEnum("task_status", [
   "blocked",
 ]);
 
-export const taskPriorityEnum = pgEnum("task_priority", ["urgent", "high", "normal", "low"]);
+export const taskPriorityEnum = pgEnum("task_priority", [
+  "urgent",
+  "high",
+  "normal",
+  "low",
+]);
 
-export const energyLevelEnum = pgEnum("energy_level", ["deep_work", "shallow", "admin", "quick_win"]);
+export const energyLevelEnum = pgEnum("energy_level", [
+  "deep_work",
+  "shallow",
+  "admin",
+  "quick_win",
+]);
 
 /** Cognitive load / focus depth (separate from physical energy). */
-export const workDepthEnum = pgEnum("work_depth", ["shallow", "normal", "deep"]);
+export const workDepthEnum = pgEnum("work_depth", [
+  "shallow",
+  "normal",
+  "deep",
+]);
 
 /** Physical energy available for the task (separate from work depth). */
-export const physicalEnergyEnum = pgEnum("physical_energy", ["low", "medium", "high"]);
+export const physicalEnergyEnum = pgEnum("physical_energy", [
+  "low",
+  "medium",
+  "high",
+]);
 
 export const taskTypeEnum = pgEnum("task_type", ["main", "subtask"]);
 
-export const sprintStatusEnum = pgEnum("sprint_status", ["planned", "active", "completed"]);
+export const sprintStatusEnum = pgEnum("sprint_status", [
+  "planned",
+  "active",
+  "completed",
+]);
 
-export const focusSessionTypeEnum = pgEnum("focus_session_type", ["work", "short_break", "long_break"]);
+export const focusSessionTypeEnum = pgEnum("focus_session_type", [
+  "work",
+  "short_break",
+  "long_break",
+]);
 
-export const focusSourceEnum = pgEnum("focus_source", ["manual", "focus_import"]);
+export const focusSourceEnum = pgEnum("focus_source", [
+  "manual",
+  "focus_import",
+]);
 
-export const caldavActionEnum = pgEnum("caldav_action", ["create", "update", "delete"]);
+export const caldavActionEnum = pgEnum("caldav_action", [
+  "create",
+  "update",
+  "delete",
+]);
 
 export const priorityPeriodEnum = pgEnum("priority_period", ["week", "month"]);
-export const priorityCategoryEnum = pgEnum("priority_category", ["work", "personal", "growth"]);
+export const priorityCategoryEnum = pgEnum("priority_category", [
+  "work",
+  "personal",
+  "growth",
+]);
 
 export const schedulingStateEnum = pgEnum("scheduling_state", [
   "unscheduled",
   "suggested",
   "scheduled",
   "overflow",
-  "needs_rescheduling"
+  "needs_rescheduling",
 ]);
 
 export const users = pgTable("users", {
@@ -74,11 +111,19 @@ export const users = pgTable("users", {
   personalHoursPerDay: real("personal_hours_per_day").notNull().default(2),
   efficiencyFactor: real("efficiency_factor").notNull().default(0.8),
   bufferFactor: real("buffer_factor").notNull().default(0.2),
-  dailyCapacityMinutes: integer("daily_capacity_minutes").notNull().default(240),
-  cognitiveLoadBaseline: real("cognitive_load_baseline").notNull().default(50.0),
+  dailyCapacityMinutes: integer("daily_capacity_minutes")
+    .notNull()
+    .default(240),
+  cognitiveLoadBaseline: real("cognitive_load_baseline")
+    .notNull()
+    .default(50.0),
   timezone: varchar("timezone", { length: 64 }).default("UTC"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 export const areas = pgTable(
@@ -89,13 +134,21 @@ export const areas = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 255 }).notNull(),
+    systemKey: varchar("system_key", { length: 32 }),
     color: varchar("color", { length: 32 }),
     icon: varchar("icon", { length: 64 }),
     sortOrder: integer("sort_order").notNull().default(0),
     weeklyHourTarget: numeric("weekly_hour_target", { precision: 5, scale: 1 }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
-  (t) => [index("areas_user_idx").on(t.userId)]
+  (t) => [
+    index("areas_user_idx").on(t.userId),
+    uniqueIndex("areas_system_key_uidx")
+      .on(t.userId, t.systemKey)
+      .where(sql`${t.systemKey} IS NOT NULL`),
+  ],
 );
 
 export const projects = pgTable(
@@ -112,10 +165,15 @@ export const projects = pgTable(
     description: text("description"),
     status: varchar("status", { length: 32 }).default("active"),
     color: varchar("color", { length: 32 }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
   },
-  (t) => [index("projects_user_idx").on(t.userId), index("projects_area_idx").on(t.areaId)]
+  (t) => [
+    index("projects_user_idx").on(t.userId),
+    index("projects_area_idx").on(t.areaId),
+  ],
 );
 
 export const sprints = pgTable(
@@ -131,9 +189,11 @@ export const sprints = pgTable(
     goal: text("goal"),
     status: sprintStatusEnum("status").notNull().default("planned"),
     capacityHours: real("capacity_hours"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
-  (t) => [index("sprints_user_idx").on(t.userId)]
+  (t) => [index("sprints_user_idx").on(t.userId)],
 );
 
 export const tasks = pgTable(
@@ -143,11 +203,16 @@ export const tasks = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
-    sprintId: uuid("sprint_id").references(() => sprints.id, { onDelete: "set null" }),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    sprintId: uuid("sprint_id").references(() => sprints.id, {
+      onDelete: "set null",
+    }),
     areaId: uuid("area_id")
       .notNull()
       .references(() => areas.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull().default(1),
     title: varchar("title", { length: 500 }).notNull(),
     description: text("description"),
     status: taskStatusEnum("status").notNull().default("todo"),
@@ -158,7 +223,9 @@ export const tasks = pgTable(
     taskType: taskTypeEnum("task_type").notNull().default("main"),
     dueDate: date("due_date"),
     scheduledDate: date("scheduled_date"),
-    schedulingState: schedulingStateEnum("scheduling_state").notNull().default("unscheduled"),
+    schedulingState: schedulingStateEnum("scheduling_state")
+      .notNull()
+      .default("unscheduled"),
     rescheduleCount: integer("reschedule_count").notNull().default(0),
     isAutoScheduled: boolean("is_auto_scheduled").notNull().default(false),
     recurrenceRule: text("recurrence_rule"),
@@ -166,7 +233,9 @@ export const tasks = pgTable(
     /** RFC5545 UID from the calendar (imports + stable identity for round-trip). */
     icalUid: varchar("ical_uid", { length: 512 }),
     /** Filename within the CalDAV collection, e.g. `abc.ics` (defaults to `{caldavUid}.ics`). */
-    caldavResourceFilename: varchar("caldav_resource_filename", { length: 512 }),
+    caldavResourceFilename: varchar("caldav_resource_filename", {
+      length: 512,
+    }),
     /** Last DTSTAMP seen from the server (pull merge / conflict hint). */
     caldavRemoteDtstamp: varchar("caldav_remote_dtstamp", { length: 64 }),
     caldavLastPullAt: timestamp("caldav_last_pull_at", { withTimezone: true }),
@@ -179,8 +248,12 @@ export const tasks = pgTable(
     sortOrder: integer("sort_order").notNull().default(0),
     idleFlagged: boolean("idle_flagged").notNull().default(false),
     idleFlaggedAt: timestamp("idle_flagged_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     /** Soft-delete: null = active; set when user deletes (restorable within client grace period). */
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -190,7 +263,7 @@ export const tasks = pgTable(
     index("tasks_sprint_idx").on(t.sprintId),
     index("tasks_area_idx").on(t.areaId),
     uniqueIndex("tasks_user_ical_uid_uidx").on(t.userId, t.icalUid),
-  ]
+  ],
 );
 
 export const subtasks = pgTable(
@@ -200,17 +273,18 @@ export const subtasks = pgTable(
     taskId: uuid("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull().default(1),
     title: varchar("title", { length: 500 }).notNull(),
     completed: boolean("completed").notNull().default(false),
     scheduledDate: date("scheduled_date"),
     scheduledTime: varchar("scheduled_time", { length: 32 }),
     estimatedMinutes: integer("estimated_minutes"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
-  (t) => [
-    index("subtasks_task_idx").on(t.taskId),
-  ]
+  (t) => [index("subtasks_task_idx").on(t.taskId)],
 );
 
 export const focusSessions = pgTable(
@@ -220,23 +294,29 @@ export const focusSessions = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    taskId: uuid("task_id").references(() => tasks.id, {
+      onDelete: "set null",
+    }),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
     endedAt: timestamp("ended_at", { withTimezone: true }),
     durationMinutes: integer("duration_minutes").notNull(),
     sessionType: focusSessionTypeEnum("session_type").notNull().default("work"),
     source: focusSourceEnum("source").notNull().default("manual"),
     notes: text("notes"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
-  (t) => [index("focus_sessions_user_idx").on(t.userId)]
+  (t) => [index("focus_sessions_user_idx").on(t.userId)],
 );
 
 export const aiCallLog = pgTable(
   "ai_call_log",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     jobType: varchar("job_type", { length: 64 }).notNull(),
     model: varchar("model", { length: 128 }).notNull(),
     provider: varchar("provider", { length: 32 }).notNull(),
@@ -244,9 +324,11 @@ export const aiCallLog = pgTable(
     outputTokens: integer("output_tokens"),
     costUsdEstimate: real("cost_usd_estimate"),
     latencyMs: integer("latency_ms"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
-  (t) => [index("ai_call_log_user_idx").on(t.userId)]
+  (t) => [index("ai_call_log_user_idx").on(t.userId)],
 );
 
 export const aiSuggestions = pgTable(
@@ -260,27 +342,32 @@ export const aiSuggestions = pgTable(
     inputContext: jsonb("input_context"),
     suggestion: text("suggestion").notNull(),
     accepted: boolean("accepted"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
-  (t) => [index("ai_suggestions_user_idx").on(t.userId)]
+  (t) => [index("ai_suggestions_user_idx").on(t.userId)],
 );
 
 /** Per-user Google OAuth link (primary calendar by default). */
-export const googleCalendarLinks = pgTable(
-  "google_calendar_links",
-  {
-    userId: uuid("user_id")
-      .primaryKey()
-      .references(() => users.id, { onDelete: "cascade" }),
-    refreshToken: text("refresh_token").notNull(),
-    /** Google calendar id, e.g. `primary` or an email. */
-    calendarId: varchar("calendar_id", { length: 512 }).notNull().default("primary"),
-    /** Incremental sync token from Calendar API `events.list`. */
-    syncToken: text("sync_token"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  }
-);
+export const googleCalendarLinks = pgTable("google_calendar_links", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  refreshToken: text("refresh_token").notNull(),
+  /** Google calendar id, e.g. `primary` or an email. */
+  calendarId: varchar("calendar_id", { length: 512 })
+    .notNull()
+    .default("primary"),
+  /** Incremental sync token from Calendar API `events.list`. */
+  syncToken: text("sync_token"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
 
 /** Weekly / monthly "compass statements" — anchors that all tasks should ladder up to. */
 export const priorities = pgTable(
@@ -298,13 +385,26 @@ export const priorities = pgTable(
     category: priorityCategoryEnum("category").notNull(),
     /** The compass sentence itself. Free-form, not a task title. */
     statement: text("statement").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
-    uniqueIndex("priorities_unique_slot").on(t.userId, t.periodType, t.periodStart, t.category),
-    index("priorities_user_period_idx").on(t.userId, t.periodType, t.periodStart),
-  ]
+    uniqueIndex("priorities_unique_slot").on(
+      t.userId,
+      t.periodType,
+      t.periodStart,
+      t.category,
+    ),
+    index("priorities_user_period_idx").on(
+      t.userId,
+      t.periodType,
+      t.periodStart,
+    ),
+  ],
 );
 
 /** Per-user goal horizon matrix. The UI owns the cell shape; the API syncs it across devices. */
@@ -313,9 +413,16 @@ export const goalHorizons = pgTable("goal_horizons", {
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
   ownerName: varchar("owner_name", { length: 255 }),
-  goals: jsonb("goals").$type<Record<string, string>>().notNull().default(sql`'{}'::jsonb`),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  goals: jsonb("goals")
+    .$type<Record<string, string>>()
+    .notNull()
+    .default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 export type WeeklyReviewIntention = {
@@ -332,22 +439,32 @@ export const weeklyReviews = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull().default(1),
     weekStart: date("week_start").notNull(),
     weekEnd: date("week_end").notNull(),
     wins: text("wins").notNull().default(""),
     carryover: text("carryover").notNull().default(""),
-    intentions: jsonb("intentions").$type<WeeklyReviewIntention[]>().notNull().default(sql`'[]'::jsonb`),
+    intentions: jsonb("intentions")
+      .$type<WeeklyReviewIntention[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     sprintNotes: text("sprint_notes").notNull().default(""),
-    sprintId: uuid("sprint_id").references(() => sprints.id, { onDelete: "set null" }),
+    sprintId: uuid("sprint_id").references(() => sprints.id, {
+      onDelete: "set null",
+    }),
     status: varchar("status", { length: 16 }).notNull().default("draft"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     uniqueIndex("weekly_reviews_user_week_uidx").on(t.userId, t.weekStart),
     index("weekly_reviews_user_week_idx").on(t.userId, t.weekStart),
-  ]
+  ],
 );
 
 /**
@@ -363,7 +480,9 @@ export const accomplishments = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     /** The task this came from, if it was logged from a completed task. */
-    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    taskId: uuid("task_id").references(() => tasks.id, {
+      onDelete: "set null",
+    }),
     /** The day the work happened (not necessarily when it was logged). */
     date: date("date").notNull(),
     /** "What you did" — the headline. */
@@ -374,13 +493,17 @@ export const accomplishments = pgTable(
     metric: varchar("metric", { length: 500 }),
     /** Skills exercised — useful for CVs and performance reviews. */
     skills: text("skills").array(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     index("accomplishments_user_idx").on(t.userId),
     index("accomplishments_user_date_idx").on(t.userId, t.date),
-  ]
+  ],
 );
 
 export const caldavSyncLog = pgTable(
@@ -390,13 +513,17 @@ export const caldavSyncLog = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    taskId: uuid("task_id").references(() => tasks.id, {
+      onDelete: "set null",
+    }),
     eventUid: varchar("event_uid", { length: 512 }),
     action: caldavActionEnum("action").notNull(),
-    syncedAt: timestamp("synced_at", { withTimezone: true }).defaultNow().notNull(),
+    syncedAt: timestamp("synced_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     error: text("error"),
   },
-  (t) => [index("caldav_sync_log_user_idx").on(t.userId)]
+  (t) => [index("caldav_sync_log_user_idx").on(t.userId)],
 );
 
 export const taskEmbeddings = pgTable(
@@ -407,9 +534,11 @@ export const taskEmbeddings = pgTable(
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
     embedding: vector1536("embedding").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
-  (t) => [uniqueIndex("task_embeddings_task_uidx").on(t.taskId)]
+  (t) => [uniqueIndex("task_embeddings_task_uidx").on(t.taskId)],
 );
 
 // ─── Time tracking ──────────────────────────────────────────────
@@ -423,15 +552,17 @@ export const taskTimeLogs = pgTable(
     startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
     endedAt: timestamp("ended_at", { withTimezone: true }),
     durationSeconds: integer("duration_seconds").generatedAlwaysAs(
-      sql`EXTRACT(EPOCH FROM (ended_at - started_at))::INTEGER`
+      sql`EXTRACT(EPOCH FROM (ended_at - started_at))::INTEGER`,
     ),
     note: text("note"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     index("task_time_logs_task_idx").on(t.taskId),
     index("task_time_logs_active_idx").on(t.endedAt),
-  ]
+  ],
 );
 
 // ─── Global tags ────────────────────────────────────────────────
@@ -439,7 +570,9 @@ export const tags = pgTable("tags", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 50 }).notNull().unique(),
   color: varchar("color", { length: 7 }).default("#6B7280"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 export const taskTags = pgTable(
@@ -452,13 +585,16 @@ export const taskTags = pgTable(
       .notNull()
       .references(() => tags.id, { onDelete: "cascade" }),
   },
-  (t) => [primaryKey({ columns: [t.taskId, t.tagId] })]
+  (t) => [primaryKey({ columns: [t.taskId, t.tagId] })],
 );
 
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
   subtasks: many(subtasks),
   area: one(areas, { fields: [tasks.areaId], references: [areas.id] }),
-  project: one(projects, { fields: [tasks.projectId], references: [projects.id] }),
+  project: one(projects, {
+    fields: [tasks.projectId],
+    references: [projects.id],
+  }),
   sprint: one(sprints, { fields: [tasks.sprintId], references: [sprints.id] }),
   user: one(users, { fields: [tasks.userId], references: [users.id] }),
   timeLogs: many(taskTimeLogs),
@@ -482,9 +618,15 @@ export const sprintsRelations = relations(sprints, ({ one, many }) => ({
   tasks: many(tasks),
 }));
 
-export const googleCalendarLinksRelations = relations(googleCalendarLinks, ({ one }) => ({
-  user: one(users, { fields: [googleCalendarLinks.userId], references: [users.id] }),
-}));
+export const googleCalendarLinksRelations = relations(
+  googleCalendarLinks,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [googleCalendarLinks.userId],
+      references: [users.id],
+    }),
+  }),
+);
 
 export const usersRelations = relations(users, ({ many, one }) => ({
   areas: many(areas),
@@ -513,3 +655,70 @@ export const taskTagsRelations = relations(taskTags, ({ one }) => ({
 export const subtasksRelations = relations(subtasks, ({ one }) => ({
   task: one(tasks, { fields: [subtasks.taskId], references: [tasks.id] }),
 }));
+
+// Daily-use persistence. SQL migration additionally defines revision/outbox triggers.
+export const oauthAttempts = pgTable("oauth_attempts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  stateHash: text("state_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+export const mutationReceipts = pgTable(
+  "mutation_receipts",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    operation: text("operation").notNull(),
+    key: text("key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    result: jsonb("result").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.operation, t.key] })],
+);
+export const dailyFocus = pgTable(
+  "daily_focus",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    targetType: text("target_type").notNull(),
+    targetId: uuid("target_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.date] })],
+);
+export const schedulePreviews = pgTable("schedule_previews", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  proposals: jsonb("proposals").notNull(),
+  context: jsonb("context").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()+interval '30 minutes'`),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+export const calendarOutbox = pgTable("calendar_outbox", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  payload: jsonb("payload").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+});

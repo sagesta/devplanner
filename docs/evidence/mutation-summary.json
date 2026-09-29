@@ -1,0 +1,19 @@
+{
+  "score": 84.12,
+  "threshold": 70,
+  "result": "PASS",
+  "counts": {
+    "Killed": 607,
+    "Survived": 117,
+    "Timeout": 13
+  },
+  "scope": [
+    "apps/api/src/google/event-write.ts",
+    "apps/api/src/google/oauth-state.ts",
+    "apps/api/src/services/daily.ts",
+    "apps/api/src/services/reviews.ts",
+    "apps/api/src/services/scheduler.ts"
+  ],
+  "databaseIntegrationEnabled": true,
+  "note": "Mutation run uses isolated real PostgreSQL databases. Two migration setup cases run in normal integration rather than each mutant invocation."
+}

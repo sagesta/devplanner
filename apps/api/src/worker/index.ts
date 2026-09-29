@@ -1,3 +1,4 @@
+import { drainCalendarOutbox } from "../services/calendar-outbox.js";
 /**
  * Run: npm run worker (from devplanner root) or npm run worker -w @devplanner/api
  * Requires Redis. CalDAV push/pull + idle scan (15m).
@@ -7,7 +8,10 @@ import { Worker } from "bullmq";
 import { and, eq, sql } from "drizzle-orm";
 import { caldavEnabled } from "../caldav/config.js";
 import { buildTaskVcalendar } from "../caldav/ical.js";
-import { runCaldavPullForUser, listUserIdsForCaldavPull } from "../caldav/pull-sync.js";
+import {
+  runCaldavPullForUser,
+  listUserIdsForCaldavPull,
+} from "../caldav/pull-sync.js";
 import {
   deleteCalendarResourceByFilename,
   objectFilenameForTask,
@@ -24,9 +28,26 @@ import {
   type GoogleCalendarSyncJob,
 } from "../queues/definitions.js";
 import { listGoogleLinkedUserIds } from "../google/auth.js";
-import { runGooglePushJob, runGooglePullForUser } from "../google/sync-engine.js";
+import {
+  runGooglePushJob,
+  runGooglePullForUser,
+} from "../google/sync-engine.js";
 
-const connection = createRedisConnection();
+const connection = createRedisConnection("worker");
+let draining = false;
+async function dispatchOutbox() {
+  if (draining) return;
+  draining = true;
+  try {
+    await drainCalendarOutbox();
+  } catch (e) {
+    console.error("[outbox] Delivery deferred", e);
+  } finally {
+    draining = false;
+  }
+}
+const outboxTimer = setInterval(() => void dispatchOutbox(), 15000);
+void dispatchOutbox();
 
 async function runIdleScan() {
   try {
@@ -37,8 +58,8 @@ async function runIdleScan() {
         and(
           eq(tasks.status, "in_progress"),
           sql`${tasks.updatedAt} < NOW() - INTERVAL '2 hours'`,
-          eq(tasks.idleFlagged, false)
-        )
+          eq(tasks.idleFlagged, false),
+        ),
       );
 
     if (rows.length > 0) {
@@ -48,7 +69,11 @@ async function runIdleScan() {
     for (const t of rows) {
       await db
         .update(tasks)
-        .set({ idleFlagged: true, idleFlaggedAt: new Date(), updatedAt: new Date() })
+        .set({
+          idleFlagged: true,
+          idleFlaggedAt: new Date(),
+          updatedAt: new Date(),
+        })
         .where(eq(tasks.id, t.id));
       emitUserEvent(t.userId, {
         type: "idle_task",
@@ -91,13 +116,17 @@ const syncWorker = new Worker(
   async (job) => {
     const data = job.data as Partial<CaldavSyncJob>;
     if (!data.userId || !data.taskId || !data.caldavUid || !data.action) {
-      console.warn("[caldav-sync] Invalid job payload. Flush Redis if upgrading.");
+      console.warn(
+        "[caldav-sync] Invalid job payload. Flush Redis if upgrading.",
+      );
       return;
     }
     const { userId, taskId, caldavUid, action, resourceFilename } = data;
 
     if (!caldavEnabled()) {
-      console.log("[caldav-sync] Skipped — set CALDAV_CALENDAR_URL and CALDAV_USER in API .env");
+      console.log(
+        "[caldav-sync] Skipped — set CALDAV_CALENDAR_URL and CALDAV_USER in API .env",
+      );
       return;
     }
 
@@ -112,14 +141,23 @@ const syncWorker = new Worker(
         action: "delete",
         error: result.ok ? null : `DELETE ${result.status}: ${result.detail}`,
       });
+      if (!result.ok)
+        throw new Error(`Calendar delete failed: ${result.status}`);
       if (result.ok) {
-        emitUserEvent(userId, { type: "caldav_queued", userId, taskId, message: "Calendar event removed" });
+        emitUserEvent(userId, {
+          type: "caldav_queued",
+          userId,
+          taskId,
+          message: "Calendar event removed",
+        });
       }
       return;
     }
 
-    const task = await db.query.tasks.findFirst({ where: eq(tasks.id, taskId) });
-    if (!task) {
+    const task = await db.query.tasks.findFirst({
+      where: eq(tasks.id, taskId),
+    });
+    if (!task || task.deletedAt) {
       await logCaldavRow({
         userId,
         taskId,
@@ -137,7 +175,7 @@ const syncWorker = new Worker(
       description: task.description,
       status: task.status,
       priority: task.priority,
-      scheduledDate: task.dueDate ?? null,
+      scheduledDate: task.scheduledDate ?? task.dueDate ?? null,
       scheduledStartTime: null,
       scheduledEndTime: null,
       dueDate: task.dueDate,
@@ -151,7 +189,7 @@ const syncWorker = new Worker(
 
     if (!ics) {
       await deleteCalendarResourceByFilename(fn).catch((err) =>
-        console.warn('[caldav worker] cleanup delete failed for', fn, err)
+        console.warn("[caldav worker] cleanup delete failed for", fn, err),
       );
       await logCaldavRow({
         userId,
@@ -171,11 +209,15 @@ const syncWorker = new Worker(
       action,
       error: put.ok ? null : `PUT ${put.status}: ${put.detail}`,
     });
+    if (!put.ok) throw new Error(`Calendar write failed: ${put.status}`);
     if (put.ok) {
       if (!task.icalUid?.trim()) {
         await db
           .update(tasks)
-          .set({ icalUid: `${effectiveCaldavUid}@devplanner`, updatedAt: task.updatedAt })
+          .set({
+            icalUid: `${effectiveCaldavUid}@devplanner`,
+            updatedAt: task.updatedAt,
+          })
           .where(eq(tasks.id, task.id));
       }
       emitUserEvent(userId, {
@@ -186,7 +228,7 @@ const syncWorker = new Worker(
       });
     }
   },
-  { connection }
+  { connection },
 );
 
 const pullWorker = new Worker(
@@ -202,7 +244,7 @@ const pullWorker = new Worker(
     }
     emitUserEvent(userId, { type: "caldav_queued", userId, message: msg });
   },
-  { connection }
+  { connection },
 );
 
 const googleSyncWorker = new Worker(
@@ -226,8 +268,9 @@ const googleSyncWorker = new Worker(
       taskId: data.action === "delete" ? null : data.taskId,
       eventUid,
       action: data.action,
-      error: r.ok ? null : r.detail ?? "Google Calendar sync failed",
+      error: r.ok ? null : (r.detail ?? "Google Calendar sync failed"),
     });
+    if (!r.ok) throw new Error(r.detail ?? "Google Calendar sync failed");
     if (r.ok) {
       emitUserEvent(data.userId, {
         type: "caldav_queued",
@@ -240,7 +283,7 @@ const googleSyncWorker = new Worker(
       });
     }
   },
-  { connection }
+  { connection },
 );
 
 const googlePullWorker = new Worker(
@@ -256,11 +299,17 @@ const googlePullWorker = new Worker(
     }
     emitUserEvent(userId, { type: "caldav_queued", userId, message: msg });
   },
-  { connection }
+  { connection },
 );
 
-const pullIntervalMs = Math.max(0, Number(process.env.CALDAV_PULL_INTERVAL_MS ?? "0"));
-const googlePullIntervalMs = Math.max(0, Number(process.env.GOOGLE_CALENDAR_PULL_INTERVAL_MS ?? "0"));
+const pullIntervalMs = Math.max(
+  0,
+  Number(process.env.CALDAV_PULL_INTERVAL_MS ?? "0"),
+);
+const googlePullIntervalMs = Math.max(
+  0,
+  Number(process.env.GOOGLE_CALENDAR_PULL_INTERVAL_MS ?? "0"),
+);
 let pullTimer: ReturnType<typeof setInterval> | null = null;
 if (pullIntervalMs > 0) {
   pullTimer = setInterval(() => {
@@ -276,7 +325,9 @@ if (pullIntervalMs > 0) {
       }
     })();
   }, pullIntervalMs);
-  console.log(`[worker] CalDAV periodic pull every ${pullIntervalMs}ms (when CALDAV_* set)`);
+  console.log(
+    `[worker] CalDAV periodic pull every ${pullIntervalMs}ms (when CALDAV_* set)`,
+  );
 }
 
 let googlePullTimer: ReturnType<typeof setInterval> | null = null;
@@ -293,11 +344,14 @@ if (googlePullIntervalMs > 0) {
       }
     })();
   }, googlePullIntervalMs);
-  console.log(`[worker] Google Calendar periodic pull every ${googlePullIntervalMs}ms`);
+  console.log(
+    `[worker] Google Calendar periodic pull every ${googlePullIntervalMs}ms`,
+  );
 }
 
 function shutdown(signal: string) {
   console.log(`\n[worker] Received ${signal}, shutting down…`);
+  clearInterval(outboxTimer);
   if (pullTimer) clearInterval(pullTimer);
   if (googlePullTimer) clearInterval(googlePullTimer);
   Promise.all([
@@ -317,5 +371,5 @@ process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
 
 console.log(
-  "DevPlanner worker: idle scan + CalDAV + Google Calendar push/pull (when configured; Redis + npm run worker)"
+  "DevPlanner worker: idle scan + CalDAV + Google Calendar push/pull (when configured; Redis + npm run worker)",
 );

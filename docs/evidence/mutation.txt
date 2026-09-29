@@ -1,0 +1,9 @@
+
+> test:mutation
+> stryker run
+
+[32m02:44:40 (42060) INFO ProjectReader[39m Found 5 of 377 file(s) to be mutated.
+[32m02:44:43 (42060) INFO Instrumenter[39m Instrumented 5 source file(s) with 710 mutant(s)
+[32m02:44:45 (42060) INFO ConcurrencyTokenProvider[39m Creating 1 test runner process(es).
+[32m02:44:47 (42060) INFO DryRunExecutor[39m Starting initial test run (command test runner with "off" coverage analysis). This may take a while.
+[32m02:44:49 (42060) INFO DryRunExecutor[39m Initial test run succeeded. Ran 1 tests in 2 seconds (net 2061 ms, overhead 1 ms).

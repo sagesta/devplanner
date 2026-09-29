@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { dailyMigrationSql } from "./daily-migration.js";
 
 /**
  * Idempotent startup migration.
@@ -287,6 +288,7 @@ export async function runMigrations(pool: pg.Pool): Promise<void> {
         ON weekly_reviews (user_id, week_start);
     `);
 
+    await client.query(dailyMigrationSql);
     await client.query("COMMIT");
     console.log("[migrate] Schema up-to-date ✓");
   } catch (err) {

@@ -1,0 +1,58 @@
+
+> devplanner@0.1.0 build
+> npm run build -w @devplanner/api && npm run build -w @devplanner/web
+
+
+> @devplanner/api@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @devplanner/web@0.1.0 build
+> cross-env NEXT_DISABLE_LOCKFILE_PATCH=1 next build
+
+  ▲ Next.js 14.2.35
+  - Environments: .env.local
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/19) ...
+   Generating static pages (4/19) 
+   Generating static pages (9/19) 
+   Generating static pages (14/19) 
+ ✓ Generating static pages (19/19)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+┌ ○ /                                    138 B          87.5 kB
+├ ○ /_not-found                          873 B          88.2 kB
+├ ƒ /api/calendar/google/callback        0 B                0 B
+├ ƒ /api/calendar/google/start           0 B                0 B
+├ ƒ /api/goals                           0 B                0 B
+├ ○ /backlog                             6.91 kB         172 kB
+├ ○ /board                               1.89 kB         190 kB
+├ ○ /goals                               2.93 kB         150 kB
+├ ○ /icon.png                            0 B                0 B
+├ ○ /insights                            812 B           155 kB
+├ ○ /login                               2.18 kB         120 kB
+├ ○ /manifest.webmanifest                0 B                0 B
+├ ○ /now                                 12.2 kB         185 kB
+├ ○ /plan                                905 B           215 kB
+├ ○ /review                              12.6 kB         176 kB
+├ ○ /settings                            11.5 kB         155 kB
+├ ○ /sprints                             1.19 kB         155 kB
+├ ○ /table                               1.62 kB         161 kB
+└ ○ /timeline                            3.61 kB         170 kB
++ First Load JS shared by all            87.3 kB
+  ├ chunks/1dd3208c-4936436c1accd8c4.js  53.6 kB
+  ├ chunks/528-101c4521498afb76.js       31.7 kB
+  └ other shared chunks (total)          1.99 kB
+
+
+ƒ Middleware                             76.9 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

@@ -1,0 +1,12 @@
+
+> devplanner@0.1.0 typecheck
+> npm run build -w @devplanner/api && npm run typecheck -w @devplanner/web
+
+
+> @devplanner/api@0.1.0 build
+> tsc -p tsconfig.json
+
+
+> @devplanner/web@0.1.0 typecheck
+> tsc --noEmit
+

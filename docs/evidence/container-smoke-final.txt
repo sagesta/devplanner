@@ -1,0 +1,4 @@
+PASS: clean-container migration/startup, database/Redis health, unauthenticated write denied
+{"status":"ok","uptime":4.790527191,"db":{"status":"ok"},"redis":{"status":"ok"}}
+PASS: Redis outage returns 503 in 173ms
+PASS: API health recovers after Redis restart without API restart

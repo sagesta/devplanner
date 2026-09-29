@@ -31,7 +31,11 @@ const NAV_ITEMS = [
   { href: "/plan?view=timeline", label: "Plan: Timeline", icon: ChartGantt },
   { href: "/plan?view=table", label: "Plan: Table", icon: LayoutList },
   { href: "/plan?view=goals", label: "Plan: Goals", icon: Target },
-  { href: "/review?view=progress", label: "Review: Progress", icon: ChartGantt },
+  {
+    href: "/review?view=progress",
+    label: "Review: Progress",
+    icon: ChartGantt,
+  },
 ] as const;
 
 export function CommandMenu({
@@ -56,6 +60,7 @@ export function CommandMenu({
 
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Reset transient search when the externally controlled dialog closes.
       setQuery("");
       return;
     }
@@ -69,7 +74,11 @@ export function CommandMenu({
         e.preventDefault();
         onOpenChange(!open);
       }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "d") {
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        e.key.toLowerCase() === "d"
+      ) {
         e.preventDefault();
         onOpenChange(false);
         onBrainDump();
@@ -86,7 +95,7 @@ export function CommandMenu({
       (item) =>
         item.label.toLowerCase().includes(q) ||
         item.href.toLowerCase().includes(q) ||
-        item.href.replace("/", "").includes(q)
+        item.href.replace("/", "").includes(q),
     );
   }, [q]);
 
@@ -107,12 +116,15 @@ export function CommandMenu({
 
   function openTask(taskId: string) {
     onOpenChange(false);
-    window.dispatchEvent(new CustomEvent("open-task", { detail: { id: taskId } }));
+    window.dispatchEvent(
+      new CustomEvent("open-task", { detail: { id: taskId } }),
+    );
   }
 
   if (!open) return null;
 
-  const nothingMatches = navFiltered.length === 0 && !brainMatches && tasksFiltered.length === 0;
+  const nothingMatches =
+    navFiltered.length === 0 && !brainMatches && tasksFiltered.length === 0;
 
   return (
     <div
@@ -122,7 +134,7 @@ export function CommandMenu({
       <Command
         shouldFilter={false}
         className="mx-auto max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-2xl animate-scaleIn"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}
       >
         <Command.Input
           ref={inputRef}
@@ -133,7 +145,9 @@ export function CommandMenu({
         />
         <Command.List className="max-h-72 overflow-auto p-2 text-sm">
           {nothingMatches ? (
-            <p className="px-3 py-6 text-center text-muted">No commands found.</p>
+            <p className="px-3 py-6 text-center text-muted">
+              No commands found.
+            </p>
           ) : (
             <>
               <Command.Empty className="hidden" />
@@ -157,7 +171,9 @@ export function CommandMenu({
               )}
               {tasksFiltered.length > 0 && (
                 <>
-                  {navFiltered.length > 0 && <Command.Separator className="my-1 border-t border-white/5" />}
+                  {navFiltered.length > 0 && (
+                    <Command.Separator className="my-1 border-t border-white/5" />
+                  )}
                   <Command.Group
                     heading="Tasks"
                     className="text-[11px] uppercase tracking-wider text-muted mb-1"
@@ -176,9 +192,10 @@ export function CommandMenu({
                   </Command.Group>
                 </>
               )}
-              {(navFiltered.length > 0 || tasksFiltered.length > 0) && brainMatches && (
-                <Command.Separator className="my-1 border-t border-white/5" />
-              )}
+              {(navFiltered.length > 0 || tasksFiltered.length > 0) &&
+                brainMatches && (
+                  <Command.Separator className="my-1 border-t border-white/5" />
+                )}
               {brainMatches && (
                 <Command.Group
                   heading="Actions"
@@ -194,7 +211,9 @@ export function CommandMenu({
                   >
                     <Lightbulb size={14} className="text-muted" />
                     Brain dump
-                    <span className="ml-auto text-[11px] text-muted/85">Ctrl/Cmd+Shift+D</span>
+                    <span className="ml-auto text-[11px] text-muted/85">
+                      Ctrl/Cmd+Shift+D
+                    </span>
                   </Command.Item>
                 </Command.Group>
               )}

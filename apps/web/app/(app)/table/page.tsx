@@ -3,10 +3,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStatus } from "@/hooks/use-auth-status";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { deleteTask, fetchSprints, fetchTasks, patchTask, postBulkStatus, restoreTask } from "@/lib/api";
+import {
+  deleteTask,
+  fetchSprints,
+  fetchTasks,
+  patchTask,
+  postBulkStatus,
+  restoreTask,
+} from "@/lib/api";
 import { SkeletonRow } from "@/lib/skeleton";
 import { normalizeYmd } from "@/lib/timeline-utils";
 import { cn, displayPhysicalEnergy, displayWorkDepth } from "@/lib/utils";
@@ -22,15 +29,53 @@ type SortKey =
   | "dueDate";
 type SortDir = "asc" | "desc";
 
-const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
+const PRIORITY_ORDER: Record<string, number> = {
+  urgent: 0,
+  high: 1,
+  normal: 2,
+  low: 3,
+};
 // Cognitive load rank: deep_work = most demanding → shown first ascending
-const COGNITIVE_ORDER: Record<string, number> = { deep_work: 0, shallow: 1, admin: 2, quick_win: 3 };
+const COGNITIVE_ORDER: Record<string, number> = {
+  deep_work: 0,
+  shallow: 1,
+  admin: 2,
+  quick_win: 3,
+};
 
 function localISODate(d = new Date()) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function SortHeader({
+  field,
+  label,
+  sortKey,
+  sortDir,
+  toggleSort,
+}: {
+  field: SortKey;
+  label: string;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  toggleSort: (key: SortKey) => void;
+}) {
+  const active = sortKey === field;
+  return (
+    <th
+      className="cursor-pointer select-none p-2 transition-colors hover:text-foreground"
+      onClick={() => toggleSort(field)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {active &&
+          (sortDir === "asc" ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+      </span>
+    </th>
+  );
 }
 
 export default function TablePage() {
@@ -58,23 +103,18 @@ export default function TablePage() {
   // "all" | "none" (backlog only) | sprint id. null = default not resolved yet;
   // defaults to the active sprint (matches the Board) so backlog tasks stay in
   // the Backlog unless "All tasks" is chosen deliberately.
-  const [sprintFilter, setSprintFilter] = useState<string | null>(null);
-  useEffect(() => {
-    if (!sprintsQ.data) return;
-    if (sprintFilter === null) {
-      const active = sprintsQ.data.sprints.find((s) => s.status === "active");
-      setSprintFilter(active?.id ?? "all");
-      return;
-    }
-    // Selected sprint no longer exists (deleted) — fall back to All.
-    if (
-      sprintFilter !== "all" &&
-      sprintFilter !== "none" &&
-      !sprintsQ.data.sprints.some((s) => s.id === sprintFilter)
-    ) {
-      setSprintFilter("all");
-    }
-  }, [sprintFilter, sprintsQ.data]);
+  const [requestedSprintFilter, setSprintFilter] = useState<string | null>(
+    null,
+  );
+  const sprintFilter =
+    requestedSprintFilter === null
+      ? (sprintsQ.data?.sprints.find((s) => s.status === "active")?.id ?? "all")
+      : requestedSprintFilter === "all" ||
+          requestedSprintFilter === "none" ||
+          !sprintsQ.data ||
+          sprintsQ.data.sprints.some((s) => s.id === requestedSprintFilter)
+        ? requestedSprintFilter
+        : "all";
 
   const roots = useMemo(() => {
     const items = [...(q.data ?? [])].filter((t) => {
@@ -84,7 +124,10 @@ export default function TablePage() {
     });
     return items.sort((a, b) => {
       let cmp = 0;
-      const dateCmp = (x: string | null | undefined, y: string | null | undefined) => {
+      const dateCmp = (
+        x: string | null | undefined,
+        y: string | null | undefined,
+      ) => {
         const xs = normalizeYmd(x) ?? "";
         const ys = normalizeYmd(y) ?? "";
         if (!xs && !ys) return 0;
@@ -100,16 +143,22 @@ export default function TablePage() {
           cmp = a.status.localeCompare(b.status);
           break;
         case "priority":
-          cmp = (PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2);
+          cmp =
+            (PRIORITY_ORDER[a.priority] ?? 2) -
+            (PRIORITY_ORDER[b.priority] ?? 2);
           break;
         case "energyLevel":
-          cmp = (COGNITIVE_ORDER[a.energyLevel] ?? 99) - (COGNITIVE_ORDER[b.energyLevel] ?? 99);
+          cmp =
+            (COGNITIVE_ORDER[a.energyLevel] ?? 99) -
+            (COGNITIVE_ORDER[b.energyLevel] ?? 99);
           break;
         case "workDepth":
           cmp = displayWorkDepth(a).localeCompare(displayWorkDepth(b));
           break;
         case "physicalEnergy":
-          cmp = displayPhysicalEnergy(a).localeCompare(displayPhysicalEnergy(b));
+          cmp = displayPhysicalEnergy(a).localeCompare(
+            displayPhysicalEnergy(b),
+          );
           break;
         case "dueDate":
           cmp = dateCmp(a.dueDate, b.dueDate);
@@ -129,13 +178,16 @@ export default function TablePage() {
   }
 
   const statusMut = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => patchTask(id, { status }),
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      patchTask(id, { status }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["tasks", userId] }),
   });
 
   const bulk = useMutation({
     mutationFn: async (status: "done" | "todo") => {
-      const ids = Object.entries(sel).filter(([, v]) => v).map(([k]) => k);
+      const ids = Object.entries(sel)
+        .filter(([, v]) => v)
+        .map(([k]) => k);
       if (!ids.length) return { updated: 0 };
       return postBulkStatus(ids, status);
     },
@@ -159,27 +211,15 @@ export default function TablePage() {
 
   const selCount = Object.values(sel).filter(Boolean).length;
 
-  function SortHeader({ field, label }: { field: SortKey; label: string }) {
-    const active = sortKey === field;
-    return (
-      <th
-        className="cursor-pointer select-none p-2 transition-colors hover:text-foreground"
-        onClick={() => toggleSort(field)}
-      >
-        <span className="inline-flex items-center gap-1">
-          {label}
-          {active && (sortDir === "asc" ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
-        </span>
-      </th>
-    );
-  }
-
   return (
     <div>
       <h1 className="font-display text-2xl text-foreground">Task table</h1>
       <div className="mt-4 flex flex-wrap items-center gap-3 min-h-[36px]">
         <div className="flex items-center gap-2">
-          <label htmlFor="table-sprint" className="text-[11px] uppercase tracking-wide text-muted">
+          <label
+            htmlFor="table-sprint"
+            className="text-[11px] uppercase tracking-wide text-muted"
+          >
             Sprint
           </label>
           <select
@@ -205,7 +245,9 @@ export default function TablePage() {
         </div>
         {selCount > 0 && (
           <div className="flex flex-wrap items-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-3 py-1.5 animate-fadeIn">
-            <span className="text-xs font-semibold text-primary-text">{selCount} selected</span>
+            <span className="text-xs font-semibold text-primary-text">
+              {selCount} selected
+            </span>
             <div className="h-4 w-[1px] bg-primary/20 mx-1" />
             <button
               type="button"
@@ -227,38 +269,48 @@ export default function TablePage() {
             <div className="h-3 w-[1px] bg-primary/20" />
             {confirmBulkDelete ? (
               <span className="inline-flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-red-400">Delete {selCount}?</span>
+                <span className="text-[11px] font-semibold text-red-400">
+                  Delete {selCount}?
+                </span>
                 <button
                   type="button"
                   className="rounded bg-danger px-2 py-0.5 text-[11px] font-bold text-white hover:bg-red-600 disabled:opacity-40"
                   disabled={bulk.isPending}
                   onClick={() => {
-                    const ids = Object.entries(sel).filter(([, v]) => v).map(([k]) => k);
+                    const ids = Object.entries(sel)
+                      .filter(([, v]) => v)
+                      .map(([k]) => k);
                     if (!ids.length) return;
                     setConfirmBulkDelete(false);
                     const invalidate = () => {
-                      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+                      void qc.invalidateQueries({
+                        queryKey: ["tasks", userId],
+                      });
                       void qc.invalidateQueries({ queryKey: ["backlog"] });
                       void qc.invalidateQueries({ queryKey: ["tasks-today"] });
                     };
-                    Promise.all(ids.map(id => deleteTask(id))).then(() => {
-                      setSel({});
-                      invalidate();
-                      toast.success(`Deleted ${ids.length} task(s)`, {
-                        duration: 6000,
-                        action: {
-                          label: "Undo",
-                          onClick: () => {
-                            void Promise.all(ids.map((id) => restoreTask(id)))
-                              .then(() => {
-                                toast.success("Tasks restored");
-                                invalidate();
-                              })
-                              .catch((err: unknown) => toast.error(String(err)));
+                    Promise.all(ids.map((id) => deleteTask(id)))
+                      .then(() => {
+                        setSel({});
+                        invalidate();
+                        toast.success(`Deleted ${ids.length} task(s)`, {
+                          duration: 6000,
+                          action: {
+                            label: "Undo",
+                            onClick: () => {
+                              void Promise.all(ids.map((id) => restoreTask(id)))
+                                .then(() => {
+                                  toast.success("Tasks restored");
+                                  invalidate();
+                                })
+                                .catch((err: unknown) =>
+                                  toast.error(String(err)),
+                                );
+                            },
                           },
-                        },
-                      });
-                    }).catch((e: Error) => toast.error(e.message));
+                        });
+                      })
+                      .catch((e: Error) => toast.error(e.message));
                   }}
                 >
                   Confirm
@@ -295,17 +347,48 @@ export default function TablePage() {
                   checked={selCount === roots.length && roots.length > 0}
                   onChange={(e) => {
                     const all: Record<string, boolean> = {};
-                    if (e.target.checked) for (const t of roots) all[t.id] = true;
+                    if (e.target.checked)
+                      for (const t of roots) all[t.id] = true;
                     setSel(all);
                   }}
                 />
               </th>
               <th className="w-4 p-2" />
-              <SortHeader field="title" label="Title" />
-              <SortHeader field="status" label="Status" />
-              <SortHeader field="priority" label="Priority" />
-              <SortHeader field="physicalEnergy" label="Energy" />
-              <SortHeader field="workDepth" label="Depth" />
+              <SortHeader
+                sortKey={sortKey}
+                sortDir={sortDir}
+                toggleSort={toggleSort}
+                field="title"
+                label="Title"
+              />
+              <SortHeader
+                sortKey={sortKey}
+                sortDir={sortDir}
+                toggleSort={toggleSort}
+                field="status"
+                label="Status"
+              />
+              <SortHeader
+                sortKey={sortKey}
+                sortDir={sortDir}
+                toggleSort={toggleSort}
+                field="priority"
+                label="Priority"
+              />
+              <SortHeader
+                sortKey={sortKey}
+                sortDir={sortDir}
+                toggleSort={toggleSort}
+                field="physicalEnergy"
+                label="Energy"
+              />
+              <SortHeader
+                sortKey={sortKey}
+                sortDir={sortDir}
+                toggleSort={toggleSort}
+                field="workDepth"
+                label="Depth"
+              />
               <th
                 className="cursor-pointer select-none p-2 transition-colors hover:text-foreground"
                 title="Cognitive load required: shallow (minimal focus), admin (routine), deep work (high focus)."
@@ -314,14 +397,28 @@ export default function TablePage() {
                 <span className="inline-flex items-center gap-1">
                   Cognitive
                   {sortKey === "energyLevel" &&
-                    (sortDir === "asc" ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                    (sortDir === "asc" ? (
+                      <ArrowUp size={10} />
+                    ) : (
+                      <ArrowDown size={10} />
+                    ))}
                 </span>
               </th>
-              <SortHeader field="dueDate" label="Due" />
-              <th className="p-2 text-[11px] uppercase text-muted">Scheduled (next sub)</th>
+              <SortHeader
+                sortKey={sortKey}
+                sortDir={sortDir}
+                toggleSort={toggleSort}
+                field="dueDate"
+                label="Due"
+              />
+              <th className="p-2 text-[11px] uppercase text-muted">
+                Scheduled (next sub)
+              </th>
               <th className="p-2 text-[11px] uppercase text-muted">Tags</th>
               <th className="p-2 text-[11px] uppercase text-muted">Timer</th>
-              <th className="w-10 p-2 text-right text-[11px] uppercase text-muted"> </th>
+              <th className="w-10 p-2 text-right text-[11px] uppercase text-muted">
+                {" "}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -334,14 +431,16 @@ export default function TablePage() {
               </>
             )}
             {roots.map((t, i) => (
-              <TaskTableRow 
-                key={t.id} 
-                task={t} 
-                index={i} 
-                userId={userId} 
-                todayYmd={todayYmd} 
-                selected={Boolean(sel[t.id])} 
-                onSelectToggle={(checked) => setSel((s) => ({ ...s, [t.id]: checked }))} 
+              <TaskTableRow
+                key={t.id}
+                task={t}
+                index={i}
+                userId={userId}
+                todayYmd={todayYmd}
+                selected={Boolean(sel[t.id])}
+                onSelectToggle={(checked) =>
+                  setSel((s) => ({ ...s, [t.id]: checked }))
+                }
               />
             ))}
           </tbody>
@@ -351,7 +450,10 @@ export default function TablePage() {
       {!q.isLoading && roots.length === 0 && (
         <p className="mt-6 text-center text-sm text-muted">
           No tasks yet. Add some from the{" "}
-          <a href="/plan?view=board" className="text-primary-text hover:underline">
+          <a
+            href="/plan?view=board"
+            className="text-primary-text hover:underline"
+          >
             Plan board
           </a>{" "}
           or Brain dump.

@@ -277,8 +277,16 @@ export function AiChatDock() {
       setMsg(detail.prompt);
       setTimeout(() => inputRef.current?.focus(), 140);
     }
+    function onOpen() {
+      setOpen(true);
+      setTimeout(() => inputRef.current?.focus(), 140);
+    }
     window.addEventListener("devplanner:ai-prompt", onPrompt as EventListener);
-    return () => window.removeEventListener("devplanner:ai-prompt", onPrompt as EventListener);
+    window.addEventListener("devplanner:open-ai", onOpen);
+    return () => {
+      window.removeEventListener("devplanner:ai-prompt", onPrompt as EventListener);
+      window.removeEventListener("devplanner:open-ai", onOpen);
+    };
   }, []);
 
   // Close selector on outside click
@@ -468,7 +476,7 @@ export function AiChatDock() {
   if (!userId) return null;
 
   return (
-    <div className="fixed right-4 z-40 flex flex-col items-end gap-2 bottom-[140px] md:bottom-4">
+    <div className="fixed right-4 z-40 flex flex-col items-end gap-2 bottom-[calc(80px+env(safe-area-inset-bottom))] md:bottom-4">
       {open && (
         <div
           id="ai-chat-panel"
@@ -729,7 +737,7 @@ export function AiChatDock() {
         type="button"
         id="ai-chat-toggle"
         className={cn(
-          "inline-flex items-center gap-2 rounded-full border border-[var(--hairline)] bg-[var(--card)] px-[18px] py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card-shadow)] transition-all duration-300",
+          "hidden items-center gap-2 rounded-full border border-[var(--hairline)] bg-[var(--card)] px-[18px] py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card-shadow)] transition-all duration-300 md:inline-flex",
           "hover:border-[var(--teal-a30)]",
           open && "border-[var(--teal-a30)] scale-[0.97]"
         )}

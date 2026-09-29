@@ -13,18 +13,23 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  createTask,
   fetchAreas,
   parseDump,
-  postBrainDumpLines,
+  postCaptureBatch,
   transcribeAudio,
   type DumpBucket,
   type ParsedDumpItem,
 } from "@/lib/api";
 import { useAppUserId } from "@/hooks/use-app-user-id";
+import { useCalendarDate } from "@/hooks/use-calendar-date";
+import {
+  captureDraftKey,
+  newDraftIdempotencyKey,
+  parseCaptureDraft,
+} from "@/lib/draft-storage";
 
 type Energy = ParsedDumpItem["energy"];
 type Priority = ParsedDumpItem["priority"];
@@ -88,6 +93,7 @@ export function BrainDumpModal({
   onClose: () => void;
 }) {
   const userId = useAppUserId();
+  const todayYmd = useCalendarDate();
   const qc = useQueryClient();
   const [text, setText] = useState("");
   const [moreSchedule, setMoreSchedule] = useState(false);
@@ -97,6 +103,13 @@ export function BrainDumpModal({
   const [recurrence, setRecurrence] = useState("");
   const [view, setView] = useState<"raw" | "preview">("raw");
   const [parsedItems, setParsedItems] = useState<ParsedDumpItem[]>([]);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftUserId, setDraftUserId] = useState("");
+  const [draftStorageError, setDraftStorageError] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const captureRequestRef = useRef({ signature: "", key: "" });
+  const currentDraftFingerprintRef = useRef("");
+  const accountGenerationRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ─── Speech-to-text (Whisper) ───────────────────────────────────
@@ -131,7 +144,7 @@ export function BrainDumpModal({
         candidates.find((c) => MediaRecorder.isTypeSupported(c)) ?? "";
       const recorder = new MediaRecorder(
         stream,
-        mimeType ? { mimeType } : undefined
+        mimeType ? { mimeType } : undefined,
       );
       recorder.ondataavailable = (ev) => {
         if (ev.data && ev.data.size > 0) audioChunksRef.current.push(ev.data);
@@ -144,7 +157,9 @@ export function BrainDumpModal({
         });
         audioChunksRef.current = [];
         if (blob.size === 0) {
-          toast.error("No audio captured — try again and speak after the mic light turns on.");
+          toast.error(
+            "No audio captured — try again and speak after the mic light turns on.",
+          );
           return;
         }
         setIsTranscribing(true);
@@ -156,8 +171,12 @@ export function BrainDumpModal({
             return;
           }
           // Append on a new line if there's already content, otherwise replace.
-          setText((prev) => (prev.trim() ? `${prev.replace(/\s+$/, "")}\n${clean}` : clean));
-          toast.success("Transcribed — review the text, then save or AI-organize.");
+          setText((prev) =>
+            prev.trim() ? `${prev.replace(/\s+$/, "")}\n${clean}` : clean,
+          );
+          toast.success(
+            "Transcribed — review the text, then save or AI-organize.",
+          );
         } catch (e) {
           toast.error(e instanceof Error ? e.message : String(e));
         } finally {
@@ -170,14 +189,14 @@ export function BrainDumpModal({
       setRecordingSec(0);
       recordingTimerRef.current = setInterval(
         () => setRecordingSec((s) => s + 1),
-        1000
+        1000,
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       toast.error(
         msg.toLowerCase().includes("permission")
           ? "Microphone permission denied. Allow it in your browser, then try again."
-          : `Couldn't start recording: ${msg}`
+          : `Couldn't start recording: ${msg}`,
       );
     }
   }
@@ -195,13 +214,18 @@ export function BrainDumpModal({
     }
   }
 
-  // Stop recording if the modal closes mid-capture or unmounts.
+  // An external close can happen while the recorder is active.
+  /* eslint-disable react-hooks/set-state-in-effect -- The recorder is external browser state and closing it must synchronously update the recording indicator. */
   useEffect(() => {
     if (!open && isRecording) stopRecording();
   }, [open, isRecording]);
+  /* eslint-enable react-hooks/set-state-in-effect */
   useEffect(() => {
     return () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      if (
+        mediaRecorderRef.current &&
+        mediaRecorderRef.current.state !== "inactive"
+      ) {
         mediaRecorderRef.current.stop();
       }
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
@@ -227,12 +251,149 @@ export function BrainDumpModal({
   });
 
   const [areaId, setAreaId] = useState<string>("");
-
+  const draftFingerprint = JSON.stringify({
+    text,
+    areaId,
+    scheduledDate,
+    startT,
+    endT,
+    recurrence,
+    parsedItems,
+    view,
+  });
   useEffect(() => {
-    if (!areasQ.data?.length) return;
-    const valid = areasQ.data.some((a) => a.id === areaId);
-    if (!areaId || !valid) setAreaId(areasQ.data[0]!.id);
-  }, [areasQ.data, areaId]);
+    currentDraftFingerprintRef.current = draftFingerprint;
+  }, [draftFingerprint]);
+
+  /* eslint-disable react-hooks/set-state-in-effect -- Account-scoped localStorage hydration must replace the previous account's in-memory draft before it can be used. */
+  useEffect(() => {
+    accountGenerationRef.current += 1;
+    if (!userId) {
+      setDraftReady(false);
+      setDraftUserId("");
+      setText("");
+      setParsedItems([]);
+      setView("raw");
+      setAreaId("");
+      setScheduledDate("");
+      setStartT("");
+      setEndT("");
+      setRecurrence("");
+      captureRequestRef.current = { signature: "", key: "" };
+      return;
+    }
+    setDraftReady(false);
+    setDraftUserId("");
+    setText("");
+    setParsedItems([]);
+    setView("raw");
+    setAreaId("");
+    captureRequestRef.current = { signature: "", key: "" };
+    try {
+      const saved = parseCaptureDraft(
+        localStorage.getItem(captureDraftKey(userId)),
+        userId,
+      );
+      if (saved) {
+        setText(saved.text);
+        setAreaId(saved.areaId);
+        setScheduledDate(saved.scheduledDate);
+        setStartT(saved.startT);
+        setEndT(saved.endT);
+        setRecurrence(saved.recurrence);
+        setParsedItems(saved.parsedItems);
+        setView(saved.view);
+        captureRequestRef.current = {
+          signature: saved.requestSignature,
+          key: saved.idempotencyKey,
+        };
+      }
+    } catch {
+      setDraftStorageError(true);
+    }
+    setDraftReady(true);
+    setDraftUserId(userId);
+  }, [userId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  /* eslint-disable react-hooks/set-state-in-effect -- The warning reflects the result of writing to browser storage, an external system. */
+  useEffect(() => {
+    if (!userId || !draftReady || draftUserId !== userId) return;
+    try {
+      localStorage.setItem(
+        captureDraftKey(userId),
+        JSON.stringify({
+          version: 1,
+          userId,
+          text,
+          areaId,
+          scheduledDate,
+          startT,
+          endT,
+          recurrence,
+          parsedItems,
+          view,
+          idempotencyKey: captureRequestRef.current.key,
+          requestSignature: captureRequestRef.current.signature,
+        }),
+      );
+      setDraftStorageError(false);
+    } catch {
+      setDraftStorageError(true);
+    }
+  }, [
+    userId,
+    draftReady,
+    draftUserId,
+    text,
+    areaId,
+    scheduledDate,
+    startT,
+    endT,
+    recurrence,
+    parsedItems,
+    view,
+  ]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  function requestKeyFor(items: unknown[]) {
+    const signature = JSON.stringify(items);
+    if (
+      captureRequestRef.current.signature !== signature ||
+      !captureRequestRef.current.key
+    ) {
+      captureRequestRef.current = { signature, key: newDraftIdempotencyKey() };
+    }
+    if (userId) {
+      try {
+        localStorage.setItem(
+          captureDraftKey(userId),
+          JSON.stringify({
+            version: 1,
+            userId,
+            text,
+            areaId,
+            scheduledDate,
+            startT,
+            endT,
+            recurrence,
+            parsedItems,
+            view,
+            idempotencyKey: captureRequestRef.current.key,
+            requestSignature: captureRequestRef.current.signature,
+          }),
+        );
+      } catch {
+        setDraftStorageError(true);
+      }
+    }
+    return captureRequestRef.current.key;
+  }
+
+  const validAreaId =
+    areaId && areasQ.data && !areasQ.data.some((area) => area.id === areaId)
+      ? ""
+      : areaId;
 
   useEffect(() => {
     if (!open) return;
@@ -261,7 +422,9 @@ export function BrainDumpModal({
       }
       const y = Number(safeDate.slice(0, 4));
       if (y > new Date().getFullYear() + 2) {
-        toast.error("That year looks wrong — please pick a date within the next 2 years.");
+        toast.error(
+          "That year looks wrong — please pick a date within the next 2 years.",
+        );
         throw new Error("date too far");
       }
     }
@@ -283,14 +446,32 @@ export function BrainDumpModal({
 
   const saveRawMut = useMutation({
     mutationFn: async () => {
-      const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+      const lines = text
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
       const schedule = validatedSchedule();
-      return postBrainDumpLines(areaId, lines, schedule);
+      const items = lines.map((title) => ({
+        title,
+        ...(validAreaId ? { areaId: validAreaId } : {}),
+        scheduledDate: schedule?.scheduledDate ?? null,
+        scheduledStartTime: schedule?.scheduledStartTime ?? null,
+        scheduledEndTime: schedule?.scheduledEndTime ?? null,
+        recurrenceRule: schedule?.recurrenceRule ?? null,
+      }));
+      const fingerprint = currentDraftFingerprintRef.current;
+      const generation = accountGenerationRef.current;
+      const result = await postCaptureBatch({
+        items,
+        idempotencyKey: requestKeyFor(items),
+      });
+      return { result, fingerprint, generation };
     },
-    onSuccess: (data) => {
-      toast.success(`Added ${data.count} task(s) to backlog`);
+    onSuccess: ({ result, fingerprint, generation }) => {
+      if (generation !== accountGenerationRef.current) return;
+      toast.success(`Added ${result.created} task(s)`);
       invalidateTaskQueries();
-      resetAndClose();
+      if (fingerprint === currentDraftFingerprintRef.current) resetAndClose();
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -309,13 +490,17 @@ export function BrainDumpModal({
       if (data.warning) {
         toast.message("AI was unavailable — used fallback parsing.");
       } else {
-        toast.success(`AI organized ${data.draft.length} task(s) — review and confirm`);
+        toast.success(
+          `AI organized ${data.draft.length} task(s) — review and confirm`,
+        );
       }
       // Some models occasionally omit the bucket field; default to "backlog"
       // so the user can always pick a destination explicitly.
       const normalised = data.draft.map((item) => ({
         ...item,
-        bucket: (BUCKET_CYCLE as readonly string[]).includes(item.bucket as string)
+        bucket: (BUCKET_CYCLE as readonly string[]).includes(
+          item.bucket as string,
+        )
           ? item.bucket
           : ("backlog" as DumpBucket),
       }));
@@ -331,11 +516,11 @@ export function BrainDumpModal({
     scheduledDate: string | null;
   } | null {
     if (bucket === "noise") return null;
-    const today = new Date();
+    const today = new Date(`${todayYmd}T12:00:00`);
     const toYmd = (d: Date) =>
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     if (bucket === "today") {
-      return { status: "todo", scheduledDate: toYmd(today) };
+      return { status: "todo", scheduledDate: todayYmd };
     }
     if (bucket === "this_week") {
       // End of this calendar week (Sunday). If today is already Sunday, target today.
@@ -356,36 +541,42 @@ export function BrainDumpModal({
       const explicitSchedule = validatedSchedule();
       const acceptable = parsedItems.filter((it) => it.bucket !== "noise");
       if (!acceptable.length) {
-        throw new Error("All items are tagged 'noise' — change at least one bucket to save.");
+        throw new Error(
+          "All items are tagged 'noise' — change at least one bucket to save.",
+        );
       }
-      const results = await Promise.all(
-        acceptable.map((item) => {
-          const defaults = bucketDefaults(item.bucket)!; // never null after filter
-          const status = explicitSchedule?.scheduledDate ? "todo" : defaults.status;
-          const scheduledDate =
-            explicitSchedule?.scheduledDate ?? defaults.scheduledDate;
-          return createTask({
-            areaId,
-            title: item.title.slice(0, 500),
-            status,
-            priority: item.priority,
-            energyLevel: item.energy,
-            estimatedMinutes: item.estimated_minutes,
-            recurrenceRule: explicitSchedule?.recurrenceRule ?? null,
-            scheduledDate,
-            scheduledStartTime: explicitSchedule?.scheduledStartTime ?? null,
-            scheduledEndTime: explicitSchedule?.scheduledEndTime ?? null,
-          });
-        })
-      );
+      const items = acceptable.map((item) => {
+        const defaults = bucketDefaults(item.bucket)!; // never null after filter
+        const scheduledDate =
+          explicitSchedule?.scheduledDate ?? defaults.scheduledDate;
+        return {
+          ...(validAreaId ? { areaId: validAreaId } : {}),
+          title: item.title.slice(0, 500),
+          // An unscheduled item remains in Inbox; scheduled items enter Today/Plan.
+          priority: item.priority,
+          energyLevel: item.energy,
+          estimatedMinutes: item.estimated_minutes,
+          recurrenceRule: explicitSchedule?.recurrenceRule ?? null,
+          scheduledDate,
+          scheduledStartTime: explicitSchedule?.scheduledStartTime ?? null,
+          scheduledEndTime: explicitSchedule?.scheduledEndTime ?? null,
+        };
+      });
+      const fingerprint = currentDraftFingerprintRef.current;
+      const generation = accountGenerationRef.current;
+      const result = await postCaptureBatch({
+        items,
+        idempotencyKey: requestKeyFor(items),
+      });
       const skipped = parsedItems.length - acceptable.length;
-      return { created: results.length, skipped };
+      return { created: result.created, skipped, fingerprint, generation };
     },
-    onSuccess: ({ created, skipped }) => {
+    onSuccess: ({ created, skipped, fingerprint, generation }) => {
+      if (generation !== accountGenerationRef.current) return;
       const skipMsg = skipped > 0 ? ` (skipped ${skipped} noise)` : "";
       toast.success(`Created ${created} organized task(s)${skipMsg}`);
       invalidateTaskQueries();
-      resetAndClose();
+      if (fingerprint === currentDraftFingerprintRef.current) resetAndClose();
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -397,6 +588,14 @@ export function BrainDumpModal({
   }
 
   function resetAndClose() {
+    if (userId) {
+      try {
+        localStorage.removeItem(captureDraftKey(userId));
+      } catch {
+        setDraftStorageError(true);
+      }
+    }
+    captureRequestRef.current = { signature: "", key: "" };
     setText("");
     setScheduledDate("");
     setStartT("");
@@ -408,8 +607,24 @@ export function BrainDumpModal({
     onClose();
   }
 
+  const closeKeepingDraft = useCallback(() => {
+    setConfirmDiscard(false);
+    onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeKeepingDraft();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [open, closeKeepingDraft]);
+
   function updateItem(idx: number, patch: Partial<ParsedDumpItem>) {
-    setParsedItems((items) => items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+    setParsedItems((items) =>
+      items.map((it, i) => (i === idx ? { ...it, ...patch } : it)),
+    );
   }
 
   function removeItem(idx: number) {
@@ -425,7 +640,8 @@ export function BrainDumpModal({
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 animate-fadeIn"
       role="dialog"
       aria-modal
-      onClick={resetAndClose}
+      aria-labelledby="brain-dump-title"
+      onClick={closeKeepingDraft}
     >
       <div
         className="w-full max-w-lg rounded-2xl border border-white/10 bg-surface p-5 shadow-2xl animate-scaleIn"
@@ -445,14 +661,18 @@ export function BrainDumpModal({
             ) : (
               <Lightbulb size={18} className="text-primary-text" />
             )}
-            <h2 className="font-display text-xl text-foreground">
+            <h2
+              id="brain-dump-title"
+              className="font-display text-xl text-foreground"
+            >
               {inPreview ? "Review parsed tasks" : "Brain dump"}
             </h2>
           </div>
           <button
             type="button"
             className="rounded-lg p-1.5 text-muted hover:bg-white/10 hover:text-foreground"
-            onClick={resetAndClose}
+            onClick={closeKeepingDraft}
+            aria-label="Close and keep draft"
           >
             <X size={16} />
           </button>
@@ -462,38 +682,72 @@ export function BrainDumpModal({
             ? "Click the badges to change energy or priority. Edit titles inline."
             : "One thought per line — save raw to backlog, or let AI organize first."}
         </p>
+        {draftStorageError && (
+          <p className="mt-2 text-xs text-red-300">
+            Browser draft recovery is unavailable. Keep this open until saving
+            succeeds.
+          </p>
+        )}
+        {(text.trim() || parsedItems.length > 0) && (
+          <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted">
+            <span>Draft kept when you close this window.</span>
+            {confirmDiscard ? (
+              <span className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={resetAndClose}
+                  className="text-red-300"
+                >
+                  Discard draft
+                </button>
+                <button type="button" onClick={() => setConfirmDiscard(false)}>
+                  Keep
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmDiscard(true)}
+                className="underline"
+              >
+                Discard
+              </button>
+            )}
+          </div>
+        )}
 
         {!inPreview && (
           <>
-            <label className="mt-4 block text-xs font-medium text-muted">Area</label>
+            <label
+              htmlFor="brain-dump-area"
+              className="mt-4 block text-xs font-medium text-muted"
+            >
+              Area
+            </label>
             {!userId ? (
               <p className="mt-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200/90">
                 Sign in to capture tasks. If this persists, refresh the page.
               </p>
             ) : areasQ.isError ? (
               <p className="mt-1 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200/90">
-                Could not load areas — is the API running and{" "}
-                <code className="rounded bg-black/30 px-1">NEXT_PUBLIC_API_URL</code> correct?{" "}
-                {areasQ.error instanceof Error ? areasQ.error.message : String(areasQ.error)}
+                Could not load areas. You can still save to General.{" "}
+                {areasQ.error instanceof Error
+                  ? areasQ.error.message
+                  : String(areasQ.error)}
               </p>
             ) : (
               <select
+                id="brain-dump-area"
                 className="mt-1 w-full rounded-lg border border-white/10 bg-background px-3 py-2 text-sm text-foreground disabled:opacity-50"
-                value={areaId}
-                disabled={areasQ.isLoading || areasQ.isFetching}
+                value={validAreaId}
                 onChange={(e) => setAreaId(e.target.value)}
               >
-                {areasQ.isLoading || areasQ.isFetching ? (
-                  <option value="">Loading areas…</option>
-                ) : (areasQ.data?.length ?? 0) === 0 ? (
-                  <option value="">No areas yet — create one in Settings</option>
-                ) : (
-                  (areasQ.data ?? []).map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))
-                )}
+                <option value="">General</option>
+                {(areasQ.data ?? []).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
               </select>
             )}
             <div className="mt-3 flex items-center justify-between">
@@ -503,7 +757,9 @@ export function BrainDumpModal({
               {canRecord && (
                 <button
                   type="button"
-                  onClick={() => (isRecording ? stopRecording() : startRecording())}
+                  onClick={() =>
+                    isRecording ? stopRecording() : startRecording()
+                  }
                   disabled={isTranscribing}
                   className={
                     isRecording
@@ -511,7 +767,9 @@ export function BrainDumpModal({
                       : "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-background px-2.5 py-1 text-[11px] text-muted hover:text-foreground hover:bg-white/5 transition-colors disabled:opacity-40"
                   }
                   title={isRecording ? "Stop recording" : "Record voice memo"}
-                  aria-label={isRecording ? "Stop recording" : "Record voice memo"}
+                  aria-label={
+                    isRecording ? "Stop recording" : "Record voice memo"
+                  }
                   aria-pressed={isRecording}
                 >
                   {isTranscribing ? (
@@ -521,7 +779,10 @@ export function BrainDumpModal({
                     </>
                   ) : isRecording ? (
                     <>
-                      <Square size={11} className="fill-red-300 text-red-300 animate-pulse" />
+                      <Square
+                        size={11}
+                        className="fill-red-300 text-red-300 animate-pulse"
+                      />
                       Stop · {Math.floor(recordingSec / 60)}:
                       {String(recordingSec % 60).padStart(2, "0")}
                     </>
@@ -546,7 +807,11 @@ export function BrainDumpModal({
               className="mt-2 flex w-full items-center justify-center gap-1 text-[11px] text-muted hover:text-foreground"
               onClick={() => setMoreSchedule((v) => !v)}
             >
-              {moreSchedule ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              {moreSchedule ? (
+                <ChevronUp size={14} />
+              ) : (
+                <ChevronDown size={14} />
+              )}
               Optional: same schedule for all lines (date, time, repeat)
             </button>
             {moreSchedule && (
@@ -597,20 +862,22 @@ export function BrainDumpModal({
               </div>
             )}
             <div className="mt-1 text-[11px] text-muted">
-              {lineCount > 0 ? `${lineCount} task${lineCount !== 1 ? "s" : ""}` : "Start typing…"}
+              {lineCount > 0
+                ? `${lineCount} task${lineCount !== 1 ? "s" : ""}`
+                : "Start typing…"}
             </div>
             <div className="mt-3 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
                 className="rounded-lg px-3 py-2 text-sm text-muted hover:bg-white/5 transition-colors"
-                onClick={resetAndClose}
+                onClick={closeKeepingDraft}
               >
                 Cancel
               </button>
               <button
                 type="button"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium text-primary-text hover:bg-primary/20 disabled:opacity-40 transition-colors"
-                disabled={!userId || !areaId || parseMut.isPending || lineCount === 0}
+                disabled={!userId || parseMut.isPending || lineCount === 0}
                 onClick={() => parseMut.mutate()}
                 title="Use AI to infer energy, priority, and time estimate per item"
               >
@@ -629,7 +896,7 @@ export function BrainDumpModal({
               <button
                 type="button"
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-40 hover:bg-primary-hover transition-colors"
-                disabled={!userId || !areaId || saveRawMut.isPending || lineCount === 0}
+                disabled={!userId || saveRawMut.isPending || lineCount === 0}
                 onClick={() => saveRawMut.mutate()}
               >
                 {saveRawMut.isPending ? (
@@ -663,7 +930,9 @@ export function BrainDumpModal({
                         type="text"
                         className="flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm text-foreground focus:border-white/15 focus:bg-background focus:outline-none"
                         value={item.title}
-                        onChange={(e) => updateItem(idx, { title: e.target.value })}
+                        onChange={(e) =>
+                          updateItem(idx, { title: e.target.value })
+                        }
                       />
                       <button
                         type="button"
@@ -679,7 +948,9 @@ export function BrainDumpModal({
                         type="button"
                         className={`rounded-full border px-2 py-0.5 font-medium transition-colors ${BUCKET_STYLE[item.bucket]}`}
                         onClick={() =>
-                          updateItem(idx, { bucket: cycle(BUCKET_CYCLE, item.bucket) })
+                          updateItem(idx, {
+                            bucket: cycle(BUCKET_CYCLE, item.bucket),
+                          })
                         }
                         title={BUCKET_DESCRIPTION[item.bucket]}
                       >
@@ -689,7 +960,9 @@ export function BrainDumpModal({
                         type="button"
                         className={`rounded-full border px-2 py-0.5 transition-colors ${ENERGY_STYLE[item.energy]}`}
                         onClick={() =>
-                          updateItem(idx, { energy: cycle(ENERGY_CYCLE, item.energy) })
+                          updateItem(idx, {
+                            energy: cycle(ENERGY_CYCLE, item.energy),
+                          })
                         }
                         title="Click to cycle energy"
                       >
@@ -699,7 +972,9 @@ export function BrainDumpModal({
                         type="button"
                         className={`rounded-full border px-2 py-0.5 capitalize transition-colors ${PRIORITY_STYLE[item.priority]}`}
                         onClick={() =>
-                          updateItem(idx, { priority: cycle(PRIORITY_CYCLE, item.priority) })
+                          updateItem(idx, {
+                            priority: cycle(PRIORITY_CYCLE, item.priority),
+                          })
                         }
                         title="Click to cycle priority"
                       >
@@ -714,7 +989,10 @@ export function BrainDumpModal({
                           value={item.estimated_minutes}
                           onChange={(e) =>
                             updateItem(idx, {
-                              estimated_minutes: Math.max(1, Number(e.target.value) || 1),
+                              estimated_minutes: Math.max(
+                                1,
+                                Number(e.target.value) || 1,
+                              ),
                             })
                           }
                         />
@@ -738,7 +1016,6 @@ export function BrainDumpModal({
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-40 hover:bg-primary-hover transition-colors"
                 disabled={
                   !userId ||
-                  !areaId ||
                   createOrganizedMut.isPending ||
                   parsedItems.length === 0
                 }

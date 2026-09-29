@@ -1,0 +1,29 @@
+✔ calendar parser accepts real UTC calendar days across years (12.5347ms)
+✔ invalid calendar text never throws and normalized impossible dates fail (18.4933ms)
+✔ idempotency digest is independent of object property insertion order (62.0172ms)
+✔ arbitrary OAuth state cannot authorize without an owned stored attempt (27.7594ms)
+✔ reserved event retries converge after a lost insert response (1.845ms)
+✔ transient patch failure never creates another event (0.3731ms)
+✔ concurrent insert conflict retries the same reserved event (0.4006ms)
+✔ state is opaque, unique, owned and single use (3.3416ms)
+✔ expired, modified, missing and legacy states fail (0.52ms)
+✔ concurrent callbacks only consume once (0.5945ms)
+✔ error serialization excludes credential and planning-content canaries (2.1822ms)
+﹣ daily persistence, revisions, stale scheduling and retry guarantees (0.6131ms) # SKIP
+﹣ clean Drizzle journal and repeated startup are compatible (0.1881ms) # SKIP
+﹣ Drizzle upgrades populated legacy journal without changing task data (0.1524ms) # SKIP
+✔ review revision zero only creates a new row and updates require an exact revision (1.2912ms)
+✔ a lost completion response can be retried only with the same review content (0.3008ms)
+✔ review period uses Monday-Sunday and creates a Monday-Friday sprint (2.6209ms)
+✔ date arithmetic crosses month boundaries (0.2016ms)
+✔ intentions are trimmed, empty rows removed, and limited to three (0.3269ms)
+✔ sprint goal keeps intention and linked goal context (0.3235ms)
+✔ sprint names are stable across machine timezones (28.4504ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 3
+ℹ todo 0
+ℹ duration_ms 5715.4678

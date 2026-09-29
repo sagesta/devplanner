@@ -294,3 +294,9 @@ git diff --staged
 
 *See PROJECT_RULES.md for canonical rules.*
 *See docs/model-selection-playbook.md for model guidance.*
+
+## Daily-use persistence recovery
+
+Task writes commit with calendar outbox records. If Redis is unavailable, restore Redis and the worker; pending records are retried with stable queue IDs. Inspect pending age/count without printing payloads: `SELECT count(*), min(created_at) FROM calendar_outbox WHERE delivered_at IS NULL;`. Do not delete pending rows to silence alerts. Mutation receipts persist seven days; retries within that window must retain the original key and request. A conflict requires refresh/reconciliation, not blind key replacement.
+
+Before deployment back up PostgreSQL. Migration 0007 is additive and covers missing legacy prerequisites; clean and legacy upgrade tests use disposable databases. Roll back compatible UI code independently, retaining recovery/receipt data. Do not restore insecure OAuth or stale-write endpoints. Google callback configuration now points to the web origin's `/api/calendar/google/callback`.

@@ -1,0 +1,16 @@
+
+> devplanner@0.1.0 build
+> npm run build -w @devplanner/api && npm run build -w @devplanner/web
+
+
+> @devplanner/api@0.1.0 build
+> tsc -p tsconfig.json
+
+src/routes/daily.ts(45,318): error TS18047: 'options.count' is possibly 'null'.
+npm error Lifecycle script `build` failed with error:
+npm error code 2
+npm error path C:\Users\adebo\PROJECTS\devplanner\apps\api
+npm error workspace @devplanner/api@0.1.0
+npm error location C:\Users\adebo\PROJECTS\devplanner\apps\api
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c tsc -p tsconfig.json

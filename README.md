@@ -119,7 +119,7 @@ npm run dev
 
 ### Google Calendar Setup
 1. In the **Google Cloud Console**, enable the **Google Calendar API**.
-2. Add your Authorized redirect URI: `http://localhost:3001/api/sync/google/callback` (or your production API URL).
+2. Add your Authorized redirect URI: `http://localhost:3000/api/calendar/google/callback` (or your production web origin).
 3. Update `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `WEB_APP_URL`, and `CORS_ORIGIN` in `.env`.
 4. In DevPlanner: **Settings → Calendar → Connect Google Calendar**.
 
@@ -132,3 +132,9 @@ npm run dev
 
 ## License
 MIT License. See the [LICENSE](LICENSE) file for more information.
+
+## Daily-use changes and validation
+
+Start with Add task → Today → Done; goals and weekly commitments are optional. See [the daily guide](docs/daily-use-guide.md), [implementation plan](docs/devplanner-daily-use-implementation-plan.md), and [verification commands](docs/USER-STEPS.md). Release status is recorded separately from local feature implementation.
+
+Personal installation and backups: [Home-server guide](docs/HOME-SERVER.md).

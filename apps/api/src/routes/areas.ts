@@ -39,7 +39,11 @@ export const areaRoutes = new Hono<AppEnv>()
     }
     const v = parsed.data;
     const userId = c.get("userId");
-    const owner = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
+    const owner = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
     if (!owner.length) {
       return c.json({ error: "user not found" }, 404);
     }
@@ -68,7 +72,8 @@ export const areaRoutes = new Hono<AppEnv>()
     if (v.icon !== undefined) updates.icon = v.icon;
     if (v.sortOrder !== undefined) updates.sortOrder = v.sortOrder;
     if (v.weekly_hour_target !== undefined)
-      updates.weeklyHourTarget = v.weekly_hour_target != null ? String(v.weekly_hour_target) : null;
+      updates.weeklyHourTarget =
+        v.weekly_hour_target != null ? String(v.weekly_hour_target) : null;
 
     if (Object.keys(updates).length === 0) {
       return c.json({ error: "no fields to update" }, 422);
@@ -87,7 +92,20 @@ export const areaRoutes = new Hono<AppEnv>()
   .delete("/:id", async (c) => {
     const id = c.req.param("id");
     const userId = c.get("userId");
-    const [row] = await db.delete(areas).where(and(eq(areas.id, id), eq(areas.userId, userId))).returning();
+    const [area] = await db
+      .select({ systemKey: areas.systemKey })
+      .from(areas)
+      .where(and(eq(areas.id, id), eq(areas.userId, userId)))
+      .limit(1);
+    if (area?.systemKey === "general")
+      return c.json(
+        { error: "General is the default capture area and cannot be deleted." },
+        409,
+      );
+    const [row] = await db
+      .delete(areas)
+      .where(and(eq(areas.id, id), eq(areas.userId, userId)))
+      .returning();
     if (!row) {
       return c.json({ error: "not found" }, 404);
     }

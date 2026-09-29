@@ -1,9 +1,31 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, sql, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+  or,
+} from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../db/client.js";
-import { areas, sprints, tags, taskTags, tasks, subtasks } from "../db/schema.js";
-import { generateAndStoreEmbedding, buildEmbeddingText, deleteStaleEmbedding } from "../ai/embeddings.js";
+import {
+  areas,
+  sprints,
+  tags,
+  taskTags,
+  tasks,
+  subtasks,
+  users,
+} from "../db/schema.js";
+import {
+  generateAndStoreEmbedding,
+  buildEmbeddingText,
+  deleteStaleEmbedding,
+} from "../ai/embeddings.js";
 import { enqueueTaskCalendarSync } from "../queues/definitions.js";
 import { taskCreatedTotal } from "../lib/metrics.js";
 import { spawnNextRecurrence } from "../services/recurrence.js";
@@ -26,7 +48,9 @@ const createBody = z.object({
     .enum(["backlog", "todo", "in_progress", "done", "cancelled", "blocked"])
     .optional(),
   priority: z.enum(["urgent", "high", "normal", "low"]).optional(),
-  energyLevel: z.enum(["deep_work", "shallow", "admin", "quick_win"]).optional(),
+  energyLevel: z
+    .enum(["deep_work", "shallow", "admin", "quick_win"])
+    .optional(),
   taskType: z.enum(["main", "subtask"]).optional(),
   description: z.string().optional().nullable(),
   dueDate: z.string().optional().nullable(),
@@ -40,10 +64,15 @@ const createBody = z.object({
   estimatedMinutes: z.number().int().optional().nullable(),
 });
 
-const patchBody = createBody.partial();
+const patchBody = createBody
+  .partial()
+  .extend({ expectedRevision: z.number().int().positive().optional() });
 
 /** stress-test-fix: reject calendar dates absurdly far in the future (bad imports / typos). */
-function assertSaneCalendarDate(field: string, value: string | null | undefined): void {
+function assertSaneCalendarDate(
+  field: string,
+  value: string | null | undefined,
+): void {
   if (value == null || value === "") return;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new Error(`Invalid ${field}`);
@@ -55,7 +84,9 @@ function assertSaneCalendarDate(field: string, value: string | null | undefined)
   }
 }
 
-function withTaskApiFields<T extends { recurrenceRule: string | null; deletedAt?: Date | null }>(t: T) {
+function withTaskApiFields<
+  T extends { recurrenceRule: string | null; deletedAt?: Date | null },
+>(t: T) {
   const { deletedAt: _d, ...rest } = t;
   return {
     ...rest,
@@ -63,7 +94,10 @@ function withTaskApiFields<T extends { recurrenceRule: string | null; deletedAt?
   };
 }
 
-async function getSprintForTaskDefaults(userId: string, sprintId: string | null | undefined) {
+async function getSprintForTaskDefaults(
+  userId: string,
+  sprintId: string | null | undefined,
+) {
   if (!sprintId) return null;
   return db.query.sprints.findFirst({
     where: and(eq(sprints.id, sprintId), eq(sprints.userId, userId)),
@@ -88,14 +122,25 @@ const brainDumpBody = z.object({
   areaId: z.string().uuid(),
   lines: z.union([z.array(z.string()), z.string()]),
   recurrenceRule: z.string().optional().nullable(),
-  scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  scheduledDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
   scheduledStartTime: z.string().optional().nullable(),
   scheduledEndTime: z.string().optional().nullable(),
 });
 
 const bulkStatusBody = z.object({
   taskIds: z.array(z.string().uuid()).min(1),
-  status: z.enum(["backlog", "todo", "in_progress", "done", "cancelled", "blocked"]),
+  status: z.enum([
+    "backlog",
+    "todo",
+    "in_progress",
+    "done",
+    "cancelled",
+    "blocked",
+  ]),
 });
 
 const bulkScheduleBody = z.object({
@@ -109,9 +154,19 @@ const bulkSprintBody = z.object({
 });
 
 const PATCH_FIELDS = [
-  "title", "description", "projectId", "sprintId", "areaId",
-  "priority", "energyLevel", "workDepth", "physicalEnergy",
-  "dueDate", "scheduledDate", "recurrenceRule", "tags",
+  "title",
+  "description",
+  "projectId",
+  "sprintId",
+  "areaId",
+  "priority",
+  "energyLevel",
+  "workDepth",
+  "physicalEnergy",
+  "dueDate",
+  "scheduledDate",
+  "recurrenceRule",
+  "tags",
 ] as const;
 
 export const taskRoutes = new Hono<AppEnv>()
@@ -122,7 +177,11 @@ export const taskRoutes = new Hono<AppEnv>()
 
     let whereClause =
       sprintId != null && sprintId !== ""
-        ? and(eq(tasks.userId, userId), eq(tasks.sprintId, sprintId), taskActive)
+        ? and(
+            eq(tasks.userId, userId),
+            eq(tasks.sprintId, sprintId),
+            taskActive,
+          )
         : and(eq(tasks.userId, userId), taskActive);
 
     // If tag filter, get matching task IDs first
@@ -147,13 +206,17 @@ export const taskRoutes = new Hono<AppEnv>()
     });
 
     const parentIds = rows.map((t) => t.id);
-    let subtaskMap: Record<string, { done: number; total: number; list: any[] }> = {};
+    let subtaskMap: Record<
+      string,
+      { done: number; total: number; list: any[] }
+    > = {};
     if (parentIds.length > 0) {
       const allSubs = await db.query.subtasks.findMany({
         where: inArray(subtasks.taskId, parentIds),
       });
       for (const s of allSubs) {
-        if (!subtaskMap[s.taskId]) subtaskMap[s.taskId] = { done: 0, total: 0, list: [] };
+        if (!subtaskMap[s.taskId])
+          subtaskMap[s.taskId] = { done: 0, total: 0, list: [] };
         subtaskMap[s.taskId].list.push(s);
         subtaskMap[s.taskId].total++;
         if (s.completed) subtaskMap[s.taskId].done++;
@@ -162,7 +225,10 @@ export const taskRoutes = new Hono<AppEnv>()
 
     // Batch load tags for all tasks
     const allTaskIds = rows.map((t) => t.id);
-    let tagMap: Record<string, Array<{ id: number; name: string; color: string | null }>> = {};
+    let tagMap: Record<
+      string,
+      Array<{ id: number; name: string; color: string | null }>
+    > = {};
     if (allTaskIds.length > 0) {
       const tagRows = await db
         .select({
@@ -177,7 +243,11 @@ export const taskRoutes = new Hono<AppEnv>()
         .orderBy(asc(tags.name));
       for (const r of tagRows) {
         if (!tagMap[r.taskId]) tagMap[r.taskId] = [];
-        tagMap[r.taskId].push({ id: r.tagId, name: r.tagName, color: r.tagColor });
+        tagMap[r.taskId].push({
+          id: r.tagId,
+          name: r.tagName,
+          color: r.tagColor,
+        });
       }
     }
 
@@ -198,17 +268,31 @@ export const taskRoutes = new Hono<AppEnv>()
   .get("/today", async (c) => {
     const userId = c.get("userId");
     const dateParam = c.req.query("date");
-    const hasParam = Boolean(dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam));
-    const dt = hasParam ? dateParam! : serverTodayYmd();
+    const hasParam = Boolean(
+      dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam),
+    );
+    const owner = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+    const timezone = owner?.timezone ?? "UTC";
+    const dt = hasParam
+      ? dateParam!
+      : new Intl.DateTimeFormat("en-CA", {
+          timeZone: timezone,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date());
 
-    let baseFilter = or(eq(tasks.dueDate, dt), eq(tasks.scheduledDate, dt)) as any;
+    const baseFilter = or(
+      eq(tasks.scheduledDate, dt),
+      and(isNull(tasks.scheduledDate), eq(tasks.dueDate, dt)),
+      sql`EXISTS (SELECT 1 FROM subtasks st WHERE st.task_id=${tasks.id} AND st.scheduled_date=${dt})`,
+    );
 
     const rows = await db.query.tasks.findMany({
       where: and(eq(tasks.userId, userId), taskActive, baseFilter),
-      orderBy: [
-        desc(tasks.priority),
-        sql`${tasks.createdAt} ASC`,
-      ],
+      orderBy: [desc(tasks.priority), sql`${tasks.createdAt} ASC`],
     });
 
     const [doneTodayRow] = await db
@@ -219,24 +303,36 @@ export const taskRoutes = new Hono<AppEnv>()
         and(
           eq(tasks.userId, userId),
           eq(subtasks.completed, true),
-          sql`(${subtasks.completedAt})::date = CURRENT_DATE`
-        )
+          sql`(${subtasks.completedAt} AT TIME ZONE ${timezone})::date = ${dt}::date`,
+        ),
       );
 
     const todayTaskIds = rows.map((t) => t.id);
-    const todayTagMap: Record<string, Array<{ id: number; name: string; color: string | null }>> = {};
+    const todayTagMap: Record<
+      string,
+      Array<{ id: number; name: string; color: string | null }>
+    > = {};
     const subtaskMap: Record<string, any[]> = {};
 
     if (todayTaskIds.length > 0) {
       const todayTagRows = await db
-        .select({ taskId: taskTags.taskId, tagId: tags.id, tagName: tags.name, tagColor: tags.color })
+        .select({
+          taskId: taskTags.taskId,
+          tagId: tags.id,
+          tagName: tags.name,
+          tagColor: tags.color,
+        })
         .from(taskTags)
         .innerJoin(tags, eq(tags.id, taskTags.tagId))
         .where(inArray(taskTags.taskId, todayTaskIds))
         .orderBy(asc(tags.name));
       for (const r of todayTagRows) {
         if (!todayTagMap[r.taskId]) todayTagMap[r.taskId] = [];
-        todayTagMap[r.taskId].push({ id: r.tagId, name: r.tagName, color: r.tagColor });
+        todayTagMap[r.taskId].push({
+          id: r.tagId,
+          name: r.tagName,
+          color: r.tagColor,
+        });
       }
 
       const subs = await db.query.subtasks.findMany({
@@ -247,17 +343,25 @@ export const taskRoutes = new Hono<AppEnv>()
         subtaskMap[s.taskId].push(s);
       }
     }
-    
+
     // Import dynamically to avoid circular dependencies if any
     const { calculateDailyCapacity } = await import("../services/scheduler.js");
     const dailyCapacity = await calculateDailyCapacity(db, userId);
-    
+
     let usedMinutes = 0;
     const finalTasks = rows.map((t) => {
       const subsForTask = subtaskMap[t.id] ?? [];
-      const parentMins = subsForTask.reduce((acc, sub) => acc + (sub.estimatedMinutes || 0), 0) || 30; // fallback per task unit
+      const parentMins =
+        subsForTask.reduce(
+          (acc, sub) => acc + (sub.estimatedMinutes || 0),
+          0,
+        ) || 30; // fallback per task unit
       usedMinutes += parentMins; // simplistic accumulation of workload
-      return { ...withTaskApiFields(t), _tags: todayTagMap[t.id] ?? [], _subtasks: subsForTask };
+      return {
+        ...withTaskApiFields(t),
+        _tags: todayTagMap[t.id] ?? [],
+        _subtasks: subsForTask,
+      };
     });
 
     return c.json({
@@ -288,11 +392,21 @@ export const taskRoutes = new Hono<AppEnv>()
     const lines = Array.isArray(rawLines)
       ? rawLines
       : rawLines.split("\n").map((l) => l.replace(/^[-*•\d.)]+\s*/, "").trim());
-    
-    const junkPrefixes = [/^task title:/i, /^sprint:/i, /^status:/i, /^priority:/i, /^difficulty:/i, /^effort:/i, /^due date:/i, /^subtasks:/i, /^recurrence:/i];
+
+    const junkPrefixes = [
+      /^task title:/i,
+      /^sprint:/i,
+      /^status:/i,
+      /^priority:/i,
+      /^difficulty:/i,
+      /^effort:/i,
+      /^due date:/i,
+      /^subtasks:/i,
+      /^recurrence:/i,
+    ];
     const titles = lines
       .map((l) => l.trim())
-      .filter((l) => l && !junkPrefixes.some(p => p.test(l)))
+      .filter((l) => l && !junkPrefixes.some((p) => p.test(l)))
       .slice(0, 200);
 
     if (!titles.length) {
@@ -310,7 +424,7 @@ export const taskRoutes = new Hono<AppEnv>()
           sprintId: null,
           sortOrder: i,
           recurrenceRule: recurrenceRule ?? null,
-        }))
+        })),
       )
       .returning();
     for (const t of inserted) {
@@ -323,7 +437,9 @@ export const taskRoutes = new Hono<AppEnv>()
         action: "create",
       }).catch(logSyncError(t.id));
       // Fire-and-forget embedding for RAG
-      generateAndStoreEmbedding(t.id, buildEmbeddingText(t.title)).catch(logEmbedError(t.id));
+      generateAndStoreEmbedding(t.id, buildEmbeddingText(t.title)).catch(
+        logEmbedError(t.id),
+      );
     }
     // If scheduledDate provided, create one subtask per inserted task
     if (parsed.data.scheduledDate) {
@@ -335,13 +451,16 @@ export const taskRoutes = new Hono<AppEnv>()
           title: t.title,
           scheduledDate: schedDate,
           scheduledTime: schedTime,
-        }))
+        })),
       );
     }
     taskCreatedTotal.inc(inserted.length);
     return c.json(
-      { tasks: inserted.map((t) => withTaskApiFields(t)), count: inserted.length },
-      201
+      {
+        tasks: inserted.map((t) => withTaskApiFields(t)),
+        count: inserted.length,
+      },
+      201,
     );
   })
   .post("/bulk-status", async (c) => {
@@ -362,7 +481,7 @@ export const taskRoutes = new Hono<AppEnv>()
           inArray(tasks.id, taskIds),
           taskActive,
           isNotNull(tasks.recurrenceRule),
-          sql`${tasks.status} != 'done'`
+          sql`${tasks.status} != 'done'`,
         ),
       });
     }
@@ -370,7 +489,9 @@ export const taskRoutes = new Hono<AppEnv>()
     const updated = await db
       .update(tasks)
       .set({ status, updatedAt: new Date(), completedAt })
-      .where(and(eq(tasks.userId, userId), inArray(tasks.id, taskIds), taskActive))
+      .where(
+        and(eq(tasks.userId, userId), inArray(tasks.id, taskIds), taskActive),
+      )
       .returning({
         id: tasks.id,
         caldavUid: tasks.caldavUid,
@@ -389,7 +510,10 @@ export const taskRoutes = new Hono<AppEnv>()
     }
     for (const candidate of recurringCandidates) {
       await spawnNextRecurrence(db, candidate, serverTodayYmd()).catch((err) =>
-        logger.error({ err, taskId: candidate.id }, "recurrence respawn failed")
+        logger.error(
+          { err, taskId: candidate.id },
+          "recurrence respawn failed",
+        ),
       );
     }
     return c.json({ updated: updated.length });
@@ -422,7 +546,9 @@ export const taskRoutes = new Hono<AppEnv>()
         status: sql`CASE WHEN ${tasks.status} IN ('todo','in_progress','done') THEN ${tasks.status} ELSE 'todo' END`,
         updatedAt: new Date(),
       })
-      .where(and(eq(tasks.userId, userId), inArray(tasks.id, taskIds), taskActive))
+      .where(
+        and(eq(tasks.userId, userId), inArray(tasks.id, taskIds), taskActive),
+      )
       .returning({ id: tasks.id });
 
     return c.json({ updated: updated.length });
@@ -438,7 +564,13 @@ export const taskRoutes = new Hono<AppEnv>()
     const [row] = await db
       .update(tasks)
       .set({ deletedAt: null, updatedAt: now })
-      .where(and(eq(tasks.id, id), eq(tasks.userId, userId), isNotNull(tasks.deletedAt)))
+      .where(
+        and(
+          eq(tasks.id, id),
+          eq(tasks.userId, userId),
+          isNotNull(tasks.deletedAt),
+        ),
+      )
       .returning();
     if (!row) {
       return c.json({ error: "not found" }, 404);
@@ -454,26 +586,32 @@ export const taskRoutes = new Hono<AppEnv>()
     // Re-add to RAG (delete removed the embedding).
     generateAndStoreEmbedding(
       row.id,
-      buildEmbeddingText(row.title, row.description)
+      buildEmbeddingText(row.title, row.description),
     ).catch(logEmbedError(row.id));
     return c.json({ task: withTaskApiFields(row) });
   })
   .post("/auto-schedule", async (c) => {
     const userId = c.get("userId");
-    const { date } = await c.req.json().catch(() => ({ date: serverTodayYmd() }));
+    const { date } = await c.req
+      .json()
+      .catch(() => ({ date: serverTodayYmd() }));
     try {
       assertSaneCalendarDate("date", date);
     } catch {
       return c.json({ error: "invalid date" }, 400);
     }
-    
+
     const horizonEnd = addDaysYmd(date, 6);
     const { buildSchedulePreview } = await import("../services/scheduler.js");
-    const result = await buildSchedulePreview(db, userId, { fromDate: date, horizonEnd });
+    const result = await buildSchedulePreview(db, userId, {
+      fromDate: date,
+      horizonEnd,
+    });
     return c.json({
       ...result,
       mode: "preview",
-      message: "Review and approve these schedule changes before they are applied.",
+      message:
+        "Review and approve these schedule changes before they are applied.",
     });
   })
   .patch("/bulk", async (c) => {
@@ -498,8 +636,15 @@ export const taskRoutes = new Hono<AppEnv>()
     if (!validTasks.length) return c.json({ updated: 0 });
 
     if (validTasks.length > 0) {
-      await db.update(tasks).set({ scheduledDate: scheduledDate })
-        .where(inArray(tasks.id, validTasks.map(t => t.id)));
+      await db
+        .update(tasks)
+        .set({ scheduledDate: scheduledDate })
+        .where(
+          inArray(
+            tasks.id,
+            validTasks.map((t) => t.id),
+          ),
+        );
     }
 
     return c.json({ updated: validTasks.length });
@@ -530,12 +675,18 @@ export const taskRoutes = new Hono<AppEnv>()
       .innerJoin(tags, eq(tags.id, taskTags.tagId))
       .where(eq(taskTags.taskId, id))
       .orderBy(asc(tags.name));
-    const taskTags_ = detailTagRows.map((r) => ({ id: r.tagId, name: r.tagName, color: r.tagColor }));
+    const taskTags_ = detailTagRows.map((r) => ({
+      id: r.tagId,
+      name: r.tagName,
+      color: r.tagColor,
+    }));
 
     return c.json({
       task: { ...withTaskApiFields(task), _tags: taskTags_ },
       subtasks: subtasksList,
-      subtaskProgress: subtasksList.length ? { done: subtasksDone, total: subtasksList.length } : null,
+      subtaskProgress: subtasksList.length
+        ? { done: subtasksDone, total: subtasksList.length }
+        : null,
     });
   })
   .post("/", async (c) => {
@@ -544,11 +695,27 @@ export const taskRoutes = new Hono<AppEnv>()
       return c.json({ error: parsed.error.flatten() }, 422);
     }
     const v = parsed.data;
-    
+
     // Bug 1 Fix: Reject AI generated metadata labels masquerading as task titles
-    const junkPrefixes = [/^task title:/i, /^sprint:/i, /^status:/i, /^priority:/i, /^difficulty:/i, /^effort:/i, /^due date:/i, /^subtasks:/i, /^recurrence:/i];
-    if (junkPrefixes.some(p => p.test(v.title))) {
-      return c.json({ error: "Invalid task title — metadata labels are not valid task names" }, 400);
+    const junkPrefixes = [
+      /^task title:/i,
+      /^sprint:/i,
+      /^status:/i,
+      /^priority:/i,
+      /^difficulty:/i,
+      /^effort:/i,
+      /^due date:/i,
+      /^subtasks:/i,
+      /^recurrence:/i,
+    ];
+    if (junkPrefixes.some((p) => p.test(v.title))) {
+      return c.json(
+        {
+          error:
+            "Invalid task title — metadata labels are not valid task names",
+        },
+        400,
+      );
     }
 
     const userId = c.get("userId");
@@ -558,7 +725,10 @@ export const taskRoutes = new Hono<AppEnv>()
     } catch (e) {
       return c.json({ error: String(e) }, 422);
     }
-    const sprintDefaults = await getSprintForTaskDefaults(userId, v.sprintId ?? null);
+    const sprintDefaults = await getSprintForTaskDefaults(
+      userId,
+      v.sprintId ?? null,
+    );
     if (v.sprintId && !sprintDefaults) {
       return c.json({ error: "sprint not found for user" }, 404);
     }
@@ -593,14 +763,17 @@ export const taskRoutes = new Hono<AppEnv>()
     // Fire-and-forget embedding for RAG
     generateAndStoreEmbedding(
       row.id,
-      buildEmbeddingText(row.title, row.description)
+      buildEmbeddingText(row.title, row.description),
     ).catch(logEmbedError(row.id));
     taskCreatedTotal.inc();
 
-    return c.json({
-      task: withTaskApiFields(row),
-      subtasks: [],
-    }, 201);
+    return c.json(
+      {
+        task: withTaskApiFields(row),
+        subtasks: [],
+      },
+      201,
+    );
   })
   .patch("/:id", async (c) => {
     const idParsed = uuidParam.safeParse(c.req.param("id"));
@@ -684,10 +857,27 @@ export const taskRoutes = new Hono<AppEnv>()
     const [row] = await db
       .update(tasks)
       .set(updates)
-      .where(and(eq(tasks.id, id), eq(tasks.userId, userId), taskActive))
+      .where(
+        and(
+          eq(tasks.id, id),
+          eq(tasks.userId, userId),
+          taskActive,
+          v.expectedRevision === undefined
+            ? undefined
+            : eq(tasks.revision, v.expectedRevision),
+        ),
+      )
       .returning();
     if (!row) {
-      return c.json({ error: "not found" }, 404);
+      return c.json(
+        {
+          error:
+            v.expectedRevision === undefined
+              ? "not found"
+              : "Task changed; reload before saving.",
+        },
+        v.expectedRevision === undefined ? 404 : 409,
+      );
     }
     await enqueueTaskCalendarSync({
       userId: row.userId,
@@ -701,15 +891,17 @@ export const taskRoutes = new Hono<AppEnv>()
     if (v.title !== undefined || v.description !== undefined) {
       generateAndStoreEmbedding(
         row.id,
-        buildEmbeddingText(row.title, row.description)
+        buildEmbeddingText(row.title, row.description),
       ).catch(logEmbedError(row.id));
     }
     let spawnedNext: ReturnType<typeof withTaskApiFields> | null = null;
     if (v.status === "done" && !wasAlreadyDone && row.recurrenceRule?.trim()) {
-      const clone = await spawnNextRecurrence(db, row, serverTodayYmd()).catch((err) => {
-        logger.error({ err, taskId: row.id }, "recurrence respawn failed");
-        return null;
-      });
+      const clone = await spawnNextRecurrence(db, row, serverTodayYmd()).catch(
+        (err) => {
+          logger.error({ err, taskId: row.id }, "recurrence respawn failed");
+          return null;
+        },
+      );
       if (clone) spawnedNext = withTaskApiFields(clone);
     }
     return c.json({ task: withTaskApiFields(row), spawnedNext });

@@ -1,0 +1,57 @@
+
+> devplanner@0.1.0 test:coverage
+> npm run test:coverage -w @devplanner/web
+
+
+> @devplanner/web@0.1.0 test:coverage
+> jest --config jest.coverage.config.js --runInBand
+
+PASS lib/api.test.ts
+PASS app/(app)/now/page.test.tsx (8.473 s)
+PASS components/kanban-board.test.tsx
+PASS app/(app)/table/page.test.tsx
+PASS components/timeline-board.test.tsx
+PASS components/goal-horizons-matrix.test.tsx (5.026 s)
+PASS components/accomplishments-panel.test.tsx
+PASS lib/daily-api.test.ts
+PASS components/priority-anchors-card.test.tsx
+PASS lib/google-oauth-bridge.test.ts
+PASS components/TaskDetailPanel.test.tsx
+PASS components/app-shell.test.tsx
+PASS components/notifications-tray.test.tsx
+PASS hooks/use-active-timer.test.tsx
+PASS lib/utils.test.ts
+PASS lib/auth-token.test.ts
+PASS lib/env.test.ts
+PASS components/getting-started-card.test.tsx
+PASS components/weekly-review-panel.test.tsx (7.259 s)
+PASS components/quick-add-task.test.tsx
+PASS components/brain-dump-modal.test.tsx
+PASS app/(app)/backlog/page.test.tsx
+PASS hooks/use-calendar-date.test.ts
+PASS lib/draft-storage.test.ts
+
+=============================== Coverage summary ===============================
+Statements   : 46.14% ( 2325/5038 )
+Branches     : 40.3% ( 1120/2779 )
+Functions    : 40.7% ( 609/1496 )
+Lines        : 47.24% ( 2170/4593 )
+================================================================================
+Jest: "global" coverage threshold for statements (80%) not met: 45.37%
+Jest: "global" coverage threshold for branches (80%) not met: 39.32%
+Jest: "global" coverage threshold for lines (80%) not met: 46.51%
+Jest: "global" coverage threshold for functions (80%) not met: 40.02%
+Jest: "./hooks/use-calendar-date.ts" coverage threshold for branches (90%) not met: 83.33%
+
+Test Suites: 24 passed, 24 total
+Tests:       131 passed, 131 total
+Snapshots:   0 total
+Time:        67.52 s
+Ran all test suites.
+npm error Lifecycle script `test:coverage` failed with error:
+npm error code 1
+npm error path C:\Users\adebo\PROJECTS\devplanner\apps\web
+npm error workspace @devplanner/web@0.1.0
+npm error location C:\Users\adebo\PROJECTS\devplanner\apps\web
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c jest --config jest.coverage.config.js --runInBand

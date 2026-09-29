@@ -1,0 +1,1 @@
+scripts/test-container-smoke.sh: line 24: syntax error near unexpected token `r.status===200?0:1'

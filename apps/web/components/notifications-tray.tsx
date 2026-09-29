@@ -2,17 +2,15 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Bell, Sparkles, X } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { fetchGoogleCalendarStatus, fetchTasks } from "@/lib/api";
+import {
+  fetchDailyPreferences,
+  fetchGoogleCalendarStatus,
+  fetchTasks,
+} from "@/lib/api";
+import { useCalendarDate } from "@/hooks/use-calendar-date";
 import { cn, isTaskOverdue } from "@/lib/utils";
-
-function localISODate(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 function parseTimeToMinutes(t: string | null | undefined): number | null {
   if (!t) return null;
@@ -26,9 +24,37 @@ function parseTimeToMinutes(t: string | null | undefined): number | null {
 
 type TrayItem = { kind: string; title: string; detail?: string };
 
-export function NotificationsTray({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function NotificationsTray({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
   const userId = useAppUserId();
-  const today = useMemo(() => localISODate(), []);
+  const preferencesQ = useQuery({
+    queryKey: ["daily-preferences", userId],
+    queryFn: fetchDailyPreferences,
+    enabled: open && Boolean(userId),
+  });
+  const timeZone =
+    preferencesQ.data?.timezone ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone ||
+    "UTC";
+  const today = useCalendarDate(timeZone);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!open) return;
+    const refresh = () => setNow(Date.now());
+    refresh();
+    const interval = setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [open]);
 
   const tasksQ = useQuery({
     queryKey: ["tasks", userId, "notifications"],
@@ -55,7 +81,15 @@ export function NotificationsTray({ open, onClose }: { open: boolean; onClose: (
     }
 
     // "Soon" — subtasks scheduled today with a scheduledTime in the next 2 hours
-    const nowM = new Date().getHours() * 60 + new Date().getMinutes();
+    const clockParts = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date(now));
+    const nowM =
+      Number(clockParts.find((part) => part.type === "hour")?.value ?? 0) * 60 +
+      Number(clockParts.find((part) => part.type === "minute")?.value ?? 0);
     for (const t of allTasks) {
       if (t.status === "done" || t.status === "cancelled") continue;
       for (const s of t._subtasks ?? []) {
@@ -67,21 +101,25 @@ export function NotificationsTray({ open, onClose }: { open: boolean; onClose: (
           out.push({
             kind: "soon",
             title: `${t.title} → ${s.title}`,
-            detail: s.scheduledTime ? `Starts ${s.scheduledTime.slice(0, 5)}` : "Starting soon",
+            detail: s.scheduledTime
+              ? `Starts ${s.scheduledTime.slice(0, 5)}`
+              : "Starting soon",
           });
         }
       }
-      if (out.filter(i => i.kind === "soon").length >= 8) break;
+      if (out.filter((i) => i.kind === "soon").length >= 8) break;
     }
 
     let g: string | null = null;
     if (googleQ.data?.connected) {
       const lp = googleQ.data.lastGooglePullAt;
-      g = lp ? `Last Google import: ${new Date(lp).toLocaleString()}` : "Google Calendar connected — sync from Settings.";
+      g = lp
+        ? `Last Google import: ${new Date(lp).toLocaleString()}`
+        : "Google Calendar connected — sync from Settings.";
     }
 
     return { actionable: out, googleDetail: g };
-  }, [tasksQ.data, today, googleQ.data]);
+  }, [tasksQ.data, today, googleQ.data, now, timeZone]);
 
   if (!open) return null;
 
@@ -96,7 +134,7 @@ export function NotificationsTray({ open, onClose }: { open: boolean; onClose: (
       <aside
         className={cn(
           "fixed right-0 top-0 z-[70] flex h-full w-full max-w-sm flex-col border-l border-white/10 bg-surface shadow-2xl",
-          "animate-slideInRight"
+          "animate-slideInRight",
         )}
       >
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
@@ -106,7 +144,7 @@ export function NotificationsTray({ open, onClose }: { open: boolean; onClose: (
           </div>
           <button
             type="button"
-            className="rounded-lg p-1.5 text-muted hover:bg-white/10 hover:text-foreground"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-white/10 hover:text-foreground"
             onClick={onClose}
             aria-label="Close"
           >
@@ -120,7 +158,8 @@ export function NotificationsTray({ open, onClose }: { open: boolean; onClose: (
               <Sparkles className="mb-2 h-8 w-8 text-primary-text/40" />
               <p>You&apos;re all caught up ✓</p>
               <p className="mt-3 max-w-[240px] text-[11px] text-muted/85">
-                Open the AI dock for suggestions. Use Brain Dump (Ctrl/Cmd+Shift+D) for quick capture.
+                Use Add task for quick capture. The AI dock can help when you
+                want suggestions.
               </p>
             </div>
           )}
@@ -135,19 +174,25 @@ export function NotificationsTray({ open, onClose }: { open: boolean; onClose: (
                     className={cn(
                       "mr-1.5 inline-block rounded px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide",
                       it.kind === "overdue" && "bg-red-500/20 text-red-200",
-                      it.kind === "soon" && "bg-amber-500/20 text-amber-100"
+                      it.kind === "soon" && "bg-amber-500/20 text-amber-100",
                     )}
                   >
                     {it.kind}
                   </span>
-                  <span className="font-medium text-foreground">{it.title}</span>
-                  {it.detail && <p className="mt-0.5 text-muted">{it.detail}</p>}
+                  <span className="font-medium text-foreground">
+                    {it.title}
+                  </span>
+                  {it.detail && (
+                    <p className="mt-0.5 text-muted">{it.detail}</p>
+                  )}
                 </li>
               ))}
             </ul>
           )}
           {googleDetail && (
-            <p className="mt-4 border-t border-white/10 pt-3 text-[11px] text-muted">{googleDetail}</p>
+            <p className="mt-4 border-t border-white/10 pt-3 text-[11px] text-muted">
+              {googleDetail}
+            </p>
           )}
         </div>
       </aside>

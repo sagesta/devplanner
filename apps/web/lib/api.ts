@@ -1,3 +1,7 @@
+import type {
+  CaptureRequest,
+  CaptureResult,
+} from "../../api/src/contracts/daily-use";
 import { authHeaders } from "./auth-token";
 import { getApiBase } from "./env";
 
@@ -27,9 +31,11 @@ async function fetchJson<T>(url: string | URL, init?: RequestInit): Promise<T> {
       // Response was not JSON; keep the raw text fallback below.
     }
     if (parsedError) {
-      throw new Error(parsedError);
+      throw Object.assign(new Error(parsedError), { status: res.status });
     }
-    throw new Error(`API ${res.status}: ${text}`);
+    throw Object.assign(new Error(`API ${res.status}: ${text}`), {
+      status: res.status,
+    });
   }
   return res.json() as Promise<T>;
 }
@@ -46,6 +52,7 @@ function apiUrl(path: string, params?: Record<string, string>): string {
 
 // ─── Types ────────────────────────────────────────────────────────
 export type TaskRow = {
+  revision: number;
   id: string;
   userId: string;
   areaId: string;
@@ -81,6 +88,7 @@ export type TaskRow = {
 };
 
 export type SubtaskRow = {
+  revision: number;
   id: string;
   taskId: string;
   title: string;
@@ -154,6 +162,8 @@ export type ScheduleProposal = {
 };
 
 export type SchedulePreviewResponse = {
+  previewId: string;
+  expiresAt: string;
   proposals: ScheduleProposal[];
   learning: {
     dailyCapacity: number;
@@ -167,7 +177,9 @@ export type SchedulePreviewResponse = {
 export async function fetchTasks(sprintId?: string): Promise<TaskRow[]> {
   const params: Record<string, string> = {};
   if (sprintId) params.sprintId = sprintId;
-  const data = await fetchJson<{ tasks: TaskRow[] }>(apiUrl("/api/tasks", params));
+  const data = await fetchJson<{ tasks: TaskRow[] }>(
+    apiUrl("/api/tasks", params),
+  );
   return data.tasks;
 }
 
@@ -179,9 +191,13 @@ export async function fetchBacklog(): Promise<TaskRow[]> {
 export async function fetchToday(date?: string) {
   const params: Record<string, string> = {};
   if (date) params.date = date;
-  return fetchJson<{ tasks: TaskRow[]; date: string; doneTodayCount: number; dailyCapacity: number; usedMinutes: number }>(
-    apiUrl("/api/tasks/today", params)
-  );
+  return fetchJson<{
+    tasks: TaskRow[];
+    date: string;
+    doneTodayCount: number;
+    dailyCapacity: number;
+    usedMinutes: number;
+  }>(apiUrl("/api/tasks/today", params));
 }
 
 export async function fetchTaskDetail(taskId: string) {
@@ -217,10 +233,13 @@ export async function createTask(body: {
 }
 
 export async function patchTask(taskId: string, body: Record<string, unknown>) {
-  return fetchJson<{ task: TaskRow; spawnedNext?: TaskRow | null }>(apiUrl(`/api/tasks/${taskId}`), {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
+  return fetchJson<{ task: TaskRow; spawnedNext?: TaskRow | null }>(
+    apiUrl(`/api/tasks/${taskId}`),
+    {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    },
+  );
 }
 
 export async function deleteTask(taskId: string) {
@@ -249,13 +268,16 @@ export async function createSubtask(body: {
   });
 }
 
-export async function patchSubtask(id: string, body: Partial<{
-  title: string;
-  completed: boolean;
-  scheduledDate: string | null;
-  scheduledTime: string | null;
-  estimatedMinutes: number | null;
-}>) {
+export async function patchSubtask(
+  id: string,
+  body: Partial<{
+    title: string;
+    completed: boolean;
+    scheduledDate: string | null;
+    scheduledTime: string | null;
+    estimatedMinutes: number | null;
+  }>,
+) {
   return fetchJson<{ subtask: SubtaskRow }>(apiUrl(`/api/subtasks/${id}`), {
     method: "PATCH",
     body: JSON.stringify(body),
@@ -268,28 +290,53 @@ export async function deleteSubtask(id: string) {
   });
 }
 
-export async function postSubtasksBulk(taskId: string, subtasks: { title: string; scheduledDate?: string | null; estimatedMinutes?: number | null }[]) {
+export async function postSubtasksBulk(
+  taskId: string,
+  subtasks: {
+    title: string;
+    scheduledDate?: string | null;
+    estimatedMinutes?: number | null;
+  }[],
+) {
   return fetchJson<{ subtasks: SubtaskRow[] }>(apiUrl("/api/subtasks/bulk"), {
     method: "POST",
     body: JSON.stringify({ taskId, subtasks }),
   });
 }
 
-export async function postSubtasksSpread(taskId: string, subtaskTitles: string[], startDate: string, endDate: string, maxPerDay?: number) {
+export async function postSubtasksSpread(
+  taskId: string,
+  subtaskTitles: string[],
+  startDate: string,
+  endDate: string,
+  maxPerDay?: number,
+) {
   return fetchJson<{ subtasks: SubtaskRow[] }>(apiUrl("/api/subtasks/spread"), {
     method: "POST",
-    body: JSON.stringify({ taskId, subtaskTitles, startDate, endDate, maxPerDay }),
+    body: JSON.stringify({
+      taskId,
+      subtaskTitles,
+      startDate,
+      endDate,
+      maxPerDay,
+    }),
   });
 }
 
-export async function patchTasksBulkSchedule(ids: string[], scheduledDate: string | null) {
+export async function patchTasksBulkSchedule(
+  ids: string[],
+  scheduledDate: string | null,
+) {
   return fetchJson<{ updated: number }>(apiUrl("/api/tasks/bulk"), {
     method: "PATCH",
     body: JSON.stringify({ ids, scheduledDate }),
   });
 }
 
-export async function patchTasksBulkSprint(taskIds: string[], sprintId: string | null) {
+export async function patchTasksBulkSprint(
+  taskIds: string[],
+  sprintId: string | null,
+) {
   return fetchJson<{ updated: number }>(apiUrl("/api/tasks/bulk-sprint"), {
     method: "POST",
     body: JSON.stringify({ taskIds, sprintId }),
@@ -297,7 +344,13 @@ export async function patchTasksBulkSprint(taskIds: string[], sprintId: string |
 }
 
 export async function postAutoSchedule(date: string) {
-  return fetchJson<SchedulePreviewResponse & { mode?: string; message?: string; error?: string }>(apiUrl("/api/tasks/auto-schedule"), {
+  return fetchJson<
+    SchedulePreviewResponse & {
+      mode?: string;
+      message?: string;
+      error?: string;
+    }
+  >(apiUrl("/api/tasks/auto-schedule"), {
     method: "POST",
     body: JSON.stringify({ date }),
   });
@@ -312,23 +365,36 @@ export async function fetchInsightsActivity() {
 }
 
 export async function fetchCalendarProgress(start: string, end: string) {
-  return fetchJson<{ start: string; end: string; dailyCapacity: number; days: CalendarProgressDay[] }>(
-    apiUrl("/api/insights/calendar-progress", { start, end })
-  );
+  return fetchJson<{
+    start: string;
+    end: string;
+    dailyCapacity: number;
+    days: CalendarProgressDay[];
+  }>(apiUrl("/api/insights/calendar-progress", { start, end }));
 }
 
-export async function postSchedulePreview(fromDate: string, horizonEnd: string) {
+export async function postSchedulePreview(
+  fromDate: string,
+  horizonEnd: string,
+) {
   return fetchJson<SchedulePreviewResponse>(apiUrl("/api/schedule/preview"), {
     method: "POST",
     body: JSON.stringify({ fromDate, horizonEnd }),
   });
 }
 
-export async function postScheduleApply(proposals: ScheduleProposal[]) {
-  return fetchJson<{ applied: number; skipped: number }>(apiUrl("/api/schedule/apply"), {
-    method: "POST",
-    body: JSON.stringify({ proposals }),
-  });
+export async function postScheduleApply(
+  previewId: string,
+  selectedIds: string[],
+  idempotencyKey: string,
+) {
+  return fetchJson<{ applied: number; skipped: number }>(
+    apiUrl("/api/schedule/apply"),
+    {
+      method: "POST",
+      body: JSON.stringify({ previewId, selectedIds, idempotencyKey }),
+    },
+  );
 }
 
 export async function postBrainDumpLines(
@@ -339,12 +405,15 @@ export async function postBrainDumpLines(
     scheduledStartTime?: string | null;
     scheduledEndTime?: string | null;
     recurrenceRule?: string | null;
-  }
+  },
 ) {
-  return fetchJson<{ tasks: TaskRow[]; count: number }>(apiUrl("/api/tasks/brain-dump"), {
-    method: "POST",
-    body: JSON.stringify({ areaId, lines, ...schedule }),
-  });
+  return fetchJson<{ tasks: TaskRow[]; count: number }>(
+    apiUrl("/api/tasks/brain-dump"),
+    {
+      method: "POST",
+      body: JSON.stringify({ areaId, lines, ...schedule }),
+    },
+  );
 }
 
 // ─── AI brain-dump parser ─────────────────────────────────────────
@@ -359,13 +428,14 @@ export type ParsedDumpItem = {
 };
 
 export async function parseDump(raw: string) {
-  return fetchJson<{ draft: ParsedDumpItem[]; model: string; warning?: string }>(
-    apiUrl("/api/ai/parse-dump"),
-    {
-      method: "POST",
-      body: JSON.stringify({ raw }),
-    }
-  );
+  return fetchJson<{
+    draft: ParsedDumpItem[];
+    model: string;
+    warning?: string;
+  }>(apiUrl("/api/ai/parse-dump"), {
+    method: "POST",
+    body: JSON.stringify({ raw }),
+  });
 }
 
 // ─── Priority anchors ─────────────────────────────────────────────
@@ -418,18 +488,21 @@ export async function savePriorities(
     periodStart: string;
     category: PriorityCategory;
     statement: string;
-  }>
+  }>,
 ) {
   return fetchJson<{ ok: true; upserted: number; deleted: number }>(
     apiUrl("/api/priorities"),
     {
       method: "PUT",
       body: JSON.stringify({ anchors }),
-    }
+    },
   );
 }
 
-export async function suggestPriorities(periodType: PriorityPeriod, periodStart: string) {
+export async function suggestPriorities(
+  periodType: PriorityPeriod,
+  periodStart: string,
+) {
   return fetchJson<{
     drafts: Array<{ category: PriorityCategory; statement: string }>;
     model: string;
@@ -444,7 +517,10 @@ export async function fetchGoalHorizons() {
   return fetchJson<GoalHorizonsResponse>("/api/goals");
 }
 
-export async function saveGoalHorizons(body: { ownerName: string; goals: GoalMatrix }) {
+export async function saveGoalHorizons(body: {
+  ownerName: string;
+  goals: GoalMatrix;
+}) {
   return fetchJson<GoalHorizonsResponse>("/api/goals", {
     method: "PUT",
     body: JSON.stringify(body),
@@ -456,7 +532,10 @@ export async function saveGoalHorizons(body: { ownerName: string; goals: GoalMat
  * Returns the recognized text. We deliberately don't reuse fetchJson because
  * the body is multipart/form-data, not JSON.
  */
-export async function transcribeAudio(audio: Blob, opts?: { language?: string }) {
+export async function transcribeAudio(
+  audio: Blob,
+  opts?: { language?: string },
+) {
   const form = new FormData();
   // Whisper sniffs format from the filename extension — give it a hint.
   const ext = audio.type.includes("ogg")
@@ -484,7 +563,7 @@ export async function transcribeAudio(audio: Blob, opts?: { language?: string })
 
 export async function postBulkStatus(
   taskIds: string[],
-  status: "backlog" | "todo" | "in_progress" | "done" | "cancelled" | "blocked"
+  status: "backlog" | "todo" | "in_progress" | "done" | "cancelled" | "blocked",
 ) {
   return fetchJson<{ updated: number }>(apiUrl("/api/tasks/bulk-status"), {
     method: "POST",
@@ -498,7 +577,11 @@ export async function fetchAreas(): Promise<AreaRow[]> {
   return data.areas;
 }
 
-export async function createArea(body: { name: string; color?: string | null; icon?: string | null }) {
+export async function createArea(body: {
+  name: string;
+  color?: string | null;
+  icon?: string | null;
+}) {
   return fetchJson<{ area: AreaRow }>(apiUrl("/api/areas"), {
     method: "POST",
     body: JSON.stringify(body),
@@ -533,7 +616,7 @@ export async function patchSprint(
     goal: string | null;
     status: string;
     capacityHours: number | null;
-  }>
+  }>,
 ) {
   return fetchJson<{ sprint: SprintRow }>(apiUrl(`/api/sprints/${sprintId}`), {
     method: "PATCH",
@@ -559,12 +642,16 @@ export async function fetchAiConfig(): Promise<AiConfigResponse> {
 }
 
 export async function fetchAiLogs(limit = 30) {
-  return fetchJson<{ logs: AiLogRow[] }>(apiUrl("/api/ai/logs", { limit: String(limit) }));
+  return fetchJson<{ logs: AiLogRow[] }>(
+    apiUrl("/api/ai/logs", { limit: String(limit) }),
+  );
 }
 
 // ─── Focus ────────────────────────────────────────────────────────
 export async function fetchFocusExport() {
-  return fetchJson<{ date: string; tasks: unknown[] }>(apiUrl("/api/focus/export"));
+  return fetchJson<{ date: string; tasks: unknown[] }>(
+    apiUrl("/api/focus/export"),
+  );
 }
 
 // ─── CalDAV sync ───────────────────────────────────────────────────
@@ -577,29 +664,38 @@ export type CaldavPullStats = {
 };
 
 export async function postCaldavMkcol() {
-  return fetchJson<{ ok: boolean; message?: string; error?: string }>(apiUrl("/api/sync/caldav/mkcol"), {
-    method: "POST",
-    body: "{}",
-  });
+  return fetchJson<{ ok: boolean; message?: string; error?: string }>(
+    apiUrl("/api/sync/caldav/mkcol"),
+    {
+      method: "POST",
+      body: "{}",
+    },
+  );
 }
 
 export async function postCaldavPullQueued() {
-  return fetchJson<{ ok: boolean; queued?: boolean; error?: string }>(apiUrl("/api/sync/caldav/pull"), {
-    method: "POST",
-    body: "{}",
-  });
+  return fetchJson<{ ok: boolean; queued?: boolean; error?: string }>(
+    apiUrl("/api/sync/caldav/pull"),
+    {
+      method: "POST",
+      body: "{}",
+    },
+  );
 }
 
 export async function postCaldavPullNow() {
-  return fetchJson<{ ok: boolean; stats: CaldavPullStats; error?: string }>(apiUrl("/api/sync/caldav/pull-now"), {
-    method: "POST",
-    body: "{}",
-  });
+  return fetchJson<{ ok: boolean; stats: CaldavPullStats; error?: string }>(
+    apiUrl("/api/sync/caldav/pull-now"),
+    {
+      method: "POST",
+      body: "{}",
+    },
+  );
 }
 
 // ─── Google Calendar (OAuth + Calendar API) ───────────────────────
 export function getGoogleOAuthStartUrl(): string {
-  return apiUrl("/api/sync/google/start");
+  return "/api/calendar/google/start";
 }
 
 export async function fetchGoogleCalendarStatus() {
@@ -621,17 +717,23 @@ export async function postGoogleCalendarDisconnect() {
 }
 
 export async function postGoogleCalendarPullQueued() {
-  return fetchJson<{ ok: boolean; queued?: boolean }>(apiUrl("/api/sync/google/pull"), {
-    method: "POST",
-    body: "{}",
-  });
+  return fetchJson<{ ok: boolean; queued?: boolean }>(
+    apiUrl("/api/sync/google/pull"),
+    {
+      method: "POST",
+      body: "{}",
+    },
+  );
 }
 
 export async function postGoogleCalendarPullNow() {
-  return fetchJson<{ ok: boolean; stats: CaldavPullStats; error?: string }>(apiUrl("/api/sync/google/pull-now"), {
-    method: "POST",
-    body: "{}",
-  });
+  return fetchJson<{ ok: boolean; stats: CaldavPullStats; error?: string }>(
+    apiUrl("/api/sync/google/pull-now"),
+    {
+      method: "POST",
+      body: "{}",
+    },
+  );
 }
 
 // ─── Time Logs ────────────────────────────────────────────────────
@@ -666,18 +768,25 @@ export async function startTimer(taskId: string) {
 }
 
 export async function stopTimer(logId: number) {
-  return fetchJson<{ log: TimeLogRow }>(apiUrl(`/api/time-logs/${logId}/stop`), {
-    method: "PATCH",
-  });
+  return fetchJson<{ log: TimeLogRow }>(
+    apiUrl(`/api/time-logs/${logId}/stop`),
+    {
+      method: "PATCH",
+    },
+  );
 }
 
 export async function fetchTimeLogs(taskId: string): Promise<TimeLogRow[]> {
-  const data = await fetchJson<{ logs: TimeLogRow[] }>(apiUrl("/api/time-logs", { task_id: taskId }));
+  const data = await fetchJson<{ logs: TimeLogRow[] }>(
+    apiUrl("/api/time-logs", { task_id: taskId }),
+  );
   return data.logs;
 }
 
 export async function fetchActiveTimer(): Promise<ActiveTimerRow | null> {
-  const data = await fetchJson<{ log: ActiveTimerRow | null }>(apiUrl("/api/time-logs/active"));
+  const data = await fetchJson<{ log: ActiveTimerRow | null }>(
+    apiUrl("/api/time-logs/active"),
+  );
   return data.log;
 }
 
@@ -687,8 +796,12 @@ export async function deleteTimeLog(id: number) {
   });
 }
 
-export async function fetchWeekSummary(weekStart: string): Promise<TimeLogSummaryRow[]> {
-  const data = await fetchJson<{ summary: TimeLogSummaryRow[] }>(apiUrl("/api/time-logs/summary/week", { week_start: weekStart }));
+export async function fetchWeekSummary(
+  weekStart: string,
+): Promise<TimeLogSummaryRow[]> {
+  const data = await fetchJson<{ summary: TimeLogSummaryRow[] }>(
+    apiUrl("/api/time-logs/summary/week", { week_start: weekStart }),
+  );
   return data.summary;
 }
 
@@ -719,19 +832,24 @@ export async function deleteTag(id: number) {
 }
 
 export async function setTaskTags(taskId: string, tagIds: number[]) {
-  return fetchJson<{ tags: Array<{ id: number; name: string; color: string | null }> }>(
-    apiUrl(`/api/tags/tasks/${taskId}/tags`),
-    {
-      method: "POST",
-      body: JSON.stringify({ tag_ids: tagIds }),
-    }
-  );
+  return fetchJson<{
+    tags: Array<{ id: number; name: string; color: string | null }>;
+  }>(apiUrl(`/api/tags/tasks/${taskId}/tags`), {
+    method: "POST",
+    body: JSON.stringify({ tag_ids: tagIds }),
+  });
 }
 
 // ─── Areas (extended) ─────────────────────────────────────────────
 export async function patchArea(
   areaId: string,
-  body: Partial<{ name: string; color: string | null; icon: string | null; sortOrder: number; weekly_hour_target: number | null }>
+  body: Partial<{
+    name: string;
+    color: string | null;
+    icon: string | null;
+    sortOrder: number;
+    weekly_hour_target: number | null;
+  }>,
 ) {
   return fetchJson<{ area: AreaRow }>(apiUrl(`/api/areas/${areaId}`), {
     method: "PATCH",
@@ -747,6 +865,7 @@ export type WeeklyReviewIntention = {
 };
 
 export type WeeklyReviewRow = {
+  revision: number;
   id: string;
   userId: string;
   weekStart: string;
@@ -769,34 +888,46 @@ export type WeeklyReviewInput = Pick<
 
 export async function fetchCurrentReview(weekStart: string) {
   return fetchJson<{ review: WeeklyReviewRow | null }>(
-    apiUrl(`/api/reviews/current?weekStart=${encodeURIComponent(weekStart)}`)
+    apiUrl(`/api/reviews/current?weekStart=${encodeURIComponent(weekStart)}`),
   );
 }
 
-export async function fetchReviews(filters: { query?: string; from?: string; to?: string } = {}) {
+export async function fetchReviews(
+  filters: { query?: string; from?: string; to?: string } = {},
+) {
   const params = new URLSearchParams();
   if (filters.query?.trim()) params.set("q", filters.query.trim());
   if (filters.from) params.set("from", filters.from);
   if (filters.to) params.set("to", filters.to);
-  const suffix = params.size ? `?${params.toString()}` : "";
-  return fetchJson<{ reviews: WeeklyReviewRow[] }>(apiUrl(`/api/reviews${suffix}`));
+  const query = params.toString();
+  const suffix = query ? `?${query}` : "";
+  return fetchJson<{ reviews: WeeklyReviewRow[] }>(
+    apiUrl(`/api/reviews${suffix}`),
+  );
 }
 
-export async function saveReviewDraft(body: WeeklyReviewInput) {
+export async function saveReviewDraft(
+  body: WeeklyReviewInput,
+  expectedRevision: number,
+) {
   return fetchJson<{ review: WeeklyReviewRow }>(apiUrl("/api/reviews"), {
     method: "PUT",
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, expectedRevision }),
   });
 }
 
-export async function completeWeeklyReview(body: WeeklyReviewInput) {
+export async function completeWeeklyReview(
+  body: WeeklyReviewInput,
+  expectedRevision: number,
+  createSprint: boolean,
+) {
   return fetchJson<{
     review: WeeklyReviewRow;
-    sprintId: string;
+    sprintId: string | null;
     alreadyCompleted: boolean;
   }>(apiUrl("/api/reviews/complete"), {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, expectedRevision, createSprint }),
   });
 }
 
@@ -825,26 +956,32 @@ export type AccomplishmentInput = {
 
 export async function fetchAccomplishments(): Promise<AccomplishmentRow[]> {
   const data = await fetchJson<{ accomplishments: AccomplishmentRow[] }>(
-    apiUrl("/api/accomplishments")
+    apiUrl("/api/accomplishments"),
   );
   return data.accomplishments;
 }
 
 export async function createAccomplishment(body: AccomplishmentInput) {
-  return fetchJson<{ accomplishment: AccomplishmentRow }>(apiUrl("/api/accomplishments"), {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  return fetchJson<{ accomplishment: AccomplishmentRow }>(
+    apiUrl("/api/accomplishments"),
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+  );
 }
 
 export async function updateAccomplishment(
   id: string,
-  body: Partial<Omit<AccomplishmentInput, "taskId">>
+  body: Partial<Omit<AccomplishmentInput, "taskId">>,
 ) {
-  return fetchJson<{ accomplishment: AccomplishmentRow }>(apiUrl(`/api/accomplishments/${id}`), {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
+  return fetchJson<{ accomplishment: AccomplishmentRow }>(
+    apiUrl(`/api/accomplishments/${id}`),
+    {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    },
+  );
 }
 
 export async function deleteAccomplishment(id: string) {
@@ -853,3 +990,19 @@ export async function deleteAccomplishment(id: string) {
   });
 }
 
+export async function postCaptureBatch(body: CaptureRequest) {
+  return fetchJson<CaptureResult>(apiUrl("/api/daily/capture"), {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchDailyPreferences() {
+  return fetchJson<{ timezone: string }>(apiUrl("/api/daily/preferences"));
+}
+export async function saveDailyTimezone(timezone: string) {
+  return fetchJson<{ timezone: string }>(apiUrl("/api/daily/preferences"), {
+    method: "PATCH",
+    body: JSON.stringify({ timezone }),
+  });
+}

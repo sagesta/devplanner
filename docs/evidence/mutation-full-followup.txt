@@ -1,0 +1,9 @@
+
+> devplanner@0.1.0 test:mutation
+> node scripts/test-mutation.mjs
+
+[32m17:47:00 (10816) INFO ProjectReader[39m Found 5 of 423 file(s) to be mutated.
+[32m17:47:02 (10816) INFO Instrumenter[39m Instrumented 5 source file(s) with 737 mutant(s)
+[32m17:47:06 (10816) INFO ConcurrencyTokenProvider[39m Creating 4 test runner process(es).
+[32m17:47:07 (10816) INFO DryRunExecutor[39m Starting initial test run (command test runner with "off" coverage analysis). This may take a while.
+[32m17:47:14 (10816) INFO DryRunExecutor[39m Initial test run succeeded. Ran 1 tests in 6 seconds (net 6901 ms, overhead 1 ms).

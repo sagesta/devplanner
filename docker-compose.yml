@@ -8,7 +8,7 @@ services:
     volumes:
       - devplanner_db_data:/var/lib/postgresql/data
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_PORT:-5433}:5432"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U devplanner -d devplanner"]
@@ -22,7 +22,7 @@ services:
     volumes:
       - devplanner_redis_data:/data
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
     restart: unless-stopped
 
   radicale:

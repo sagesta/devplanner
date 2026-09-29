@@ -1,8 +1,11 @@
 "use client";
 
+import { addDaysYMD } from "@/lib/timeline-utils";
+
 import {
   DndContext,
   DragEndEvent,
+  DragStartEvent,
   DragOverlay,
   PointerSensor,
   pointerWithin,
@@ -13,7 +16,15 @@ import {
 } from "@dnd-kit/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStatus } from "@/hooks/use-auth-status";
-import { ChevronDown, ChevronUp, Plus, Trash2, X, Filter, Sparkles } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  Trash2,
+  X,
+  Filter,
+  Sparkles,
+} from "lucide-react";
 import confetti from "canvas-confetti";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -40,7 +51,12 @@ import {
 } from "@/lib/api";
 import Link from "next/link";
 import { SkeletonCard } from "@/lib/skeleton";
-import { cn, displayPhysicalEnergy, displayWorkDepth, isTaskOverdue } from "@/lib/utils";
+import {
+  cn,
+  displayPhysicalEnergy,
+  displayWorkDepth,
+  isTaskOverdue,
+} from "@/lib/utils";
 import { StatusDot, SubtaskBar, TaskCard } from "./task-card";
 import { DraggableCard } from "./kanban/DraggableCard";
 import { DroppableColumn } from "./kanban/DroppableColumn";
@@ -74,14 +90,15 @@ const COL_MOBILE_ORDER: Record<string, string> = {
 const DAYBOOK_CARD_CLASS =
   "rounded-xl border-[var(--hairline)] bg-[var(--card)] px-4 py-3.5 shadow-[var(--card-shadow)] hover:-translate-y-0.5 hover:border-[var(--hairline)] hover:shadow-[var(--card-shadow)]";
 
-function resolveDropStatus(overId: string | undefined, rootsList: TaskRow[]): string | null {
+function resolveDropStatus(
+  overId: string | undefined,
+  rootsList: TaskRow[],
+): string | null {
   if (!overId) return null;
   if (COL_KEYS.has(overId)) return overId;
   const hit = rootsList.find((t) => t.id === overId);
   return hit ? hit.status : null;
 }
-
-
 
 export function KanbanBoard() {
   const { status } = useAuthStatus();
@@ -94,7 +111,11 @@ export function KanbanBoard() {
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [sprintFormStart, setSprintFormStart] = useState<string>("");
   const { tags: allTags } = useTags();
-  const { activeLog, isRunning: timerIsRunning, elapsed: timerElapsed } = useActiveTimer();
+  const {
+    activeLog,
+    isRunning: timerIsRunning,
+    elapsed: timerElapsed,
+  } = useActiveTimer();
   const todayYmd = useMemo(() => toYMD(new Date()), []);
 
   const areasQ = useQuery({
@@ -111,26 +132,18 @@ export function KanbanBoard() {
 
   const activeSprints = useMemo(() => {
     if (!sprintsQ.data?.sprints) return [];
-    return sprintsQ.data.sprints.filter(s => s.status === 'active');
-  }, [sprintsQ.data?.sprints]);
+    return sprintsQ.data.sprints.filter((s) => s.status === "active");
+  }, [sprintsQ.data]);
 
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
 
   const activeSprint = useMemo(() => {
     if (activeSprints.length === 0) return null;
     if (selectedSprintId) {
-      const found = activeSprints.find(s => s.id === selectedSprintId);
+      const found = activeSprints.find((s) => s.id === selectedSprintId);
       if (found) return found;
     }
     return activeSprints[0];
-  }, [activeSprints, selectedSprintId]);
-
-  useEffect(() => {
-    if (activeSprints.length > 0 && (!selectedSprintId || !activeSprints.find(s => s.id === selectedSprintId))) {
-      setSelectedSprintId(activeSprints[0].id);
-    } else if (activeSprints.length === 0 && selectedSprintId) {
-      setSelectedSprintId(null);
-    }
   }, [activeSprints, selectedSprintId]);
 
   const q = useQuery({
@@ -150,18 +163,24 @@ export function KanbanBoard() {
     return () => window.removeEventListener("open-task", handleOpenTask);
   }, []);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
 
   const m = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => patchTask(id, { status }),
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      patchTask(id, { status }),
     onMutate: async ({ id, status }) => {
       await qc.cancelQueries({ queryKey: ["sprintTasks"] });
       await qc.cancelQueries({ queryKey: ["tasks"] });
-      const prev = qc.getQueryData<TaskRow[]>(["sprintTasks", activeSprint?.id]);
+      const prev = qc.getQueryData<TaskRow[]>([
+        "sprintTasks",
+        activeSprint?.id,
+      ]);
       if (prev) {
         qc.setQueryData(
           ["sprintTasks", activeSprint?.id],
-          prev.map((t) => (t.id === id ? { ...t, status } : t))
+          prev.map((t) => (t.id === id ? { ...t, status } : t)),
         );
       }
       return { prev };
@@ -178,7 +197,8 @@ export function KanbanBoard() {
       }
     },
     onError: (e: Error, _v, ctx) => {
-      if (ctx?.prev) qc.setQueryData(["sprintTasks", activeSprint?.id], ctx.prev);
+      if (ctx?.prev)
+        qc.setQueryData(["sprintTasks", activeSprint?.id], ctx.prev);
       toast.error(e.message);
     },
     onSettled: () => {
@@ -189,21 +209,26 @@ export function KanbanBoard() {
   });
 
   const priMut = useMutation({
-    mutationFn: ({ id, priority }: { id: string; priority: string }) => patchTask(id, { priority }),
+    mutationFn: ({ id, priority }: { id: string; priority: string }) =>
+      patchTask(id, { priority }),
     onMutate: async ({ id, priority }) => {
       await qc.cancelQueries({ queryKey: ["sprintTasks"] });
       await qc.cancelQueries({ queryKey: ["tasks"] });
-      const prev = qc.getQueryData<TaskRow[]>(["sprintTasks", activeSprint?.id]);
+      const prev = qc.getQueryData<TaskRow[]>([
+        "sprintTasks",
+        activeSprint?.id,
+      ]);
       if (prev) {
         qc.setQueryData(
           ["sprintTasks", activeSprint?.id],
-          prev.map((t) => (t.id === id ? { ...t, priority } : t))
+          prev.map((t) => (t.id === id ? { ...t, priority } : t)),
         );
       }
       return { prev };
     },
     onError: (e: Error, _v, ctx) => {
-      if (ctx?.prev) qc.setQueryData(["sprintTasks", activeSprint?.id], ctx.prev);
+      if (ctx?.prev)
+        qc.setQueryData(["sprintTasks", activeSprint?.id], ctx.prev);
       toast.error(e.message);
     },
     onSettled: () => {
@@ -213,12 +238,13 @@ export function KanbanBoard() {
   });
 
   const createSprintM = useMutation({
-    mutationFn: (body: Parameters<typeof createSprint>[0]) => createSprint(body),
+    mutationFn: (body: Parameters<typeof createSprint>[0]) =>
+      createSprint(body),
     onSuccess: () => {
-       toast.success("Sprint created!");
-       void qc.invalidateQueries({ queryKey: ["sprints", userId] });
+      toast.success("Sprint created!");
+      void qc.invalidateQueries({ queryKey: ["sprints", userId] });
     },
-    onError: (e: Error) => toast.error(e.message)
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const rescueMut = useMutation({
@@ -246,7 +272,7 @@ export function KanbanBoard() {
       if (!activeTask || activeTask.status === targetStatus) return;
       m.mutate({ id: activeId, status: targetStatus });
     },
-    [q.data, m]
+    [q.data, m],
   );
 
   const roots = useMemo(() => q.data ?? [], [q.data]);
@@ -259,13 +285,13 @@ export function KanbanBoard() {
   const draggedTask = dragId ? roots.find((t) => t.id === dragId) : null;
   const overdueRoots = useMemo(
     () => roots.filter((t) => isTaskOverdue(t, todayYmd)),
-    [roots, todayYmd]
+    [roots, todayYmd],
   );
-  
+
   const filteredRoots = useMemo(() => {
     if (selectedTags.length === 0) return roots;
     return roots.filter((task) =>
-      task._tags?.some((tag) => selectedTags.includes(tag.id))
+      task._tags?.some((tag) => selectedTags.includes(tag.id)),
     );
   }, [roots, selectedTags]);
 
@@ -280,12 +306,15 @@ export function KanbanBoard() {
     return (
       <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--rule)] bg-[var(--card)] py-16 px-6 text-center shadow-[var(--card-shadow)]">
         <Sparkles size={32} className="mb-4 text-[var(--teal)]" />
-        <p className="font-display text-[26px] italic text-[var(--ink)]">No active sprint</p>
-        <p className="mt-1 text-sm text-muted max-w-md">
-          Create a new sprint to start adding tasks from your backlog and tracking your progress!
+        <p className="font-display text-[26px] italic text-[var(--ink)]">
+          No active sprint
         </p>
-        
-        <form 
+        <p className="mt-1 text-sm text-muted max-w-md">
+          Create a new sprint to start adding tasks from your backlog and
+          tracking your progress!
+        </p>
+
+        <form
           className="mt-8 flex flex-col items-center gap-3 w-full max-w-sm"
           onSubmit={(e) => {
             e.preventDefault();
@@ -294,58 +323,70 @@ export function KanbanBoard() {
             const startDate = fd.get("startDate") as string;
             const endDate = fd.get("endDate") as string;
             if (!name || !startDate || !endDate) {
-               toast.error("Please fill in all sprint fields.");
-               return;
+              toast.error("Please fill in all sprint fields.");
+              return;
             }
             if (endDate < startDate) {
-               toast.error("End date must be on or after start date.");
-               return;
+              toast.error("End date must be on or after start date.");
+              return;
             }
-            createSprintM.mutate({ name, startDate, endDate, status: "active" });
+            createSprintM.mutate({
+              name,
+              startDate,
+              endDate,
+              status: "active",
+            });
           }}
         >
           <input
-             name="name"
-             placeholder="Sprint name (e.g. Launch Week)"
-             className="w-full rounded-xl border border-[var(--hairline)] bg-background px-4 py-3 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none"
-             required
-             defaultValue="Sprint 1"
+            name="name"
+            placeholder="Sprint name (e.g. Launch Week)"
+            className="w-full rounded-xl border border-[var(--hairline)] bg-background px-4 py-3 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none"
+            required
+            defaultValue="Sprint 1"
           />
           <div className="flex gap-3 w-full">
-             <div className="flex-1">
-               <label className="block text-left text-[11px] uppercase font-semibold tracking-[0.08em] text-muted mb-1 px-1">Start date</label>
-               <input
-                 type="date"
-                 name="startDate"
-                 className="w-full rounded-xl border border-[var(--hairline)] bg-background px-3 py-2 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none"
-                 required
-                 defaultValue={todayYmd}
-                 onChange={(e) => setSprintFormStart(e.target.value)}
-               />
-             </div>
-             <div className="flex-1">
-               <label className="block text-left text-[11px] uppercase font-semibold tracking-[0.08em] text-muted mb-1 px-1">End date</label>
-               <input
-                 type="date"
-                 name="endDate"
-                 min={sprintFormStart || todayYmd}
-                 className="w-full rounded-xl border border-[var(--hairline)] bg-background px-3 py-2 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none"
-                 required
-                 defaultValue={toYMD(new Date(Date.now() + 14 * 86400000))}
-               />
-             </div>
+            <div className="flex-1">
+              <label className="block text-left text-[11px] uppercase font-semibold tracking-[0.08em] text-muted mb-1 px-1">
+                Start date
+              </label>
+              <input
+                type="date"
+                name="startDate"
+                className="w-full rounded-xl border border-[var(--hairline)] bg-background px-3 py-2 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none"
+                required
+                defaultValue={todayYmd}
+                onChange={(e) => setSprintFormStart(e.target.value)}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-left text-[11px] uppercase font-semibold tracking-[0.08em] text-muted mb-1 px-1">
+                End date
+              </label>
+              <input
+                type="date"
+                name="endDate"
+                min={sprintFormStart || todayYmd}
+                className="w-full rounded-xl border border-[var(--hairline)] bg-background px-3 py-2 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none"
+                required
+                defaultValue={addDaysYMD(todayYmd, 14)}
+              />
+            </div>
           </div>
-          <button 
-             type="submit" 
-             disabled={createSprintM.isPending}
-             className="w-full mt-2 flex items-center justify-center gap-2 rounded-full bg-[var(--ink-btn-bg)] px-5 py-3 text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-50"
+          <button
+            type="submit"
+            disabled={createSprintM.isPending}
+            className="w-full mt-2 flex items-center justify-center gap-2 rounded-full bg-[var(--ink-btn-bg)] px-5 py-3 text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-50"
           >
-             <Plus size={16} /> Create & Start Sprint
+            <Plus size={16} /> Create &amp; Start Sprint
           </button>
         </form>
 
         <div className="mt-6 border-t border-[var(--hairline-soft)] pt-4">
-          <Link href="/plan?view=sprints" className="text-[13px] text-[var(--teal)] hover:underline transition-colors">
+          <Link
+            href="/plan?view=sprints"
+            className="text-[13px] text-[var(--teal)] hover:underline transition-colors"
+          >
             Or manage sprints in Plan →
           </Link>
         </div>
@@ -358,7 +399,11 @@ export function KanbanBoard() {
       {overdueRoots.length >= 3 && !rescueDismissed && (
         <div className="mb-4 flex flex-col gap-2 rounded-xl border border-[var(--hairline)] bg-[var(--card)] px-4 py-3 text-sm text-foreground shadow-[var(--card-shadow)] sm:flex-row sm:items-center sm:justify-between">
           <span>
-            You have <span className="font-semibold text-[var(--high)]">{overdueRoots.length} overdue tasks</span>. Reschedule all to today?
+            You have{" "}
+            <span className="font-semibold text-[var(--high)]">
+              {overdueRoots.length} overdue tasks
+            </span>
+            . Reschedule all to today?
           </span>
           <div className="flex flex-wrap gap-2">
             <button
@@ -381,10 +426,16 @@ export function KanbanBoard() {
       )}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--teal)]">Active sprint board</p>
-          <h2 className="mt-1 truncate font-display text-[22px] text-[var(--ink)]">{activeSprint.name}</h2>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--teal)]">
+            Active sprint board
+          </p>
+          <h2 className="mt-1 truncate font-display text-[22px] text-[var(--ink)]">
+            {activeSprint.name}
+          </h2>
           <div className="mt-0.5 flex items-center gap-2">
-            <p className="text-xs text-muted">{activeSprint.startDate} to {activeSprint.endDate}</p>
+            <p className="text-xs text-muted">
+              {activeSprint.startDate} to {activeSprint.endDate}
+            </p>
             {activeSprint.endDate < todayYmd && (
               <span className="rounded-full border border-[var(--high)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--high)]">
                 Sprint expired
@@ -419,11 +470,13 @@ export function KanbanBoard() {
               "flex items-center gap-1.5 rounded-full border bg-transparent px-3.5 py-1.5 text-[13px] transition-colors",
               selectedTags.length > 0
                 ? "border-[var(--teal)] bg-[var(--teal-a12)] text-[var(--teal)]"
-                : "border-[var(--hairline)] text-muted hover:bg-[var(--teal-a08)] hover:text-[var(--teal)]"
+                : "border-[var(--hairline)] text-muted hover:bg-[var(--teal-a08)] hover:text-[var(--teal)]",
             )}
           >
             <Filter size={14} />
-            <span>Tags {selectedTags.length > 0 ? `(${selectedTags.length})` : ""}</span>
+            <span>
+              Tags {selectedTags.length > 0 ? `(${selectedTags.length})` : ""}
+            </span>
           </button>
 
           <div className="absolute right-0 top-full mt-1 hidden w-56 flex-col overflow-hidden rounded-xl border border-[var(--hairline)] bg-[var(--card)] shadow-[var(--card-shadow)] group-hover/filter:flex z-[40]">
@@ -443,7 +496,7 @@ export function KanbanBoard() {
                       key={tag.id}
                       className={cn(
                         "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors hover:bg-[var(--teal-a08)]",
-                        active && "bg-[var(--teal-a08)]"
+                        active && "bg-[var(--teal-a08)]",
                       )}
                     >
                       <input
@@ -451,8 +504,12 @@ export function KanbanBoard() {
                         checked={active}
                         className="rounded border-[var(--rule)] bg-background accent-[var(--teal)]"
                         onChange={(e) => {
-                          if (e.target.checked) setSelectedTags((prev) => [...prev, tag.id]);
-                          else setSelectedTags((prev) => prev.filter((id) => id !== tag.id));
+                          if (e.target.checked)
+                            setSelectedTags((prev) => [...prev, tag.id]);
+                          else
+                            setSelectedTags((prev) =>
+                              prev.filter((id) => id !== tag.id),
+                            );
                         }}
                       />
                       <span
@@ -472,7 +529,7 @@ export function KanbanBoard() {
       <DndContext
         sensors={sensors}
         collisionDetection={pointerWithin}
-        onDragStart={(e) => setDragId(e.active.id as string)}
+        onDragStart={(e: DragStartEvent) => setDragId(e.active.id as string)}
         onDragEnd={onDragEnd}
         onDragCancel={() => setDragId(null)}
       >
@@ -485,7 +542,9 @@ export function KanbanBoard() {
                 id={key}
                 title={label}
                 count={colTasks.length}
-                showColumnEmpty={!q.isLoading && colTasks.length === 0 && addingCol !== key}
+                showColumnEmpty={
+                  !q.isLoading && colTasks.length === 0 && addingCol !== key
+                }
                 onAdd={() => setAddingCol(addingCol === key ? null : key)}
                 className={COL_MOBILE_ORDER[key]}
               >
@@ -498,16 +557,23 @@ export function KanbanBoard() {
                 )}
                 {colTasks.map((t) => {
                   const area = areaMap.get(t.areaId);
-                  const timerRunningHere = timerIsRunning && activeLog?.taskId === t.id;
+                  const timerRunningHere =
+                    timerIsRunning && activeLog?.taskId === t.id;
                   const subtaskPct =
                     (t._subtasksTotal ?? 0) > 0
-                      ? Math.round(((t._subtasksDone ?? 0) / (t._subtasksTotal ?? 1)) * 100)
+                      ? Math.round(
+                          ((t._subtasksDone ?? 0) / (t._subtasksTotal ?? 1)) *
+                            100,
+                        )
                       : null;
                   return (
                     <div key={t.id} className="space-y-0.5">
                       <DraggableCard id={t.id}>
                         <TaskCard
-                          className={cn(DAYBOOK_CARD_CLASS, t.status === "done" && "opacity-55")}
+                          className={cn(
+                            DAYBOOK_CARD_CLASS,
+                            t.status === "done" && "opacity-55",
+                          )}
                           title={t.title}
                           status={t.status}
                           priority={t.priority}
@@ -521,8 +587,12 @@ export function KanbanBoard() {
                           depthLabel={displayWorkDepth(t)}
                           energyLabel={displayPhysicalEnergy(t)}
                           boardStatuses={boardStatusValues}
-                          onBoardStatusSelect={(next) => m.mutate({ id: t.id, status: next })}
-                          onPriorityChange={(priority) => priMut.mutate({ id: t.id, priority })}
+                          onBoardStatusSelect={(next) =>
+                            m.mutate({ id: t.id, status: next })
+                          }
+                          onPriorityChange={(priority) =>
+                            priMut.mutate({ id: t.id, priority })
+                          }
                           onStatusCycle={() => {
                             const next = STATUS_CYCLE[t.status] ?? "todo";
                             m.mutate({ id: t.id, status: next });
@@ -535,7 +605,9 @@ export function KanbanBoard() {
                         <div className="px-1 pt-1.5">
                           <div className="flex items-center gap-2 text-xs text-muted">
                             <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[var(--teal)]" />
-                            <span>timer running · {formatElapsed(timerElapsed)}</span>
+                            <span>
+                              timer running · {formatElapsed(timerElapsed)}
+                            </span>
                           </div>
                           {subtaskPct !== null && (
                             <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-[var(--track)]">
@@ -563,9 +635,15 @@ export function KanbanBoard() {
                             void (async () => {
                               try {
                                 const invalidate = () => {
-                                  void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
-                                  void qc.invalidateQueries({ queryKey: ["tasks"] });
-                                  void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
+                                  void qc.invalidateQueries({
+                                    queryKey: ["sprintTasks"],
+                                  });
+                                  void qc.invalidateQueries({
+                                    queryKey: ["tasks"],
+                                  });
+                                  void qc.invalidateQueries({
+                                    queryKey: ["tasks-today", userId],
+                                  });
                                 };
                                 await deleteTask(t.id);
                                 invalidate();
@@ -579,7 +657,9 @@ export function KanbanBoard() {
                                           toast.success("Task restored");
                                           invalidate();
                                         })
-                                        .catch((err: unknown) => toast.error(String(err)));
+                                        .catch((err: unknown) =>
+                                          toast.error(String(err)),
+                                        );
                                     },
                                   },
                                 });
@@ -628,7 +708,11 @@ export function KanbanBoard() {
         </DragOverlay>
       </DndContext>
       {openTaskId && (
-        <TaskDrawer taskId={openTaskId} userId={userId} onClose={() => setOpenTaskId(null)} />
+        <TaskDrawer
+          taskId={openTaskId}
+          userId={userId}
+          onClose={() => setOpenTaskId(null)}
+        />
       )}
     </>
   );
@@ -668,6 +752,7 @@ function TaskDrawer({
   const [spreadStart, setSpreadStart] = useState("");
   const [spreadEnd, setSpreadEnd] = useState("");
 
+  /* eslint-disable react-hooks/set-state-in-effect -- Hydrate the editable drawer from the external task query after it loads. */
   useEffect(() => {
     const t = q.data?.task;
     if (!t) return;
@@ -683,6 +768,7 @@ function TaskDrawer({
     setPhysicalEnergy(t.physicalEnergy ?? "medium");
     setEnergyLevel(t.energyLevel ?? "shallow");
   }, [q.data?.task]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const addSub = useMutation({
     mutationFn: async () => {
@@ -717,47 +803,51 @@ function TaskDrawer({
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["task", taskId] });
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
-    }
+    },
   });
 
   const spreadSubs = useMutation({
-     mutationFn: async () => {
-       if (!q.data) return null;
-       const unscheduled = q.data.subtasks.filter((s: SubtaskRow) => !s.scheduledDate && !s.completed);
-       if (unscheduled.length === 0 || !spreadStart || !spreadEnd) {
-         toast.error("Invalid range or no unscheduled subtasks");
-         return null;
-       }
-       // Parse date strings as LOCAL dates (avoid UTC midnight → day-before bug in UTC+ timezones)
-       function localDateFromYmd(ymd: string): Date {
-         const [y, mo, d] = ymd.split("-").map(Number);
-         return new Date(y, mo - 1, d);
-       }
-       const start = localDateFromYmd(spreadStart);
-       const end   = localDateFromYmd(spreadEnd);
-       const diff = end.getTime() - start.getTime();
-       const inc = unscheduled.length > 1 ? diff / (unscheduled.length - 1) : 0;
-       
-       await Promise.all(unscheduled.map((s: SubtaskRow, i: number) => {
-         const date = new Date(start.getTime() + inc * i);
-         const y  = date.getFullYear();
-         const mo = String(date.getMonth() + 1).padStart(2, "0");
-         const d  = String(date.getDate()).padStart(2, "0");
-         const dateStr = `${y}-${mo}-${d}`;
-         return patchSubtask(s.id, { scheduledDate: dateStr });
-       }));
-        return true;
-     },
-     onSuccess: () => {
-        setShowSpread(false);
-        setSpreadStart("");
-        setSpreadEnd("");
-        void qc.invalidateQueries({ queryKey: ["task", taskId] });
-        void qc.invalidateQueries({ queryKey: ["tasks", userId] });
-        void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
-        void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
-     },
-     onError: (e: Error) => toast.error(e.message)
+    mutationFn: async () => {
+      if (!q.data) return null;
+      const unscheduled = q.data.subtasks.filter(
+        (s: SubtaskRow) => !s.scheduledDate && !s.completed,
+      );
+      if (unscheduled.length === 0 || !spreadStart || !spreadEnd) {
+        toast.error("Invalid range or no unscheduled subtasks");
+        return null;
+      }
+      // Parse date strings as LOCAL dates (avoid UTC midnight → day-before bug in UTC+ timezones)
+      function localDateFromYmd(ymd: string): Date {
+        const [y, mo, d] = ymd.split("-").map(Number);
+        return new Date(y, mo - 1, d);
+      }
+      const start = localDateFromYmd(spreadStart);
+      const end = localDateFromYmd(spreadEnd);
+      const diff = end.getTime() - start.getTime();
+      const inc = unscheduled.length > 1 ? diff / (unscheduled.length - 1) : 0;
+
+      await Promise.all(
+        unscheduled.map((s: SubtaskRow, i: number) => {
+          const date = new Date(start.getTime() + inc * i);
+          const y = date.getFullYear();
+          const mo = String(date.getMonth() + 1).padStart(2, "0");
+          const d = String(date.getDate()).padStart(2, "0");
+          const dateStr = `${y}-${mo}-${d}`;
+          return patchSubtask(s.id, { scheduledDate: dateStr });
+        }),
+      );
+      return true;
+    },
+    onSuccess: () => {
+      setShowSpread(false);
+      setSpreadStart("");
+      setSpreadEnd("");
+      void qc.invalidateQueries({ queryKey: ["task", taskId] });
+      void qc.invalidateQueries({ queryKey: ["tasks", userId] });
+      void qc.invalidateQueries({ queryKey: ["sprintTasks"] });
+      void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const saveMeta = useMutation({
@@ -765,7 +855,8 @@ function TaskDrawer({
       if (!q.data) return;
       let recurrenceRule: string | null;
       if (recurrence === "") recurrenceRule = null;
-      else if (recurrence === "__custom") recurrenceRule = q.data.task.recurrenceRule ?? null;
+      else if (recurrence === "__custom")
+        recurrenceRule = q.data.task.recurrenceRule ?? null;
       else recurrenceRule = recurrence;
       return patchTask(taskId, {
         dueDate: dueDate || null,
@@ -775,7 +866,8 @@ function TaskDrawer({
         priority: priority as "urgent" | "high" | "normal" | "low",
         workDepth: workDepth as "shallow" | "normal" | "deep",
         physicalEnergy: physicalEnergy as "low" | "medium" | "high",
-        energyLevel: energyLevel as "deep_work" | "shallow" | "admin" | "quick_win",
+        energyLevel: energyLevel as
+          "deep_work" | "shallow" | "admin" | "quick_win",
       });
     },
     onSuccess: () => {
@@ -806,7 +898,9 @@ function TaskDrawer({
               .then(() => {
                 toast.success("Task restored");
                 void qc.invalidateQueries({ queryKey: ["tasks", userId] });
-                void qc.invalidateQueries({ queryKey: ["tasks-today", userId] });
+                void qc.invalidateQueries({
+                  queryKey: ["tasks-today", userId],
+                });
                 void qc.invalidateQueries({ queryKey: ["task", taskId] });
               })
               .catch((err: unknown) => toast.error(String(err)));
@@ -837,9 +931,14 @@ function TaskDrawer({
           <>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="font-display text-[22px] text-[var(--ink)]">{q.data.task.title}</h2>
+                <h2 className="font-display text-[22px] text-[var(--ink)]">
+                  {q.data.task.title}
+                </h2>
                 <p className="mt-1 text-xs text-muted">
-                  Status: <span className="capitalize">{q.data.task.status.replace("_", " ")}</span>
+                  Status:{" "}
+                  <span className="capitalize">
+                    {q.data.task.status.replace("_", " ")}
+                  </span>
                   {q.data.task.description && (
                     <span className="ml-2">· {q.data.task.description}</span>
                   )}
@@ -867,9 +966,16 @@ function TaskDrawer({
 
             {/* Tags */}
             <div className="mt-3 flex items-center gap-2 flex-wrap">
-              {(q.data.task._tags ?? []).map((tag: { id: number; name: string; color: string | null }) => (
-                <TagChip key={tag.id} name={tag.name} color={tag.color} size="sm" />
-              ))}
+              {(q.data.task._tags ?? []).map(
+                (tag: { id: number; name: string; color: string | null }) => (
+                  <TagChip
+                    key={tag.id}
+                    name={tag.name}
+                    color={tag.color}
+                    size="sm"
+                  />
+                ),
+              )}
               <TagSelector
                 taskId={taskId}
                 currentTags={q.data.task._tags ?? []}
@@ -881,7 +987,9 @@ function TaskDrawer({
             </div>
 
             <div className="mt-4 space-y-3 rounded-xl border border-[var(--hairline)] bg-[var(--card)] p-3 shadow-[var(--card-shadow)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Fields &amp; Deadline</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                Fields &amp; Deadline
+              </p>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block text-[11px] text-muted">
                   Priority
@@ -990,7 +1098,9 @@ function TaskDrawer({
                     </option>
                   ))}
                   {((q.data.task.recurrenceRule &&
-                    !RECURRENCE_PRESETS.some((p) => p.value === (q.data.task.recurrenceRule ?? ""))) ||
+                    !RECURRENCE_PRESETS.some(
+                      (p) => p.value === (q.data.task.recurrenceRule ?? ""),
+                    )) ||
                     recurrence === "__custom") && (
                     <option value="__custom">Custom (keep current)</option>
                   )}
@@ -1007,34 +1117,67 @@ function TaskDrawer({
             </div>
 
             <div className="mt-6 flex items-center justify-between">
-              <h3 className="font-display text-[19px] italic text-[var(--ink)]">Subtasks</h3>
-              <button onClick={() => setShowSpread(!showSpread)} className="text-xs text-[var(--teal)] hover:underline flex items-center gap-1">
-                <Sparkles size={12}/> Spread across days
+              <h3 className="font-display text-[19px] italic text-[var(--ink)]">
+                Subtasks
+              </h3>
+              <button
+                onClick={() => setShowSpread(!showSpread)}
+                className="text-xs text-[var(--teal)] hover:underline flex items-center gap-1"
+              >
+                <Sparkles size={12} /> Spread across days
               </button>
             </div>
 
             {showSpread && (
-               <div className="mt-2 rounded-xl border border-[var(--teal-a30)] bg-[var(--teal-a08)] p-3 flex flex-col gap-2">
-                 <p className="text-xs text-muted">Distribute unscheduled subtasks across a date range.</p>
-                 <div className="flex gap-2">
-                   <div className="flex-1">
-                     <label className="block text-[11px] uppercase tracking-[0.08em] text-muted mb-1">Start</label>
-                     <input type="date" defaultValue={spreadStart} onChange={e => setSpreadStart(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-[var(--hairline)]" />
-                   </div>
-                   <div className="flex-1">
-                     <label className="block text-[11px] uppercase tracking-[0.08em] text-muted mb-1">End</label>
-                     <input type="date" defaultValue={spreadEnd} onChange={e => setSpreadEnd(e.target.value)} className="w-full rounded-md bg-background px-2 py-1 text-xs border border-[var(--hairline)]" />
-                   </div>
-                 </div>
-                 <button onClick={() => spreadSubs.mutate()} disabled={!spreadStart || !spreadEnd || spreadSubs.isPending || !q.data.subtasks.some((s: SubtaskRow) => !s.scheduledDate)} className="w-full mt-2 rounded-full bg-[var(--ink-btn-bg)] py-1.5 text-xs font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-50">
-                    Apply Spread
-                 </button>
-               </div>
+              <div className="mt-2 rounded-xl border border-[var(--teal-a30)] bg-[var(--teal-a08)] p-3 flex flex-col gap-2">
+                <p className="text-xs text-muted">
+                  Distribute unscheduled subtasks across a date range.
+                </p>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="block text-[11px] uppercase tracking-[0.08em] text-muted mb-1">
+                      Start
+                    </label>
+                    <input
+                      type="date"
+                      defaultValue={spreadStart}
+                      onChange={(e) => setSpreadStart(e.target.value)}
+                      className="w-full rounded-md bg-background px-2 py-1 text-xs border border-[var(--hairline)]"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-[11px] uppercase tracking-[0.08em] text-muted mb-1">
+                      End
+                    </label>
+                    <input
+                      type="date"
+                      defaultValue={spreadEnd}
+                      onChange={(e) => setSpreadEnd(e.target.value)}
+                      className="w-full rounded-md bg-background px-2 py-1 text-xs border border-[var(--hairline)]"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={() => spreadSubs.mutate()}
+                  disabled={
+                    !spreadStart ||
+                    !spreadEnd ||
+                    spreadSubs.isPending ||
+                    !q.data.subtasks.some((s: SubtaskRow) => !s.scheduledDate)
+                  }
+                  className="w-full mt-2 rounded-full bg-[var(--ink-btn-bg)] py-1.5 text-xs font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-50"
+                >
+                  Apply Spread
+                </button>
+              </div>
             )}
 
             {q.data.subtaskProgress && (
               <div className="mt-3">
-                <SubtaskBar done={q.data.subtaskProgress.done} total={q.data.subtaskProgress.total} />
+                <SubtaskBar
+                  done={q.data.subtaskProgress.done}
+                  total={q.data.subtaskProgress.total}
+                />
               </div>
             )}
             <ul className="mt-4 space-y-1.5 stagger-list">
@@ -1043,7 +1186,7 @@ function TaskDrawer({
                   key={s.id}
                   className={cn(
                     "group flex items-center gap-2 rounded-lg border border-[var(--hairline-soft)] bg-[var(--card)] px-2 py-2 transition-all hover:border-[var(--hairline)]",
-                    s.completed && "opacity-50"
+                    s.completed && "opacity-50",
                   )}
                 >
                   {/* Checkbox */}
@@ -1053,7 +1196,7 @@ function TaskDrawer({
                       "h-4 w-4 shrink-0 rounded-full border transition-colors",
                       s.completed
                         ? "border-[var(--teal)] bg-[var(--teal)]"
-                        : "border-[var(--rule)] hover:border-[var(--success-border)] hover:bg-[var(--success-bg)]"
+                        : "border-[var(--rule)] hover:border-[var(--success-border)] hover:bg-[var(--success-bg)]",
                     )}
                     onClick={() => toggleSubStatus.mutate(s)}
                   />
@@ -1064,14 +1207,15 @@ function TaskDrawer({
                     name={`subtask-${s.id}-name`}
                     className={cn(
                       "flex-1 bg-transparent px-1 min-w-0 text-sm outline-none placeholder:text-[var(--muted-soft)]",
-                      s.completed && "line-through text-muted"
+                      s.completed && "line-through text-muted",
                     )}
                     defaultValue={s.title}
                     disabled={s.completed}
                     onBlur={(e) => {
                       if (e.target.value !== s.title) {
-                        patchSubtask(s.id, { title: e.target.value })
-                          .then(() => qc.invalidateQueries({ queryKey: ["task", taskId] }));
+                        patchSubtask(s.id, { title: e.target.value }).then(() =>
+                          qc.invalidateQueries({ queryKey: ["task", taskId] }),
+                        );
                       }
                     }}
                   />
@@ -1086,8 +1230,11 @@ function TaskDrawer({
                     disabled={s.completed}
                     title="Scheduled date"
                     onChange={(e) => {
-                      patchSubtask(s.id, { scheduledDate: e.target.value || null })
-                        .then(() => qc.invalidateQueries({ queryKey: ["task", taskId] }));
+                      patchSubtask(s.id, {
+                        scheduledDate: e.target.value || null,
+                      }).then(() =>
+                        qc.invalidateQueries({ queryKey: ["task", taskId] }),
+                      );
                     }}
                   />
                   {/* Time */}
@@ -1098,8 +1245,11 @@ function TaskDrawer({
                     disabled={s.completed}
                     title="Scheduled time"
                     onChange={(e) => {
-                      patchSubtask(s.id, { scheduledTime: e.target.value || null })
-                        .then(() => qc.invalidateQueries({ queryKey: ["task", taskId] }));
+                      patchSubtask(s.id, {
+                        scheduledTime: e.target.value || null,
+                      }).then(() =>
+                        qc.invalidateQueries({ queryKey: ["task", taskId] }),
+                      );
                     }}
                   />
                   {/* Est. minutes */}
@@ -1113,17 +1263,22 @@ function TaskDrawer({
                     placeholder="min"
                     title="Estimated minutes"
                     onBlur={(e) => {
-                      const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                      const val = e.target.value
+                        ? parseInt(e.target.value, 10)
+                        : null;
                       if (val !== s.estimatedMinutes) {
-                        patchSubtask(s.id, { estimatedMinutes: val })
-                          .then(() => qc.invalidateQueries({ queryKey: ["task", taskId] }));
+                        patchSubtask(s.id, { estimatedMinutes: val }).then(() =>
+                          qc.invalidateQueries({ queryKey: ["task", taskId] }),
+                        );
                       }
                     }}
                   />
                   {/* Delete */}
                   <button
                     type="button"
-                    onClick={() => { if (confirm("Delete subtask?")) deleteSub.mutate(s.id); }}
+                    onClick={() => {
+                      if (confirm("Delete subtask?")) deleteSub.mutate(s.id);
+                    }}
                     className="shrink-0 p-1 rounded text-muted hover-actions opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[var(--rose)] transition-all"
                     title="Delete subtask"
                   >
@@ -1138,8 +1293,9 @@ function TaskDrawer({
                 placeholder="+ Add executable step"
                 value={newSubtaskTitle}
                 onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newSubtaskTitle.trim()) addSub.mutate();
+                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                  if (e.key === "Enter" && newSubtaskTitle.trim())
+                    addSub.mutate();
                 }}
               />
               <button

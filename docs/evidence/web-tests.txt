@@ -1,0 +1,22 @@
+
+> devplanner@0.1.0 test:web
+> npm run test -w @devplanner/web --runInBand
+
+npm warn Unknown cli config "--runInBand". This will stop working in the next major version of npm.
+
+> @devplanner/web@0.1.0 test
+> jest --runInBand
+
+PASS components/weekly-review-panel.test.tsx
+PASS hooks/use-calendar-date.test.ts
+PASS components/getting-started-card.test.tsx
+PASS lib/draft-storage.test.ts
+PASS components/quick-add-task.test.tsx
+PASS app/(app)/backlog/page.test.tsx
+PASS components/brain-dump-modal.test.tsx
+
+Test Suites: 7 passed, 7 total
+Tests:       24 passed, 24 total
+Snapshots:   0 total
+Time:        12.875 s, estimated 15 s
+Ran all test suites.

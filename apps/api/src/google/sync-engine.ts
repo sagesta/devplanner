@@ -1,6 +1,11 @@
+import { randomUUID } from "node:crypto";
+import { writeReservedEvent, providerStatus } from "./event-write.js";
 import type { calendar_v3 } from "googleapis";
-import { and, eq, isNotNull } from "drizzle-orm";
-import { DEVPLANNER_UID_RE, parseDevplannerCaldavUid } from "../caldav/parse-incoming.js";
+import { isNull, and, eq, isNotNull } from "drizzle-orm";
+import {
+  DEVPLANNER_UID_RE,
+  parseDevplannerCaldavUid,
+} from "../caldav/parse-incoming.js";
 import { db } from "../db/client.js";
 import { googleCalendarLinks, subtasks, tasks, users } from "../db/schema.js";
 import { resolveOrCreateImportAreaId } from "../lib/importArea.js";
@@ -29,7 +34,9 @@ function dayDelta(a: Date, b: Date): number {
   return Math.round((db - da) / t);
 }
 
-function parseWallTime(t: string | null | undefined): { h: number; m: number } | null {
+function parseWallTime(
+  t: string | null | undefined,
+): { h: number; m: number } | null {
   if (!t) return null;
   const m = t.match(/^(\d{1,2}):(\d{2})/);
   if (!m) return null;
@@ -58,7 +65,9 @@ function parseGoogleEvent(ev: calendar_v3.Schema$Event): {
   if (!icalUid) return null;
 
   let title =
-    typeof ev.summary === "string" && ev.summary.trim() ? ev.summary.trim().slice(0, 500) : "(no title)";
+    typeof ev.summary === "string" && ev.summary.trim()
+      ? ev.summary.trim().slice(0, 500)
+      : "(no title)";
   let statusCompleted = false;
   if (title.startsWith("[Done] ")) {
     statusCompleted = true;
@@ -72,11 +81,15 @@ function parseGoogleEvent(ev: calendar_v3.Schema$Event): {
   }
 
   const description =
-    typeof ev.description === "string" && ev.description.trim() ? ev.description.trim() : null;
+    typeof ev.description === "string" && ev.description.trim()
+      ? ev.description.trim()
+      : null;
 
   const priv = ev.extendedProperties?.private;
   const devplannerTaskId =
-    priv && typeof priv.devplannerTaskId === "string" && priv.devplannerTaskId.trim()
+    priv &&
+    typeof priv.devplannerTaskId === "string" &&
+    priv.devplannerTaskId.trim()
       ? priv.devplannerTaskId.trim()
       : null;
 
@@ -92,10 +105,7 @@ function parseGoogleEvent(ev: calendar_v3.Schema$Event): {
     const end = new Date(e.date + "T12:00:00");
     const deltaDays = dayDelta(start, end);
     const midnight =
-      s.date.length <= 10 &&
-      e.date.length <= 10 &&
-      !s.dateTime &&
-      !e.dateTime;
+      s.date.length <= 10 && e.date.length <= 10 && !s.dateTime && !e.dateTime;
     if (midnight && deltaDays === 1) {
       scheduledDate = s.date;
     } else if (midnight && deltaDays > 1) {
@@ -164,7 +174,7 @@ export function taskToGoogleEvent(
     caldavUid: string | null;
     icalUid: string | null;
   },
-  tz: string
+  tz: string,
 ): calendar_v3.Schema$Event | null {
   const sd = task.scheduledDate;
   const due = task.dueDate;
@@ -177,7 +187,10 @@ export function taskToGoogleEvent(
   if (task.status === "cancelled") summary = `[Cancelled] ${summary}`;
   if (task.status === "blocked") summary = `[Blocked] ${summary}`;
 
-  const uid = (task.icalUid?.trim() || `${stableUid}@devplanner`).replace(/[\r\n;]/g, "");
+  const uid = (task.icalUid?.trim() || `${stableUid}@devplanner`).replace(
+    /[\r\n;]/g,
+    "",
+  );
 
   const ext: calendar_v3.Schema$Event["extendedProperties"] = {
     private: {
@@ -230,7 +243,9 @@ export function taskToGoogleEvent(
   };
 
   if (task.recurrenceRule?.trim()) {
-    body.recurrence = [`RRULE:${task.recurrenceRule.trim().replace(/^RRULE:/i, "")}`];
+    body.recurrence = [
+      `RRULE:${task.recurrenceRule.trim().replace(/^RRULE:/i, "")}`,
+    ];
   }
 
   if (task.status === "cancelled") {
@@ -250,7 +265,9 @@ export async function runGooglePushJob(input: {
   if (!bundle) return { ok: true, skipped: true };
 
   const { calendar, calendarId } = bundle;
-  const userRow = await db.query.users.findFirst({ where: eq(users.id, input.userId) });
+  const userRow = await db.query.users.findFirst({
+    where: eq(users.id, input.userId),
+  });
   const tz = userRow?.timezone?.trim() || "UTC";
 
   if (input.action === "delete") {
@@ -261,13 +278,32 @@ export async function runGooglePushJob(input: {
       return { ok: true };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes("404")) return { ok: true };
+      if ([404, 410].includes(providerStatus(e) ?? 0)) return { ok: true };
       return { ok: false, detail: msg };
     }
   }
 
-  const task = await db.query.tasks.findFirst({ where: eq(tasks.id, input.taskId) });
-  if (!task) return { ok: false, detail: "task not found" };
+  const task = await db.query.tasks.findFirst({
+    where: eq(tasks.id, input.taskId),
+  });
+  if (!task || task.userId !== input.userId) return { ok: true, skipped: true };
+  if (task.deletedAt) {
+    if (task.googleEventId) {
+      try {
+        await calendar.events.delete({
+          calendarId,
+          eventId: task.googleEventId,
+        });
+      } catch (error) {
+        if (![404, 410].includes(providerStatus(error) ?? 0))
+          return {
+            ok: false,
+            detail: "Calendar deletion failed; retry pending.",
+          };
+      }
+    }
+    return { ok: true, skipped: true };
+  }
 
   // Push on the planned execution date (fall back to due date). When the
   // task has timed subtasks that day, push a timed block instead of all-day:
@@ -277,11 +313,16 @@ export async function runGooglePushJob(input: {
   let endTime: string | null = null;
   if (eventDate) {
     const daySubs = await db.query.subtasks.findMany({
-      where: and(eq(subtasks.taskId, task.id), eq(subtasks.scheduledDate, eventDate)),
+      where: and(
+        eq(subtasks.taskId, task.id),
+        eq(subtasks.scheduledDate, eventDate),
+      ),
     });
     const timed = daySubs
       .filter((s) => parseWallTime(s.scheduledTime))
-      .sort((a, b) => (a.scheduledTime ?? "").localeCompare(b.scheduledTime ?? ""));
+      .sort((a, b) =>
+        (a.scheduledTime ?? "").localeCompare(b.scheduledTime ?? ""),
+      );
     const first = timed[0] ? parseWallTime(timed[0].scheduledTime) : null;
     if (first) {
       const totalMinutes =
@@ -293,52 +334,64 @@ export async function runGooglePushJob(input: {
     }
   }
 
-  const body = taskToGoogleEvent({
-    ...task,
-    scheduledDate: eventDate,
-    scheduledStartTime: startTime,
-    scheduledEndTime: endTime,
-  }, tz);
+  const body = taskToGoogleEvent(
+    {
+      ...task,
+      scheduledDate: eventDate,
+      scheduledStartTime: startTime,
+      scheduledEndTime: endTime,
+    },
+    tz,
+  );
   if (!body) {
     if (task.googleEventId) {
       try {
-        await calendar.events.delete({ calendarId, eventId: task.googleEventId });
-      } catch {
-        /* ignore */
+        await calendar.events.delete({
+          calendarId,
+          eventId: task.googleEventId,
+        });
+      } catch (error) {
+        if (![404, 410].includes(providerStatus(error) ?? 0))
+          return {
+            ok: false,
+            detail: "Calendar deletion failed; retry pending.",
+          };
       }
       await db
         .update(tasks)
-        .set({ googleEventId: null, googleRemoteUpdated: null, updatedAt: new Date() })
+        .set({
+          googleEventId: null,
+          googleRemoteUpdated: null,
+          updatedAt: new Date(),
+        })
         .where(eq(tasks.id, task.id));
     }
     return { ok: true };
   }
 
   try {
-    if (task.googleEventId) {
-      const res = await calendar.events.patch({
-        calendarId,
-        eventId: task.googleEventId,
-        requestBody: body,
-      });
-      const u = res.data.updated ?? null;
-      const ical = res.data.iCalUID ?? task.icalUid;
-      await db
+    let eventId = task.googleEventId;
+    if (!eventId) {
+      // Reserve identity before the external call, surviving process/network failures.
+      const reserved = await db
         .update(tasks)
-        .set({
-          googleRemoteUpdated: u,
-          icalUid: ical,
-          updatedAt: task.updatedAt,
-        })
-        .where(eq(tasks.id, task.id));
-      return { ok: true };
+        .set({ googleEventId: randomUUID().replace(/-/g, "") })
+        .where(and(eq(tasks.id, task.id), isNull(tasks.googleEventId)))
+        .returning({ id: tasks.googleEventId });
+      eventId =
+        reserved[0]?.id ??
+        (await db.query.tasks.findFirst({ where: eq(tasks.id, task.id) }))
+          ?.googleEventId ??
+        null;
     }
-
-    const res = await calendar.events.insert({
+    if (!eventId)
+      return { ok: false, detail: "Calendar identity reservation failed" };
+    const ev = await writeReservedEvent(
+      calendar.events,
       calendarId,
-      requestBody: body,
-    });
-    const ev = res.data;
+      eventId,
+      body,
+    );
     await db
       .update(tasks)
       .set({
@@ -361,7 +414,13 @@ export async function runGooglePullForUser(userId: string): Promise<{
   skipped: number;
   errors: string[];
 }> {
-  const stats = { imported: 0, updated: 0, removed: 0, skipped: 0, errors: [] as string[] };
+  const stats = {
+    imported: 0,
+    updated: 0,
+    removed: 0,
+    skipped: 0,
+    errors: [] as string[],
+  };
   const bundle = await getCalendarForUser(userId);
   if (!bundle) {
     stats.errors.push("Google Calendar not connected");
@@ -460,7 +519,9 @@ export async function runGooglePullForUser(userId: string): Promise<{
         const gid = t.googleEventId!;
         if (seenIds.has(gid)) continue;
         if (!t.googleLastPullAt) continue;
-        const isImported = Boolean(t.icalUid && !DEVPLANNER_UID_RE.test(t.icalUid));
+        const isImported = Boolean(
+          t.icalUid && !DEVPLANNER_UID_RE.test(t.icalUid),
+        );
         if (isImported) {
           await db.delete(tasks).where(eq(tasks.id, t.id));
           stats.removed++;
@@ -499,7 +560,13 @@ async function applyOneGoogleEvent(
   areaId: string,
   raw: calendar_v3.Schema$Event,
   now: Date,
-  stats: { imported: number; updated: number; removed: number; skipped: number; errors: string[] }
+  stats: {
+    imported: number;
+    updated: number;
+    removed: number;
+    skipped: number;
+    errors: string[];
+  },
 ) {
   const parsed = parseGoogleEvent(raw);
   if (!parsed) {
@@ -515,7 +582,10 @@ async function applyOneGoogleEvent(
   let existing =
     parsed.devplannerTaskId != null
       ? await db.query.tasks.findFirst({
-          where: and(eq(tasks.userId, userId), eq(tasks.id, parsed.devplannerTaskId)),
+          where: and(
+            eq(tasks.userId, userId),
+            eq(tasks.id, parsed.devplannerTaskId),
+          ),
         })
       : await db.query.tasks.findFirst({
           where: and(eq(tasks.userId, userId), eq(tasks.googleEventId, evId)),
@@ -538,7 +608,9 @@ async function applyOneGoogleEvent(
 
   if (parsed.statusCancelled) {
     if (existing) {
-      const isImported = Boolean(existing.icalUid && !DEVPLANNER_UID_RE.test(existing.icalUid));
+      const isImported = Boolean(
+        existing.icalUid && !DEVPLANNER_UID_RE.test(existing.icalUid),
+      );
       if (isImported) {
         await db.delete(tasks).where(eq(tasks.id, existing.id));
         stats.removed++;
@@ -561,7 +633,9 @@ async function applyOneGoogleEvent(
   }
 
   if (existing) {
-    const isOurs = Boolean(parsed.devplannerTaskId || DEVPLANNER_UID_RE.test(parsed.icalUid));
+    const isOurs = Boolean(
+      parsed.devplannerTaskId || DEVPLANNER_UID_RE.test(parsed.icalUid),
+    );
     if (
       isOurs &&
       existing.googleLastPullAt &&
@@ -594,7 +668,6 @@ async function applyOneGoogleEvent(
         completedAt: status === "done" ? (existing.completedAt ?? now) : null,
       })
       .where(eq(tasks.id, existing.id));
-
 
     stats.updated++;
     return;

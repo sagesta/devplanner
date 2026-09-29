@@ -5,8 +5,33 @@ import {
   buildSprintGoal,
   normalizeReviewIntentions,
   reviewPeriodFromWeekStart,
+  reviewRevisionMatches,
+  sameReviewContent,
   sprintNameFromStart,
 } from "./reviews.js";
+
+test("review revision zero only creates a new row and updates require an exact revision", () => {
+  assert.equal(reviewRevisionMatches(0, 1, true), true);
+  assert.equal(reviewRevisionMatches(0, 1, false), false);
+  assert.equal(reviewRevisionMatches(1, 1), true);
+  assert.equal(reviewRevisionMatches(1, 2), false);
+});
+
+test("a lost completion response can be retried only with the same review content", () => {
+  const content = {
+    weekStart: "2026-09-28",
+    weekEnd: "2026-10-04",
+    wins: "Shipped",
+    carryover: "",
+    intentions: [],
+    sprintNotes: "",
+  };
+  assert.equal(sameReviewContent(content, { ...content }), true);
+  assert.equal(
+    sameReviewContent(content, { ...content, wins: "Changed" }),
+    false,
+  );
+});
 
 test("review period uses Monday-Sunday and creates a Monday-Friday sprint", () => {
   assert.deepEqual(reviewPeriodFromWeekStart("2026-07-20"), {
@@ -39,10 +64,16 @@ test("intentions are trimmed, empty rows removed, and limited to three", () => {
 test("sprint goal keeps intention and linked goal context", () => {
   assert.equal(
     buildSprintGoal(
-      [{ text: "Finish mock exam", goalKey: "short:professional", goalLabel: "Pass exam" }],
-      "Keep Friday open for corrections"
+      [
+        {
+          text: "Finish mock exam",
+          goalKey: "short:professional",
+          goalLabel: "Pass exam",
+        },
+      ],
+      "Keep Friday open for corrections",
     ),
-    "Top intentions:\n1. Finish mock exam [Pass exam]\n\nSprint notes:\nKeep Friday open for corrections"
+    "Top intentions:\n1. Finish mock exam [Pass exam]\n\nSprint notes:\nKeep Friday open for corrections",
   );
   assert.equal(buildSprintGoal([], ""), null);
 });

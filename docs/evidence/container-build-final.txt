@@ -1,0 +1,79 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.api
+#1 DONE 0.0s
+
+#1 [internal] load build definition from Dockerfile.api
+#1 transferring dockerfile: 1.67kB 0.0s done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/node:22-bookworm-slim
+#2 DONE 3.3s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 342B 0.2s
+#3 transferring context: 344B 0.2s done
+#3 DONE 0.2s
+
+#4 [deps 1/6] FROM docker.io/library/node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 492.47kB 1.2s done
+#5 DONE 1.2s
+
+#6 [deps 5/6] COPY apps/web/package.json apps/web/
+#6 CACHED
+
+#7 [deps 2/6] WORKDIR /app
+#7 CACHED
+
+#8 [deps 3/6] COPY package.json package-lock.json ./
+#8 CACHED
+
+#9 [deps 4/6] COPY apps/api/package.json apps/api/
+#9 CACHED
+
+#10 [deps 6/6] RUN npm ci --no-audit --no-fund
+#10 CACHED
+
+#11 [build 1/2] COPY apps/api apps/api
+#11 DONE 0.1s
+
+#12 [build 2/2] RUN npm run build -w @devplanner/api
+#12 0.710 
+#12 0.710 > @devplanner/api@0.1.0 build
+#12 0.710 > tsc -p tsconfig.json
+#12 0.710 
+#12 DONE 23.7s
+
+#13 [runner 1/8] WORKDIR /app
+#13 CACHED
+
+#14 [runner 2/8] RUN npm prune --omit=dev && npm cache clean --force
+#14 CACHED
+
+#15 [runner 3/8] COPY --from=build /app/apps/api/dist ./apps/api/dist
+#15 DONE 0.2s
+
+#16 [runner 4/8] COPY apps/api/drizzle.config.ts ./apps/api/
+#16 DONE 0.2s
+
+#17 [runner 5/8] COPY apps/api/src/db ./apps/api/src/db
+#17 DONE 0.2s
+
+#18 [runner 6/8] COPY apps/api/scripts/docker-entrypoint.mjs ./apps/api/scripts/
+#18 DONE 0.2s
+
+#19 [runner 7/8] COPY docker/entrypoint-api.sh ./docker/entrypoint-api.sh
+#19 DONE 0.2s
+
+#20 [runner 8/8] RUN sed -i 's/\r$//' ./docker/entrypoint-api.sh && chmod +x ./docker/entrypoint-api.sh
+#20 DONE 0.5s
+
+#21 exporting to image
+#21 exporting layers
+#21 exporting layers 0.4s done
+#21 writing image sha256:62820318c1582372a6ccb1e6fae769fa2dfe80dbd369247abe8c08a0c54fdf93 done
+#21 naming to docker.io/library/devplanner-daily:verified 0.0s done
+#21 DONE 0.5s

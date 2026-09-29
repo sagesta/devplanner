@@ -1,0 +1,23 @@
+
+> devplanner@0.1.0 test:integration
+> node scripts/test-integration.mjs
+
+[migrate] Schema up-to-date ✓
+[migrate] Schema up-to-date ✓
+✔ daily persistence, revisions, stale scheduling and retry guarantees (1112.1415ms)
+[migrate] Schema up-to-date ✓
+[migrate] Schema up-to-date ✓
+✔ clean Drizzle journal and repeated startup are compatible (937.4255ms)
+[migrate] Schema up-to-date ✓
+✔ Drizzle upgrades populated legacy journal without changing task data (984.7633ms)
+✔ PostgreSQL OAuth attempts enforce owner, expiry and atomic single consumption (55.8062ms)
+✔ daily API uses authenticated context for capture, move, focus and preferences (296.6757ms)
+✔ account cascade deletion does not enqueue orphaned calendar events (34.1675ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5065.1169

@@ -6,12 +6,6 @@
  *   [text](url) links, --- horizontal rules, line breaks.
  */
 
-type Segment =
-  | { type: "text"; value: string }
-  | { type: "bold"; value: string }
-  | { type: "italic"; value: string }
-  | { type: "code"; value: string };
-
 /** Parse inline markdown (bold / italic / code / links) into React nodes */
 function renderInline(text: string): React.ReactNode[] {
   // Pattern order matters — code > bold > italic > link
@@ -50,7 +44,13 @@ function renderInline(text: string): React.ReactNode[] {
     } else if (raw.startsWith("[")) {
       // link
       const linkText = match[2] ?? "";
-      const href = match[3] ?? "#";
+      const href = (match[3] ?? "").trim();
+      const safe = !/[\u0000-\u001f\u007f]/.test(href) && /^(https?:\/\/|mailto:|\/(?!\/)|#)/i.test(href);
+      if (!safe) {
+        nodes.push(<span key={match.index}>{linkText}</span>);
+        last = match.index + raw.length;
+        continue;
+      }
       nodes.push(
         <a
           key={match.index}
@@ -181,9 +181,9 @@ export function MarkdownMessage({ content }: { content: string }) {
 
     // Regular line
     blocks.push(
-      <p key={i} className="text-[0.85rem] leading-relaxed">
+      <div key={i} className="text-[0.85rem] leading-relaxed">
         {renderLine(line, i)}
-      </p>
+      </div>
     );
     i++;
   }

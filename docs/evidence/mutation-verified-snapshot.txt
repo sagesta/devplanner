@@ -1,0 +1,624 @@
+
+> devplanner@0.1.0 test:mutation
+> node scripts/test-mutation.mjs
+
+[32m18:06:54 (8984) INFO ProjectReader[39m Found 5 of 470 file(s) to be mutated.
+[32m18:06:55 (8984) INFO Instrumenter[39m Instrumented 5 source file(s) with 737 mutant(s)
+[32m18:06:58 (8984) INFO ConcurrencyTokenProvider[39m Creating 4 test runner process(es).
+[32m18:07:01 (8984) INFO DryRunExecutor[39m Starting initial test run (command test runner with "off" coverage analysis). This may take a while.
+[32m18:07:10 (8984) INFO DryRunExecutor[39m Initial test run succeeded. Ran 1 tests in 8 seconds (net 8899 ms, overhead 2 ms).
+
+All tests
+  ✓ All tests (killed 607)
+
+[Survived] OptionalChaining
+apps/api/src/google/event-write.ts:5:5
+-       e?.response?.status ?? (typeof e?.code === "number" ? e.code : undefined)
++       e.response?.status ?? (typeof e?.code === "number" ? e.code : undefined)
+
+[Survived] ConditionalExpression
+apps/api/src/google/event-write.ts:5:29
+-       e?.response?.status ?? (typeof e?.code === "number" ? e.code : undefined)
++       e?.response?.status ?? (true ? e.code : undefined)
+
+[Survived] OptionalChaining
+apps/api/src/google/event-write.ts:5:36
+-       e?.response?.status ?? (typeof e?.code === "number" ? e.code : undefined)
++       e?.response?.status ?? (typeof e.code === "number" ? e.code : undefined)
+
+[Survived] ObjectLiteral
+apps/api/src/google/event-write.ts:43:32
+-       return (await client.patch({ calendarId, eventId, requestBody: content }))
++       return (await client.patch({}))
+
+[Survived] ArithmeticOperator
+apps/api/src/google/oauth-state.ts:7:29
+-   export const OAUTH_TTL_MS = 10 * 60 * 1000;
++   export const OAUTH_TTL_MS = 10 / 60 * 1000;
+
+[Survived] Regex
+apps/api/src/google/oauth-state.ts:31:37
+-     if (typeof state !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(state))
++     if (typeof state !== "string" || !/^[A-Za-z0-9_-]{43}/.test(state))
+
+[Survived] Regex
+apps/api/src/google/oauth-state.ts:31:37
+-     if (typeof state !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(state))
++     if (typeof state !== "string" || !/[A-Za-z0-9_-]{43}$/.test(state))
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:31:50
+-     isolation: "read committed" | "serializable" = "read committed",
++     isolation: "read committed" | "serializable" = "",
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:36:7
+-         isolation === "serializable"
++         false
+
+[Survived] EqualityOperator
+apps/api/src/services/daily.ts:36:7
+-         isolation === "serializable"
++         isolation !== "serializable"
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:36:7
+-         isolation === "serializable"
++         true
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:36:21
+-         isolation === "serializable"
++         isolation === ""
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:56:50
+-     isolation: "read committed" | "serializable" = "read committed",
++     isolation: "read committed" | "serializable" = "",
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:62:11
+-             `${userId}:${operation}:${key}`,
++             ``,
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:86:70
+-           ["40001", "40P01"].includes((e as { code?: string }).code ?? "")
++           ["40001", "40P01"].includes((e as { code?: string }).code ?? "Stryker was here!")
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:102:7
+-         "SELECT id FROM areas WHERE user_id=$1 AND system_key='general'",
++         "",
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:106:9
+-       if (!areaId) {
++       if (true) {
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:118:48
+-     if (!owned.rowCount) throw new DailyConflict("Area is unavailable.");
++     if (!owned.rowCount) throw new DailyConflict("");
+
+[Survived] LogicalOperator
+apps/api/src/services/daily.ts:157:7
+-         item.scheduledDate ?? null,
++         item.scheduledDate && null,
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:168:5
+-       "capture",
++       "",
+
+[Survived] ConditionalExpression
+apps/api/src/services/daily.ts:187:7
+-     if (!(value instanceof Date)) return String(value);
++     if (false) return String(value);
+
+[Survived] ArrowFunction
+apps/api/src/services/daily.ts:260:23
+-       input.targets.map((t) => ({ ...t, date: input.scheduledDate })),
++       input.targets.map(() => undefined),
+
+[Survived] StringLiteral
+apps/api/src/services/daily.ts:258:5
+-       "move",
++       "",
+
+[Survived] ObjectLiteral
+apps/api/src/services/daily.ts:260:31
+-       input.targets.map((t) => ({ ...t, date: input.scheduledDate })),
++       input.targets.map((t) => ({})),
+
+[Survived] MethodExpression
+apps/api/src/services/daily.ts:262:23
+-         const targets = [...input.targets].sort((a, b) =>
+-           a.targetId.localeCompare(b.targetId),
+-         );
++         const targets = [...input.targets];
+
+[Survived] ArrowFunction
+apps/api/src/services/daily.ts:262:47
+-         const targets = [...input.targets].sort((a, b) =>
+-           a.targetId.localeCompare(b.targetId),
++         const targets = [...input.targets].sort(() => undefined,
+
+[Survived] Regex
+apps/api/src/services/reviews.ts:3:16
+-   const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
++   const YMD_RE = /^\d{4}-\d{2}-\d{2}/;
+
+[Survived] Regex
+apps/api/src/services/reviews.ts:3:16
+-   const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
++   const YMD_RE = /\d{4}-\d{2}-\d{2}$/;
+
+[Survived] StringLiteral
+apps/api/src/services/reviews.ts:6:42
+-     if (!YMD_RE.test(ymd)) throw new Error("date must use YYYY-MM-DD");
++     if (!YMD_RE.test(ymd)) throw new Error("");
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:6:7
+-     if (!YMD_RE.test(ymd)) throw new Error("date must use YYYY-MM-DD");
++     if (false) throw new Error("date must use YYYY-MM-DD");
+
+[Survived] StringLiteral
+apps/api/src/services/reviews.ts:8:53
+-     if (Number.isNaN(date.getTime())) throw new Error("invalid date");
++     if (Number.isNaN(date.getTime())) throw new Error("");
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:8:7
+-     if (Number.isNaN(date.getTime())) throw new Error("invalid date");
++     if (false) throw new Error("invalid date");
+
+[Survived] StringLiteral
+apps/api/src/services/reviews.ts:45:60
+-       const goal = item.goalLabel ? ` [${item.goalLabel}]` : "";
++       const goal = item.goalLabel ? ` [${item.goalLabel}]` : "Stryker was here!";
+
+[Survived] MethodExpression
+apps/api/src/services/reviews.ts:48:17
+-     const notes = sprintNotes.trim();
++     const notes = sprintNotes;
+
+[Survived] StringLiteral
+apps/api/src/services/reviews.ts:51:49
+-         ? `Top intentions:\n${intentionLines.join("\n")}`
++         ? `Top intentions:\n${intentionLines.join("")}`
+
+[Survived] BooleanLiteral
+apps/api/src/services/reviews.ts:72:16
+-     createdNow = false,
++     createdNow = true,
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:74:44
+-     if (expected === 0) return createdNow && actual === 1;
++     if (expected === 0) return createdNow && true;
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:97:5
+-       left.weekStart === right.weekStart &&
+-       left.weekEnd === right.weekEnd &&
++       true &&
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:98:5
+-       left.weekEnd === right.weekEnd &&
++       true &&
+
+[Survived] LogicalOperator
+apps/api/src/services/reviews.ts:97:5
+-       left.weekStart === right.weekStart &&
+-       left.weekEnd === right.weekEnd &&
++       left.weekStart === right.weekStart || left.weekEnd === right.weekEnd &&
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:97:5
+-       left.weekStart === right.weekStart &&
++       true &&
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:100:5
+-       left.carryover === right.carryover &&
++       true &&
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:102:5
+-       JSON.stringify(left.intentions) === JSON.stringify(right.intentions)
++       true
+
+[Survived] ConditionalExpression
+apps/api/src/services/reviews.ts:101:5
+-       left.sprintNotes === right.sprintNotes &&
++       true &&
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:24:18
+-     const buffer = user.bufferFactor ?? 0.2;
++     const buffer = user.bufferFactor && 0.2;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:79:46
+-     if (!row || Number(row.active_days) < 5 || row.median_minutes == null)
++     if (!row || Number(row.active_days) < 5 || false)
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:87:7
+-     if (priority === "normal") return 2;
++     if (true) return 2;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:87:7
+-     if (priority === "normal") return 2;
++     if (false) return 2;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:87:20
+-     if (priority === "normal") return 2;
++     if (priority === "") return 2;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:113:9
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (a.status === "in_progress" || b.status !== "in_progress") return -1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:113:9
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (true) return -1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:113:9
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (true && b.status !== "in_progress") return -1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:113:39
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (a.status === "in_progress" && true) return -1;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:113:52
+-       if (a.status === "in_progress" && b.status !== "in_progress") return -1;
++       if (a.status === "in_progress" && b.status !== "") return -1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:114:9
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (true) return 1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:114:9
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (false) return 1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:114:9
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (true && a.status !== "in_progress") return 1;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:114:22
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (b.status === "" && a.status !== "in_progress") return 1;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:114:9
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (b.status !== "in_progress" && a.status !== "in_progress") return 1;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:114:9
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (b.status === "in_progress" || a.status !== "in_progress") return 1;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:114:39
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (b.status === "in_progress" && a.status === "in_progress") return 1;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:114:52
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (b.status === "in_progress" && a.status !== "") return 1;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:114:39
+-       if (b.status === "in_progress" && a.status !== "in_progress") return 1;
++       if (b.status === "in_progress" && true) return 1;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:118:12
+-       return pB - pA;
++       return pB + pA;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:126:9
+-       if (usedMinutes + mins > dailyCapacity) {
++       if (true) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:126:9
+-       if (usedMinutes + mins > dailyCapacity) {
++       if (usedMinutes + mins >= dailyCapacity) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:128:11
+-         if (t.status === "in_progress" || t.priority === "urgent") {
++         if (false || t.priority === "urgent") {
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:128:24
+-         if (t.status === "in_progress" || t.priority === "urgent") {
++         if (t.status === "" || t.priority === "urgent") {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:152:19
+-       const state = nextCount > 3 ? "needs_rescheduling" : "overflow";
++       const state = nextCount >= 3 ? "needs_rescheduling" : "overflow";
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:199:69
+-     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
++     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "")}-${String(d.getDate()).padStart(2, "0")}`;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:211:27
+-     while (cursor <= end && out.length < 370) {
++     while (cursor <= end && true) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:211:27
+-     while (cursor <= end && out.length < 370) {
++     while (cursor <= end && out.length <= 370) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:230:37
+-       item.workDepth === "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
++       item.workDepth === "deep" ? 2 : true ? 1 : 0;
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:230:56
+-       item.workDepth === "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
++       item.workDepth === "deep" ? 2 : item.workDepth === "" ? 1 : 0;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:230:37
+-       item.workDepth === "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
++       item.workDepth === "deep" ? 2 : false ? 1 : 0;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:230:37
+-       item.workDepth === "deep" ? 2 : item.workDepth === "normal" ? 1 : 0;
++       item.workDepth === "deep" ? 2 : item.workDepth !== "normal" ? 1 : 0;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:240:5
+-       physicalScore * 4 -
++       physicalScore / 4 -
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:284:7
+-         Number(row.total_minutes ?? 0) + Number(row.completions ?? 0) * 15;
++         Number(row.total_minutes ?? 0) - Number(row.completions ?? 0) * 15;
+
+[Survived] UnaryOperator
+apps/api/src/services/scheduler.ts:281:19
+-     let peakScore = -1;
++     let peakScore = +1;
+
+[Survived] ArithmeticOperator
+apps/api/src/services/scheduler.ts:284:40
+-         Number(row.total_minutes ?? 0) + Number(row.completions ?? 0) * 15;
++         Number(row.total_minutes ?? 0) + Number(row.completions ?? 0) / 15;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:284:47
+-         Number(row.total_minutes ?? 0) + Number(row.completions ?? 0) * 15;
++         Number(row.total_minutes ?? 0) + Number(row.completions && 0) * 15;
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:285:41
+-       if (Number(row.active_days) >= 5 && score > peakScore) {
++       if (Number(row.active_days) >= 5 && score >= peakScore) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:294:20
+-       deepWorkHours: peakHour == null ? [] : [peakHour, (peakHour + 1) % 24],
++       deepWorkHours: false ? [] : [peakHour, (peakHour + 1) % 24],
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:294:39
+-       deepWorkHours: peakHour == null ? [] : [peakHour, (peakHour + 1) % 24],
++       deepWorkHours: peakHour == null ? ["Stryker was here"] : [peakHour, (peakHour + 1) % 24],
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:338:9
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (false) continue;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:338:9
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (!item.scheduledDate && !dayLoad.has(item.scheduledDate)) continue;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:341:8
+-         (dayLoad.get(item.scheduledDate) ?? 0) +
++         (dayLoad.get(item.scheduledDate) && 0) +
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:367:9
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (!item.scheduledDate && !dayLoad.has(item.scheduledDate)) continue;
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:367:9
+-       if (!item.scheduledDate || !dayLoad.has(item.scheduledDate)) continue;
++       if (false) continue;
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:370:8
+-         (dayLoad.get(item.scheduledDate) ?? 0) + 30,
++         (dayLoad.get(item.scheduledDate) && 0) + 30,
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:478:21
+-       let pickedDay = days[0] ?? opts.fromDate;
++       let pickedDay = days[0] && opts.fromDate;
+
+[Survived] BlockStatement
+apps/api/src/services/scheduler.ts:487:28
+-         if (load < bestLoad) {
+-           bestLoad = load;
+-           pickedDay = day;
+-         }
++         if (load < bestLoad) {}
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:487:11
+-         if (load < bestLoad) {
++         if (load >= bestLoad) {
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:487:11
+-         if (load < bestLoad) {
++         if (load <= bestLoad) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:487:11
+-         if (load < bestLoad) {
++         if (false) {
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:499:7
+-         item.workDepth === "deep" && learning.peakHour != null
++         true
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:499:7
+-         item.workDepth === "deep" && learning.peakHour != null
++         false
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:499:7
+-         item.workDepth === "deep" && learning.peakHour != null
++         item.workDepth !== "deep" && learning.peakHour != null
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:499:7
+-         item.workDepth === "deep" && learning.peakHour != null
++         true && learning.peakHour != null
+
+[Survived] LogicalOperator
+apps/api/src/services/scheduler.ts:499:7
+-         item.workDepth === "deep" && learning.peakHour != null
++         item.workDepth === "deep" || learning.peakHour != null
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:499:26
+-         item.workDepth === "deep" && learning.peakHour != null
++         item.workDepth === "" && learning.peakHour != null
+
+[Survived] EqualityOperator
+apps/api/src/services/scheduler.ts:499:36
+-         item.workDepth === "deep" && learning.peakHour != null
++         item.workDepth === "deep" && learning.peakHour == null
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:500:11
+-           ? ` near your usual deep-work window around ${learning.peakHour}:00`
++           ? ``
+
+[Survived] ConditionalExpression
+apps/api/src/services/scheduler.ts:499:36
+-         item.workDepth === "deep" && learning.peakHour != null
++         item.workDepth === "deep" && true
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:504:11
+-         id: `${item.targetType}:${item.targetId}:${item.fromDate}:${pickedDay}`,
++         id: ``,
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:501:11
+-           : "";
++           : "Stryker was here!";
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:560:5
+-       "schedule",
++       "",
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:550:23
+-       { isolationLevel: "repeatable read" },
++       { isolationLevel: "" },
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:550:5
+-       { isolationLevel: "repeatable read" },
++       {},
+
+[Survived] MethodExpression
+apps/api/src/services/scheduler.ts:562:48
+-       { previewId: input.previewId, selectedIds: [...input.selectedIds].sort() },
++       { previewId: input.previewId, selectedIds: [...input.selectedIds] },
+
+[Survived] ObjectLiteral
+apps/api/src/services/scheduler.ts:562:5
+-       { previewId: input.previewId, selectedIds: [...input.selectedIds].sort() },
++       {},
+
+[Survived] ArrayDeclaration
+apps/api/src/services/scheduler.ts:562:48
+-       { previewId: input.previewId, selectedIds: [...input.selectedIds].sort() },
++       { previewId: input.previewId, selectedIds: [].sort() },
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:573:21
+-         await c.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [userId]);
++         await c.query("", [userId]);
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:575:9
+-           "SELECT id FROM tasks WHERE user_id=$1 ORDER BY id FOR UPDATE",
++           "",
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:579:9
+-           "SELECT s.id FROM subtasks s JOIN tasks t ON t.id=s.task_id WHERE t.user_id=$1 ORDER BY s.id FOR UPDATE OF s",
++           "",
+
+[Survived] MethodExpression
+apps/api/src/services/scheduler.ts:597:9
+-           selected.some((p) => !p) ||
++           selected.every(p => !p) ||
+
+[Survived] StringLiteral
+apps/api/src/services/scheduler.ts:617:5
+-       "serializable",
++       "",
+
+Ran 0.98 tests per mutant on average.
+-----------------|------------------|----------|-----------|------------|----------|----------|
+                 | % Mutation score |          |           |            |          |          |
+File             |  total | covered | # killed | # timeout | # survived | # no cov | # errors |
+-----------------|--------|---------|----------|-----------|------------|----------|----------|
+All files        |  84.12 |   84.12 |      607 |        13 |        117 |        0 |        0 |
+ google          |  84.44 |   84.44 |       38 |         0 |          7 |        0 |        0 |
+  event-write.ts |  83.33 |   83.33 |       20 |         0 |          4 |        0 |        0 |
+  oauth-state.ts |  85.71 |   85.71 |       18 |         0 |          3 |        0 |        0 |
+ services        |  84.10 |   84.10 |      569 |        13 |        110 |        0 |        0 |
+  daily.ts       |  91.85 |   91.85 |      202 |        12 |         19 |        0 |        0 |
+  reviews.ts     |  81.82 |   81.82 |       81 |         0 |         18 |        0 |        0 |
+  scheduler.ts   |  79.72 |   79.72 |      286 |         1 |         73 |        0 |        0 |
+-----------------|--------|---------|----------|-----------|------------|----------|----------|
+[32m18:54:40 (8984) INFO MutationTestReportHelper[39m Final mutation score of 84.12 is greater than or equal to break threshold 70
+[32m18:54:40 (8984) INFO JsonReporter[39m Your report can be found at: file:///C:/Users/adebo/PROJECTS/devplanner/reports/mutation/mutation.json
+[32m18:54:40 (8984) INFO HtmlReporter[39m Your report can be found at: file:///C:/Users/adebo/PROJECTS/devplanner/reports/mutation/mutation.html
+[32m18:54:40 (8984) INFO MutationTestExecutor[39m Done in 47 minutes and 47 seconds.

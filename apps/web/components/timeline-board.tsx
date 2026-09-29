@@ -3,6 +3,7 @@
 import {
   DndContext,
   DragEndEvent,
+  DragStartEvent,
   DragOverlay,
   PointerSensor,
   pointerWithin,
@@ -14,8 +15,14 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStatus } from "@/hooks/use-auth-status";
 import { useAppUserId } from "@/hooks/use-app-user-id";
-import { ChevronLeft, ChevronRight, CalendarOff, CheckCircle2, Circle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CalendarOff,
+  CheckCircle2,
+  Circle,
+} from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PRIORITY_BAR_CLASS } from "@/components/task-card";
 import {
@@ -37,7 +44,11 @@ import {
   toYMD,
 } from "@/lib/timeline-utils";
 import { cn } from "@/lib/utils";
-import { ZoomControl, zoomToDays, type ZoomLevel } from "@/components/ZoomControl";
+import {
+  ZoomControl,
+  zoomToDays,
+  type ZoomLevel,
+} from "@/components/ZoomControl";
 
 const DAY_W = 44;
 
@@ -70,14 +81,11 @@ function clamp(val: number, min: number, max: number) {
 
 // ─── DroppableDay ─────────────────────────────────────────────────────────────
 
-function DroppableDay({
-  ymd,
-  isToday,
-}: {
-  ymd: string;
-  isToday: boolean;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: `timeline-day-${ymd}`, data: { ymd } });
+function DroppableDay({ ymd, isToday }: { ymd: string; isToday: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `timeline-day-${ymd}`,
+    data: { ymd },
+  });
   return (
     <div
       ref={setNodeRef}
@@ -86,13 +94,15 @@ function DroppableDay({
       className={cn(
         "shrink-0 border-l border-white/10 py-1 text-center transition-colors",
         isToday && "bg-primary/10",
-        isOver && "bg-primary/25 ring-1 ring-primary/40 ring-inset"
+        isOver && "bg-primary/25 ring-1 ring-primary/40 ring-inset",
       )}
     >
       <span className="block text-[11px] font-medium uppercase tracking-wide text-muted">
         {shortWeekday(ymd)}
       </span>
-      <span className="block text-[11px] tabular-nums text-foreground">{ymd.slice(8)}</span>
+      <span className="block text-[11px] tabular-nums text-foreground">
+        {ymd.slice(8)}
+      </span>
     </div>
   );
 }
@@ -126,7 +136,7 @@ function SubtaskDot({
   const dotSize = 10;
   const gapY = 14;
   const top = 4 + rowIdx * gapY;
-  const left = colIdx * DAY_W + (DAY_W / 2) - dotSize / 2 + offsetX;
+  const left = colIdx * DAY_W + DAY_W / 2 - dotSize / 2 + offsetX;
 
   const tooltip = `${sub.title}${sub.scheduledTime ? " · " + sub.scheduledTime.slice(0, 5) : ""}${sub.estimatedMinutes ? " · " + sub.estimatedMinutes + "m" : ""}${sub.completed ? " · ✓ done" : ""}`;
 
@@ -140,7 +150,7 @@ function SubtaskDot({
           sub.completed
             ? "border-success/80 bg-success/50"
             : "border-primary/80 bg-primary/40 hover:bg-primary/70",
-          dragging && "scale-125 z-20"
+          dragging && "scale-125 z-20",
         )}
         style={{
           width: dotSize,
@@ -149,7 +159,10 @@ function SubtaskDot({
           left,
         }}
         onClick={() => {
-          if (skipClickRef.current) { skipClickRef.current = false; return; }
+          if (skipClickRef.current) {
+            skipClickRef.current = false;
+            return;
+          }
           setExpanded((v) => !v);
         }}
         onPointerDown={(e) => {
@@ -212,13 +225,17 @@ function SubtaskDot({
               "mt-2 flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors w-full",
               sub.completed
                 ? "bg-white/5 text-muted hover:bg-white/10"
-                : "bg-success/20 text-success hover:bg-success/30"
+                : "bg-success/20 text-success hover:bg-success/30",
             )}
           >
             {sub.completed ? (
-              <><Circle size={12} /> Mark incomplete</>
+              <>
+                <Circle size={12} /> Mark incomplete
+              </>
             ) : (
-              <><CheckCircle2 size={12} /> Mark done</>
+              <>
+                <CheckCircle2 size={12} /> Mark done
+              </>
             )}
           </button>
           <button
@@ -253,11 +270,16 @@ function TaskBandRow({
   onSubtaskDragReschedule: (subId: string, newYmd: string) => void;
   onTaskBarDrag: (taskId: string, startIdx: number, deltaDays: number) => void;
 }) {
-  const barClass = PRIORITY_BAR_CLASS[band.task.priority] ?? PRIORITY_BAR_CLASS.normal;
+  const barClass =
+    PRIORITY_BAR_CLASS[band.task.priority] ?? PRIORITY_BAR_CLASS.normal;
 
   // Compute bar span indices
-  const startIdx = band.startYmd ? clamp(ymdToIdx(band.startYmd, days), 0, numDays - 1) : -1;
-  const endIdx = band.endYmd ? clamp(ymdToIdx(band.endYmd, days), 0, numDays - 1) : -1;
+  const startIdx = band.startYmd
+    ? clamp(ymdToIdx(band.startYmd, days), 0, numDays - 1)
+    : -1;
+  const endIdx = band.endYmd
+    ? clamp(ymdToIdx(band.endYmd, days), 0, numDays - 1)
+    : -1;
 
   const hasBar = startIdx !== -1 || endIdx !== -1;
   const barStart = startIdx !== -1 ? startIdx : endIdx;
@@ -280,7 +302,10 @@ function TaskBandRow({
   }, [band.subtasks, days]);
 
   // Row height: need room for stacked dots
-  const maxDotsInCol = Math.max(0, ...Array.from(subsByCol.values()).map((a) => a.length));
+  const maxDotsInCol = Math.max(
+    0,
+    ...Array.from(subsByCol.values()).map((a) => a.length),
+  );
   const rowH = Math.max(44, 16 + maxDotsInCol * 14 + 4);
 
   const dragRef = useRef<{ startX: number; startIdx: number } | null>(null);
@@ -293,7 +318,10 @@ function TaskBandRow({
       {/* Label */}
       <div className="flex w-[200px] shrink-0 items-start border-r border-white/10 px-2 pt-2.5 pb-2 md:w-[240px]">
         <div className="min-w-0">
-          <span className="block truncate text-xs font-medium text-foreground" title={band.task.title}>
+          <span
+            className="block truncate text-xs font-medium text-foreground"
+            title={band.task.title}
+          >
             {band.task.title}
           </span>
           <span className="text-[11px] text-muted capitalize">
@@ -304,7 +332,10 @@ function TaskBandRow({
       </div>
 
       {/* Grid */}
-      <div className="relative min-h-10 min-w-0 flex-1" style={{ height: rowH }}>
+      <div
+        className="relative min-h-10 min-w-0 flex-1"
+        style={{ height: rowH }}
+      >
         <div className="relative h-full" style={{ width: numDays * DAY_W }}>
           {/* Day grid lines */}
           {days.map((ymd, di) => (
@@ -312,7 +343,7 @@ function TaskBandRow({
               key={ymd}
               className={cn(
                 "absolute top-0 h-full border-l border-white/[0.06]",
-                ymd === todayYMD && "bg-primary/[0.04]"
+                ymd === todayYMD && "bg-primary/[0.04]",
               )}
               style={{ left: di * DAY_W, width: DAY_W }}
             />
@@ -324,7 +355,7 @@ function TaskBandRow({
               className={cn(
                 "pointer-events-auto absolute top-1 flex h-5 items-center overflow-hidden rounded-md px-1.5 text-left text-[11px] font-medium text-white/90 opacity-60 cursor-grab active:cursor-grabbing",
                 barClass,
-                dragging && "opacity-90 z-20"
+                dragging && "opacity-90 z-20",
               )}
               style={{
                 left: barLeft + barOffsetX,
@@ -376,7 +407,7 @@ function TaskBandRow({
                 onToggle={onSubtaskToggle}
                 onDragReschedule={onSubtaskDragReschedule}
               />
-            ))
+            )),
           )}
         </div>
       </div>
@@ -399,35 +430,45 @@ function UnscheduledDraggable({
   areaColor?: string | null;
   extra?: string;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id,
+  });
   return (
     <div
       ref={setNodeRef}
       className={cn(
         "flex cursor-grab flex-col gap-0.5 rounded-lg border border-white/10 bg-background/90 px-2 py-1.5 active:cursor-grabbing",
-        isDragging && "opacity-50"
+        isDragging && "opacity-50",
       )}
       {...listeners}
       {...attributes}
     >
       <div className="flex items-center gap-2">
         {areaColor && (
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: areaColor }} />
+          <span
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: areaColor }}
+          />
         )}
-        <span className="max-w-[200px] shrink truncate text-xs text-foreground" title={title}>
+        <span
+          className="max-w-[200px] shrink truncate text-xs text-foreground"
+          title={title}
+        >
           {title}
         </span>
         <span
           className={cn(
             "ml-auto shrink-0 rounded px-1 py-0.5 text-[8px] font-semibold uppercase text-white",
-            PRIORITY_BAR_CLASS[priority] ?? PRIORITY_BAR_CLASS.normal
+            PRIORITY_BAR_CLASS[priority] ?? PRIORITY_BAR_CLASS.normal,
           )}
         >
           {priority.slice(0, 1)}
         </span>
       </div>
       {extra && (
-        <span className="pl-4 text-[11px] font-mono text-amber-200/80">{extra}</span>
+        <span className="pl-4 text-[11px] font-mono text-amber-200/80">
+          {extra}
+        </span>
       )}
     </div>
   );
@@ -439,9 +480,11 @@ export function TimelineBoard() {
   const { status } = useAuthStatus();
   const userId = useAppUserId();
   const qc = useQueryClient();
-  const [anchorDate, setAnchorDate] = useState(() => startOfWeekMonday(new Date()));
+  const [anchorDate, setAnchorDate] = useState(() =>
+    startOfWeekMonday(new Date()),
+  );
   // null = default not resolved yet; "" = user explicitly chose "All tasks".
-  const [sprintId, setSprintId] = useState<string | null>(null);
+  const [requestedSprintId, setSprintId] = useState<string | null>(null);
   const [zoom, setZoom] = useState<ZoomLevel>("3-week");
   const NUM_DAYS = zoomToDays(zoom);
   const todayYMD = toYMD(new Date());
@@ -453,7 +496,10 @@ export function TimelineBoard() {
     return startOfWeekMonday(new Date(anchorDate + "T12:00:00"));
   }, [zoom, anchorDate]);
 
-  const days = useMemo(() => eachDayFrom(chartStartDate, NUM_DAYS), [chartStartDate, NUM_DAYS]);
+  const days = useMemo(
+    () => eachDayFrom(chartStartDate, NUM_DAYS),
+    [chartStartDate, NUM_DAYS],
+  );
 
   const areasQ = useQuery({
     queryKey: ["areas", userId],
@@ -467,20 +513,20 @@ export function TimelineBoard() {
     enabled: Boolean(userId),
   });
 
-  // Default to the active sprint (matches the Board) so backlog tasks stay in
-  // the Backlog unless "All tasks" is chosen deliberately.
-  useEffect(() => {
-    if (!sprintsQ.data) return;
-    if (sprintId === null) {
-      const active = sprintsQ.data.sprints.find((s: SprintRow) => s.status === "active");
-      setSprintId(active?.id ?? "");
-      return;
-    }
-    // Selected sprint no longer exists (deleted) — fall back to All tasks.
-    if (sprintId !== "" && !sprintsQ.data.sprints.some((s: SprintRow) => s.id === sprintId)) {
-      setSprintId("");
-    }
-  }, [sprintId, sprintsQ.data]);
+  // Derive the default from fetched sprints; user choices remain explicit.
+  const sprintId =
+    requestedSprintId === null
+      ? sprintsQ.data
+        ? (sprintsQ.data.sprints.find((s: SprintRow) => s.status === "active")
+            ?.id ?? "")
+        : null
+      : !requestedSprintId ||
+          !sprintsQ.data ||
+          sprintsQ.data.sprints.some(
+            (s: SprintRow) => s.id === requestedSprintId,
+          )
+        ? requestedSprintId
+        : "";
 
   const tasksQ = useQuery({
     queryKey: ["tasks", userId, sprintId || "all"],
@@ -498,7 +544,13 @@ export function TimelineBoard() {
 
   const { bands, unscheduled } = useMemo(() => {
     const taskBands: TaskBand[] = [];
-    type UnschedItem = { id: string; title: string; priority: string; areaId: string; extra?: string };
+    type UnschedItem = {
+      id: string;
+      title: string;
+      priority: string;
+      areaId: string;
+      extra?: string;
+    };
     const unsched: UnschedItem[] = [];
 
     for (const task of tasksQ.data ?? []) {
@@ -511,8 +563,16 @@ export function TimelineBoard() {
           .filter((d): d is string => !!d)
           .sort();
 
-        const startYmd = scheduledDates[0] ?? normalizeYmd(task.scheduledDate) ?? normalizeYmd(task.dueDate) ?? null;
-        const endYmd = scheduledDates[scheduledDates.length - 1] ?? normalizeYmd(task.scheduledDate) ?? normalizeYmd(task.dueDate) ?? null;
+        const startYmd =
+          scheduledDates[0] ??
+          normalizeYmd(task.scheduledDate) ??
+          normalizeYmd(task.dueDate) ??
+          null;
+        const endYmd =
+          scheduledDates[scheduledDates.length - 1] ??
+          normalizeYmd(task.scheduledDate) ??
+          normalizeYmd(task.dueDate) ??
+          null;
 
         // Determine if anything is in view
         const inView =
@@ -530,7 +590,9 @@ export function TimelineBoard() {
           });
         } else {
           // Only add to unscheduled if task isn't done and has unscheduled subs
-          const hasUnscheduled = subs.some((s) => !s.scheduledDate && !s.completed);
+          const hasUnscheduled = subs.some(
+            (s) => !s.scheduledDate && !s.completed,
+          );
           if (hasUnscheduled && task.status !== "done") {
             unsched.push({
               id: `task-${task.id}`,
@@ -543,7 +605,8 @@ export function TimelineBoard() {
         }
       } else {
         // Flat task with no subtasks — show on its scheduledDate or dueDate
-        const anchor = normalizeYmd(task.scheduledDate) ?? normalizeYmd(task.dueDate);
+        const anchor =
+          normalizeYmd(task.scheduledDate) ?? normalizeYmd(task.dueDate);
         if (anchor && days.includes(anchor)) {
           taskBands.push({
             task,
@@ -565,7 +628,9 @@ export function TimelineBoard() {
     }
 
     // Sort by band start date
-    taskBands.sort((a, b) => (a.startYmd ?? "zz").localeCompare(b.startYmd ?? "zz"));
+    taskBands.sort((a, b) =>
+      (a.startYmd ?? "zz").localeCompare(b.startYmd ?? "zz"),
+    );
 
     return { bands: taskBands, unscheduled: unsched };
   }, [tasksQ.data, days, NUM_DAYS, areaMap]);
@@ -580,7 +645,8 @@ export function TimelineBoard() {
   });
 
   const subtaskToggleMut = useMutation({
-    mutationFn: (sub: SubtaskRow) => patchSubtask(sub.id, { completed: !sub.completed }),
+    mutationFn: (sub: SubtaskRow) =>
+      patchSubtask(sub.id, { completed: !sub.completed }),
     onError: (e: Error) => toast.error(e.message),
     onSettled: () => void qc.invalidateQueries({ queryKey: ["tasks", userId] }),
   });
@@ -593,8 +659,9 @@ export function TimelineBoard() {
   });
 
   const onSubtaskDragReschedule = useCallback(
-    (subId: string, newYmd: string) => subtaskRescheduleMut.mutate({ subId, newYmd }),
-    [subtaskRescheduleMut]
+    (subId: string, newYmd: string) =>
+      subtaskRescheduleMut.mutate({ subId, newYmd }),
+    [subtaskRescheduleMut],
   );
 
   const onTaskBarDrag = useCallback(
@@ -603,11 +670,13 @@ export function TimelineBoard() {
       const newYmd = days[newIdx];
       if (newYmd) taskScheduleMut.mutate({ taskId, newYmd });
     },
-    [days, taskScheduleMut, NUM_DAYS]
+    [days, taskScheduleMut, NUM_DAYS],
   );
 
   // DnD for unscheduled chips → drop onto day header
-  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
   const [dragUnschedId, setDragUnschedId] = useState<string | null>(null);
 
   const onDragEnd = (e: DragEndEvent) => {
@@ -621,7 +690,9 @@ export function TimelineBoard() {
     }
   };
 
-  const draggedUnsched = dragUnschedId ? unscheduled.find((u) => u.id === dragUnschedId) : null;
+  const draggedUnsched = dragUnschedId
+    ? unscheduled.find((u) => u.id === dragUnschedId)
+    : null;
 
   if (status === "loading") return <p className="text-muted">Loading…</p>;
   if (!userId) return null;
@@ -661,7 +732,10 @@ export function TimelineBoard() {
         <div className="flex items-center gap-3">
           <ZoomControl value={zoom} onChange={setZoom} />
           <div className="flex items-center gap-2">
-            <label htmlFor="timeline-sprint" className="text-[11px] uppercase tracking-wide text-muted">
+            <label
+              htmlFor="timeline-sprint"
+              className="text-[11px] uppercase tracking-wide text-muted"
+            >
               Sprint
             </label>
             <select
@@ -684,21 +758,28 @@ export function TimelineBoard() {
       {/* ── Legend ───────────────────────────────────────────────── */}
       <div className="flex items-center gap-4 text-[11px] text-muted px-1">
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-8 rounded-sm bg-primary/50 opacity-60" /> Task span
+          <span className="h-2 w-8 rounded-sm bg-primary/50 opacity-60" /> Task
+          span
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full border-2 border-primary/80 bg-primary/40" /> Incomplete subtask
+          <span className="h-2.5 w-2.5 rounded-full border-2 border-primary/80 bg-primary/40" />{" "}
+          Incomplete subtask
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full border-2 border-success/80 bg-success/50" /> Done subtask
+          <span className="h-2.5 w-2.5 rounded-full border-2 border-success/80 bg-success/50" />{" "}
+          Done subtask
         </span>
-        <span className="text-muted/85">Click a dot to expand · Drag to reschedule</span>
+        <span className="text-muted/85">
+          Click a dot to expand · Drag to reschedule
+        </span>
       </div>
 
       <DndContext
         sensors={dndSensors}
         collisionDetection={pointerWithin}
-        onDragStart={(e) => setDragUnschedId(e.active.id as string)}
+        onDragStart={(e: DragStartEvent) =>
+          setDragUnschedId(e.active.id as string)
+        }
         onDragEnd={onDragEnd}
         onDragCancel={() => setDragUnschedId(null)}
       >
@@ -712,7 +793,11 @@ export function TimelineBoard() {
               <div className="flex min-w-0 flex-1 overflow-x-auto">
                 <div className="flex" style={{ width: NUM_DAYS * DAY_W }}>
                   {days.map((ymd) => (
-                    <DroppableDay key={ymd} ymd={ymd} isToday={ymd === todayYMD} />
+                    <DroppableDay
+                      key={ymd}
+                      ymd={ymd}
+                      isToday={ymd === todayYMD}
+                    />
                   ))}
                 </div>
               </div>

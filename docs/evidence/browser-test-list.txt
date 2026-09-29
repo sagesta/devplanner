@@ -1,0 +1,6 @@
+Listing tests:
+  [desktop] › daily-use.spec.ts:9:5 › Today has accessible navigation and usable capture in both themes
+  [desktop] › daily-use.spec.ts:35:5 › title-only capture and completion without weekly planning
+  [mobile] › daily-use.spec.ts:9:5 › Today has accessible navigation and usable capture in both themes
+  [mobile] › daily-use.spec.ts:35:5 › title-only capture and completion without weekly planning
+Total: 4 tests in 1 file

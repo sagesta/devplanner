@@ -8,7 +8,9 @@ type IdlePayload = { taskId: string; title: string; message: string };
 
 export function useTaskSse(onIdle: (payload: IdlePayload) => void) {
   const onIdleRef = useRef(onIdle);
-  onIdleRef.current = onIdle;
+  useEffect(() => {
+    onIdleRef.current = onIdle;
+  }, [onIdle]);
   const [connected, setConnected] = useState(false);
   const { isLoaded, isSignedIn, userId, getToken } = useAuth();
 

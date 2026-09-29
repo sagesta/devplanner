@@ -1,0 +1,71 @@
+
+> devplanner@0.1.0 test:integration
+> node scripts/test-integration.mjs
+
+✔ calendar parser accepts real UTC calendar days across years (9.1161ms)
+✔ invalid calendar text never throws and normalized impossible dates fail (15.3477ms)
+✔ idempotency digest is independent of object property insertion order (74.7325ms)
+✔ arbitrary OAuth state cannot authorize without an owned stored attempt (29.3166ms)
+✔ reserved event retries converge after a lost insert response (2.2399ms)
+✔ transient patch failure never creates another event (0.5343ms)
+✔ concurrent insert conflict retries the same reserved event (0.5191ms)
+✔ state is opaque, unique, owned and single use (4.8135ms)
+✔ expired, modified, missing and legacy states fail (0.6549ms)
+✔ concurrent callbacks only consume once (0.556ms)
+✔ error serialization excludes credential and planning-content canaries (3.026ms)
+✔ basic planning does not require Google or AI credentials (2.9276ms)
+✔ missing required configuration reports names only (0.8766ms)
+✔ AI guard fails closed on Redis outage without leaking connection details (28.4605ms)
+✔ AI guard rejects missing owner and enforces the configured count window (2.795ms)
+✔ review PUT preflight permits configured split-origin bearer requests (40.2697ms)
+✔ unconfigured and lookalike origins receive no cross-origin authorization (2.3923ms)
+✔ request connections reject unavailable Redis instead of queuing forever (73.8214ms)
+✔ worker consumers retain the reconnect contract required by BullMQ (0.6161ms)
+✔ public clients cannot bypass authentication using claimed ownership (5.7734ms)
+✔ capture rejects empty titles, invalid dates and invalid wall times before persistence (8.6435ms)
+✔ capture rejects unsupported recurrence instead of storing an inert rule (1.3372ms)
+✔ malformed JSON is a validation response rather than internal failure (0.838ms)
+✔ move rejects duplicate targets, missing revisions and invalid date (1.8205ms)
+✔ focus and preferences reject malformed input before database access (18.2429ms)
+✔ public health responses never reveal underlying database or Redis secrets (39.6595ms)
+✔ health probes reflect dependency availability without modifying the database (2.1509ms)
+[migrate] Schema up-to-date ✓
+[migrate] Schema up-to-date ✓
+✔ daily persistence, revisions, stale scheduling and retry guarantees (1767.7319ms)
+[migrate] Schema up-to-date ✓
+[migrate] Schema up-to-date ✓
+✔ clean Drizzle journal and repeated startup are compatible (1147.717ms)
+[migrate] Schema up-to-date ✓
+✔ Drizzle upgrades populated legacy journal without changing task data (1080.3592ms)
+✔ PostgreSQL OAuth attempts enforce owner, expiry and atomic single consumption (64.5054ms)
+✔ daily API uses authenticated context for capture, move, focus and preferences (347.3722ms)
+✔ account cascade deletion does not enqueue orphaned calendar events (27.7804ms)
+✔ capture persists optional fields, duration, defaults, and a user-selected area (49.7751ms)
+✔ moves reject terminal, deleted, missing and grouped targets; preserve deadlines and status (223.139ms)
+✔ focus selects only the requested execution item and invalidates on completion or date change (142.66ms)
+✔ capacity blends sufficient history and clamps unusually low and high observations (209.1608ms)
+✔ learning splits elapsed time through DST fallback and does not multiply joined completions (80.318ms)
+✔ preview prioritizes urgency, work depth and energy and uses available destination capacity (132.7425ms)
+✔ preview respects scheduled children, normalizes estimates and selects least-loaded overflow day (82.9344ms)
+✔ apply rejects expired, foreign, invented and duplicate preview selections atomically (88.8011ms)
+✔ destination insertion after preview invalidates context, and concurrent applies cannot double-move (128.0799ms)
+✔ legacy scheduler anchors urgent and running work and escalates repeated overflow (85.778ms)
+✔ receipt retries only transient database failures, bounds retries and replays acknowledged work (47.2106ms)
+✔ midnight learning recommendations wrap and spring-forward logs omit the nonexistent hour (112.8602ms)
+✔ a database exception after the first write rolls back capture receipts and all task rows (34.3947ms)
+✔ capacity uses configured efficiency and buffer and work scores break ties predictably (110.7212ms)
+✔ review revision zero only creates a new row and updates require an exact revision (2.0391ms)
+✔ a lost completion response can be retried only with the same review content (0.5987ms)
+✔ review period uses Monday-Sunday and creates a Monday-Friday sprint (3.3142ms)
+✔ date arithmetic crosses month boundaries (0.6266ms)
+✔ intentions are trimmed, empty rows removed, and limited to three (0.9354ms)
+✔ sprint goal keeps intention and linked goal context (0.4258ms)
+✔ sprint names are stable across machine timezones (33.4205ms)
+ℹ tests 54
+ℹ suites 0
+ℹ pass 54
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8372.5537

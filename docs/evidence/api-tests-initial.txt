@@ -1,0 +1,16 @@
+✔ state is opaque, unique, owned and single use (2.6575ms)
+✔ expired, modified, missing and legacy states fail (0.3496ms)
+✔ concurrent callbacks only consume once (0.3115ms)
+✔ review period uses Monday-Sunday and creates a Monday-Friday sprint (2.6302ms)
+✔ date arithmetic crosses month boundaries (0.1817ms)
+✔ intentions are trimmed, empty rows removed, and limited to three (0.1819ms)
+✔ sprint goal keeps intention and linked goal context (0.1556ms)
+✔ sprint names are stable across machine timezones (15.8048ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 341.5759

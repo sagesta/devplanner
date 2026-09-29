@@ -1,0 +1,2 @@
+apps/api/src/middleware/aiRateLimit.ts(20,23): error TS2742: The inferred type of 'aiRateLimit' cannot be named without a reference to '../../../../node_modules/hono/dist/types/context.js'. This is likely not portable. A type annotation is necessary.
+apps/api/src/middleware/requireAuth.ts(24,23): error TS2742: The inferred type of 'requireAuth' cannot be named without a reference to '../../../../node_modules/hono/dist/types/context.js'. This is likely not portable. A type annotation is necessary.

@@ -21,8 +21,15 @@ export function TimerButton({
   compact?: boolean;
   className?: string;
 }) {
-  const { activeLog, isRunning, elapsed, startTimer, stopActiveTimer, isStarting, isStopping } =
-    useActiveTimer();
+  const {
+    activeLog,
+    isRunning,
+    elapsed,
+    startTimer,
+    stopActiveTimer,
+    isStarting,
+    isStopping,
+  } = useActiveTimer();
 
   const isThisTask = isRunning && activeLog?.taskId === taskId;
   const isOtherTask = isRunning && activeLog?.taskId !== taskId;
@@ -34,20 +41,25 @@ export function TimerButton({
         className={cn(
           "group relative inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-mono font-medium transition-colors",
           "bg-primary/15 text-primary-text hover:bg-primary/25",
-          className
+          className,
         )}
         title="Stop timer"
         disabled={isStopping}
         onClick={(e) => {
           e.stopPropagation();
-          stopActiveTimer();
+          void stopActiveTimer().catch(() => {});
         }}
       >
         {/* Pulsing ring */}
         <span className="timer-pulse-ring absolute inset-0 rounded-lg" />
-        <Square size={compact ? 10 : 12} className="relative z-10 fill-current" />
+        <Square
+          size={compact ? 10 : 12}
+          className="relative z-10 fill-current"
+        />
         {!compact && (
-          <span className="relative z-10 tabular-nums">{formatElapsed(elapsed)}</span>
+          <span className="relative z-10 tabular-nums">
+            {formatElapsed(elapsed)}
+          </span>
         )}
       </button>
     );
@@ -61,7 +73,7 @@ export function TimerButton({
         isOtherTask
           ? "text-muted/70 hover:text-muted hover:bg-white/5"
           : "text-muted hover:text-primary-text hover:bg-primary/10",
-        className
+        className,
       )}
       title={isOtherTask ? "Start timer (stops current)" : "Start timer"}
       disabled={isStarting}

@@ -1,8 +1,17 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Briefcase, Check, Compass, GraduationCap, Heart, Pencil, Sparkles, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  Briefcase,
+  Check,
+  Compass,
+  GraduationCap,
+  Heart,
+  Pencil,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
   fetchPriorities,
@@ -45,7 +54,8 @@ const PERIOD_LABEL: Record<PriorityPeriod, string> = {
 
 function placeholderFor(category: PriorityCategory): string {
   if (category === "work") return "Ship the thing that matters this week…";
-  if (category === "personal") return "What does future-you want to thank you for?";
+  if (category === "personal")
+    return "What does future-you want to thank you for?";
   return "Which professional skill or habit are you improving?";
 }
 
@@ -74,17 +84,17 @@ export function PriorityAnchorsCard({
     personal: "",
     growth: "",
   });
-  // Track which period the draft was opened for so we don't leak edits
-  // between week ↔ month when the user toggles.
-  useEffect(() => {
-    if (!editing || !q.data) return;
-    const slot = editing === "week" ? q.data.week_anchors : q.data.month_anchors;
+  // Snapshot server text when editing begins; query refreshes must not erase typing.
+  function beginEditing(period: PriorityPeriod) {
+    if (!q.data) return;
+    const slot = period === "week" ? q.data.week_anchors : q.data.month_anchors;
     setDraft({
       work: slot.find((a) => a.category === "work")?.statement ?? "",
       personal: slot.find((a) => a.category === "personal")?.statement ?? "",
       growth: slot.find((a) => a.category === "growth")?.statement ?? "",
     });
-  }, [editing, q.data]);
+    setEditing(period);
+  }
 
   const saveMut = useMutation({
     mutationFn: async (periodType: PriorityPeriod) => {
@@ -150,7 +160,9 @@ export function PriorityAnchorsCard({
         <div className="flex flex-col gap-3.5">
           {CATEGORIES.map((category) => {
             const meta = CATEGORY_META[category];
-            const statement = anchors.find((a) => a.category === category)?.statement.trim();
+            const statement = anchors
+              .find((a) => a.category === category)
+              ?.statement.trim();
             return (
               <div key={category}>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
@@ -161,12 +173,16 @@ export function PriorityAnchorsCard({
                     rows={2}
                     maxLength={280}
                     value={draft[category]}
-                    onChange={(e) => setDraft((d) => ({ ...d, [category]: e.target.value }))}
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...d, [category]: e.target.value }))
+                    }
                     placeholder={placeholderFor(category)}
                     className="mt-1 w-full resize-none rounded-lg border border-[var(--hairline)] bg-background px-2.5 py-1.5 text-sm leading-[1.45] text-[var(--ink)] placeholder:text-[var(--muted-soft)] focus:border-[var(--teal-a30)] focus:outline-none"
                   />
                 ) : statement ? (
-                  <p className="mt-1 text-sm leading-[1.45] text-[var(--ink)]">{statement}</p>
+                  <p className="mt-1 text-sm leading-[1.45] text-[var(--ink)]">
+                    {statement}
+                  </p>
                 ) : (
                   <p className="mt-1 text-[13px] italic leading-[1.45] text-[var(--muted-soft)]">
                     {placeholderFor(category)}
@@ -207,7 +223,7 @@ export function PriorityAnchorsCard({
           <button
             type="button"
             className="mt-3 inline-block text-[13px] text-[var(--teal)] hover:underline"
-            onClick={() => setEditing("week")}
+            onClick={() => beginEditing("week")}
           >
             Edit anchors
           </button>
@@ -222,7 +238,7 @@ export function PriorityAnchorsCard({
       <div
         className={cn(
           "rounded-xl border border-white/10 bg-surface/60 p-4 animate-pulse",
-          className
+          className,
         )}
       >
         <div className="h-4 w-24 rounded bg-white/10" />
@@ -264,7 +280,10 @@ export function PriorityAnchorsCard({
                   {PERIOD_LABEL[period]}
                 </h3>
                 <span className="text-[11px] text-muted/85">
-                  {new Date(periodStart + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                  {new Date(periodStart + "T12:00:00").toLocaleDateString(
+                    undefined,
+                    { month: "short", day: "numeric", year: "numeric" },
+                  )}
                 </span>
                 {filledCount === 0 && !isEditing && (
                   <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-300">
@@ -276,7 +295,7 @@ export function PriorityAnchorsCard({
                 <button
                   type="button"
                   className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-muted hover:bg-white/5 hover:text-foreground transition-colors"
-                  onClick={() => setEditing(period)}
+                  onClick={() => beginEditing(period)}
                   aria-label={`Edit ${PERIOD_LABEL[period]} anchors`}
                 >
                   <Pencil size={11} />
@@ -336,7 +355,10 @@ export function PriorityAnchorsCard({
                         maxLength={280}
                         value={draft[category]}
                         onChange={(e) =>
-                          setDraft((d) => ({ ...d, [category]: e.target.value }))
+                          setDraft((d) => ({
+                            ...d,
+                            [category]: e.target.value,
+                          }))
                         }
                         placeholder={placeholderFor(category)}
                         className="mt-1 w-full resize-none rounded-md border border-white/5 bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted/60 focus:border-primary/40 focus:outline-none"
@@ -352,7 +374,7 @@ export function PriorityAnchorsCard({
                       "rounded-lg border p-2.5 transition-colors",
                       statement
                         ? "border-white/10 bg-background/40"
-                        : "border-dashed border-white/10 bg-transparent"
+                        : "border-dashed border-white/10 bg-transparent",
                     )}
                   >
                     <div className="flex items-center gap-1.5">

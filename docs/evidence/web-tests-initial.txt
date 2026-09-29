@@ -1,0 +1,9 @@
+Error: > Couldn't find any `pages` or `app` directory. Please create one under the project root
+    at findPagesDir (C:\users\adebo\projects\devplanner\node_modules\next\dist\lib\find-pages-dir.js:42:15)
+    at C:\users\adebo\projects\devplanner\node_modules\next\dist\build\jest\jest.js:123:75
+    at async readConfigFileAndSetRootDir (C:\users\adebo\projects\devplanner\node_modules\@jest\core\node_modules\jest-config\build\readConfigFileAndSetRootDir.js:129:20)
+    at async readInitialOptions (C:\users\adebo\projects\devplanner\node_modules\@jest\core\node_modules\jest-config\build\index.js:392:15)
+    at async readConfig (C:\users\adebo\projects\devplanner\node_modules\@jest\core\node_modules\jest-config\build\index.js:147:48)
+    at async readConfigs (C:\users\adebo\projects\devplanner\node_modules\@jest\core\node_modules\jest-config\build\index.js:424:26)
+    at async runCLI (C:\users\adebo\projects\devplanner\node_modules\@jest\core\build\cli\index.js:151:59)
+    at async Object.run (C:\users\adebo\projects\devplanner\node_modules\jest-cli\build\run.js:130:37)

@@ -1,14 +1,23 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, Download, Layers, Settings as SettingsIcon, Cpu, Zap } from "lucide-react";
+import {
+  Calendar,
+  Download,
+  Layers,
+  Settings as SettingsIcon,
+  Cpu,
+  Zap,
+} from "lucide-react";
 import { useUser } from "@clerk/nextjs";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
 import {
   fetchAiConfig,
+  fetchDailyPreferences,
+  saveDailyTimezone,
   fetchAiLogs,
   fetchAreas,
   patchArea,
@@ -35,26 +44,59 @@ import {
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { key: "general", label: "General", icon: SettingsIcon, hint: "Account info and app defaults" },
-  { key: "areas", label: "Areas", icon: Layers, hint: "Life areas and weekly time budgets" },
-  { key: "calendar", label: "Calendar", icon: Calendar, hint: "Sync tasks with Google Calendar or CalDAV" },
-  { key: "focus", label: "Focus", icon: Zap, hint: "Pomodoro timers and distraction settings" },
-  { key: "ai", label: "AI", icon: Cpu, hint: "Chat model and assistant behavior" },
+  {
+    key: "general",
+    label: "General",
+    icon: SettingsIcon,
+    hint: "Account info and app defaults",
+  },
+  {
+    key: "areas",
+    label: "Areas",
+    icon: Layers,
+    hint: "Life areas and weekly time budgets",
+  },
+  {
+    key: "calendar",
+    label: "Calendar",
+    icon: Calendar,
+    hint: "Sync tasks with Google Calendar or CalDAV",
+  },
+  {
+    key: "focus",
+    label: "Focus",
+    icon: Zap,
+    hint: "Pomodoro timers and distraction settings",
+  },
+  {
+    key: "ai",
+    label: "AI",
+    icon: Cpu,
+    hint: "Chat model and assistant behavior",
+  },
 ] as const;
 
 /** Same key the AI chat dock reads for its "Can edit" writes toggle. */
 const LS_AI_WRITES = "devplanner.aiWritesEnabled";
 
 /* Daybook building blocks */
-const CARD = "rounded-2xl border border-[var(--hairline)] bg-[var(--card)] p-6 shadow-[var(--card-shadow)]";
+const CARD =
+  "rounded-2xl border border-[var(--hairline)] bg-[var(--card)] p-6 shadow-[var(--card-shadow)]";
 const CARD_TITLE = "font-display text-[22px] text-foreground";
-const LINK = "text-[13px] text-[var(--teal)] transition-colors hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:no-underline";
-const LINK_MUTED = "text-[13px] text-muted transition-colors hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:no-underline";
-const INK_BTN = "inline-flex items-center gap-1.5 rounded-full bg-[var(--ink-btn-bg)] px-5 py-2.5 text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-40";
-const BADGE_SUCCESS = "rounded-full border border-[var(--success-border)] bg-[var(--success-bg)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--success-text)]";
-const BADGE_MUTED = "rounded-full border border-[var(--hairline)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted";
-const MONO_FIELD = "rounded-lg border border-[var(--hairline)] bg-background px-3 py-2.5 font-mono text-[13px] text-foreground";
-const INPUT = "rounded-lg border border-[var(--hairline)] bg-background px-3 py-2 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none";
+const LINK =
+  "text-[13px] text-[var(--teal)] transition-colors hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:no-underline";
+const LINK_MUTED =
+  "text-[13px] text-muted transition-colors hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:no-underline";
+const INK_BTN =
+  "inline-flex items-center gap-1.5 rounded-full bg-[var(--ink-btn-bg)] px-5 py-2.5 text-[13px] font-semibold text-[var(--ink-btn-fg)] transition-opacity hover:opacity-85 disabled:opacity-40";
+const BADGE_SUCCESS =
+  "rounded-full border border-[var(--success-border)] bg-[var(--success-bg)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--success-text)]";
+const BADGE_MUTED =
+  "rounded-full border border-[var(--hairline)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted";
+const MONO_FIELD =
+  "rounded-lg border border-[var(--hairline)] bg-background px-3 py-2.5 font-mono text-[13px] text-foreground";
+const INPUT =
+  "rounded-lg border border-[var(--hairline)] bg-background px-3 py-2 text-sm text-foreground focus:border-[var(--teal)] focus:outline-none";
 const CODE_CHIP = "rounded bg-background px-1 font-mono text-xs";
 
 export default function SettingsPage() {
@@ -62,10 +104,31 @@ export default function SettingsPage() {
   const userId = useAppUserId();
   const qc = useQueryClient();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<string>(() => searchParams.get("tab") ?? "general");
+  const router = useRouter();
+  const [timezoneDraft, setTimezoneDraft] = useState("");
+  const timezoneQuery = useQuery({
+    queryKey: ["daily-preferences", userId],
+    queryFn: fetchDailyPreferences,
+    enabled: Boolean(userId),
+  });
+  const timezoneMutation = useMutation({
+    mutationFn: saveDailyTimezone,
+    onSuccess: () => {
+      toast.success("Timezone saved");
+      void qc.invalidateQueries({ queryKey: ["daily-preferences"] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const [tab, setTab] = useState<string>(
+    () => searchParams.get("tab") ?? "general",
+  );
   const [exporting, setExporting] = useState(false);
-  const [calBusy, setCalBusy] = useState<"mkcol" | "pull" | "queue" | null>(null);
-  const [googleBusy, setGoogleBusy] = useState<"pull" | "queue" | "disconnect" | null>(null);
+  const [calBusy, setCalBusy] = useState<"mkcol" | "pull" | "queue" | null>(
+    null,
+  );
+  const [googleBusy, setGoogleBusy] = useState<
+    "pull" | "queue" | "disconnect" | null
+  >(null);
   const [pomoWork, setPomoWork] = useState("25");
   const [pomoShort, setPomoShort] = useState("5");
   const [pomoLong, setPomoLong] = useState("15");
@@ -78,7 +141,15 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const t = searchParams.get("tab");
-    if (t === "general" || t === "areas" || t === "calendar" || t === "focus" || t === "ai") setTab(t);
+    if (
+      t === "general" ||
+      t === "areas" ||
+      t === "calendar" ||
+      t === "focus" ||
+      t === "ai"
+    )
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Sync the selected tab with an external navigation change.
+      setTab(t);
   }, [searchParams]);
 
   useEffect(() => {
@@ -87,12 +158,28 @@ export default function SettingsPage() {
       void qc.invalidateQueries({ queryKey: ["google-cal", userId] });
     }
     const ge = searchParams.get("google_error");
-    if (ge) toast.error(decodeURIComponent(ge));
+    if (ge) {
+      const messages: Record<string, string> = {
+        invalid_state:
+          "This connection attempt expired or was already used. Connect again.",
+        consent_denied: "Calendar access was not approved. You can try again.",
+        sign_in_required: "Sign in before connecting your calendar.",
+        connection_unavailable:
+          "Calendar connection is unavailable. Check configuration and retry.",
+        connection_failed: "Could not connect your calendar. Please try again.",
+        reconnect_required:
+          "Remove the previous Google grant and connect again.",
+      };
+      toast.error(
+        messages[ge] ?? "Calendar connection failed. Please try again.",
+      );
+    }
   }, [searchParams, qc, userId]);
 
   // AI tab: read localStorage before paint so the model select does not flash the server default first.
   useLayoutEffect(() => {
     if (typeof window === "undefined" || tab !== "ai") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Hydrate browser-only preferences after SSR; reading them during render causes a hydration mismatch.
     setAiModel(localStorage.getItem(LS_CHAT_MODEL) ?? "");
     setAiBudget(localStorage.getItem(LS_AI_BUDGET) === "1");
     setAiEnergySuggest(localStorage.getItem(LS_AI_ENERGY_SUGGEST) !== "0");
@@ -102,13 +189,16 @@ export default function SettingsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (tab === "focus") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Hydrate browser-only preferences when opening this settings tab.
       setPomoWork(localStorage.getItem(LS_POMO_WORK) ?? "25");
       setPomoShort(localStorage.getItem(LS_POMO_SHORT) ?? "5");
       setPomoLong(localStorage.getItem(LS_POMO_LONG) ?? "15");
       setFocusModeDef(localStorage.getItem(LS_FOCUS_MODE) === "1");
     }
     if (tab === "calendar") {
-      setCalPrimaryOnly(localStorage.getItem("devplanner.googleImportPrimaryOnly") !== "0");
+      setCalPrimaryOnly(
+        localStorage.getItem("devplanner.googleImportPrimaryOnly") !== "0",
+      );
     }
   }, [tab]);
 
@@ -139,7 +229,9 @@ export default function SettingsPage() {
     setExporting(true);
     try {
       const data = await fetchFocusExport();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -178,7 +270,7 @@ export default function SettingsPage() {
       }
       const { stats } = r;
       toast.success(
-        `Imported ${stats.imported}, updated ${stats.updated}, removed/cancelled ${stats.removed}, skipped ${stats.skipped}`
+        `Imported ${stats.imported}, updated ${stats.updated}, removed/cancelled ${stats.removed}, skipped ${stats.skipped}`,
       );
       if (stats.errors.length) {
         toast.error(stats.errors.slice(0, 2).join(" · "));
@@ -196,7 +288,8 @@ export default function SettingsPage() {
     setCalBusy("queue");
     try {
       const r = await postCaldavPullQueued();
-      if (r.ok && r.queued) toast.success("Pull queued — ensure the worker is running");
+      if (r.ok && r.queued)
+        toast.success("Pull queued — ensure the worker is running");
       else toast.error(r.error ?? "Could not queue pull");
     } catch (e) {
       toast.error(String(e));
@@ -236,9 +329,10 @@ export default function SettingsPage() {
       }
       const { stats } = r;
       toast.success(
-        `Google: imported ${stats.imported}, updated ${stats.updated}, removed ${stats.removed}, skipped ${stats.skipped}`
+        `Google: imported ${stats.imported}, updated ${stats.updated}, removed ${stats.removed}, skipped ${stats.skipped}`,
       );
-      if (stats.errors.length) toast.error(stats.errors.slice(0, 2).join(" · "));
+      if (stats.errors.length)
+        toast.error(stats.errors.slice(0, 2).join(" · "));
       void qc.invalidateQueries({ queryKey: ["tasks", userId] });
     } catch (e) {
       toast.error(String(e));
@@ -252,7 +346,8 @@ export default function SettingsPage() {
     setGoogleBusy("queue");
     try {
       const r = await postGoogleCalendarPullQueued();
-      if (r.ok && r.queued) toast.success("Google pull queued — ensure the worker is running");
+      if (r.ok && r.queued)
+        toast.success("Google pull queued — ensure the worker is running");
       else toast.error("Could not queue Google pull");
     } catch (e) {
       toast.error(String(e));
@@ -283,13 +378,17 @@ export default function SettingsPage() {
               onClick={() => setTab(key)}
               className={cn(
                 "rounded-[10px] px-3.5 py-2.5 text-left transition-colors",
-                tab === key ? "bg-[var(--teal-a12)]" : "hover:bg-[var(--teal-a08)]"
+                tab === key
+                  ? "bg-[var(--teal-a12)]"
+                  : "hover:bg-[var(--teal-a08)]",
               )}
             >
               <p
                 className={cn(
                   "text-sm",
-                  tab === key ? "font-semibold text-[var(--ink)]" : "text-muted"
+                  tab === key
+                    ? "font-semibold text-[var(--ink)]"
+                    : "text-muted",
                 )}
               >
                 {label}
@@ -302,10 +401,40 @@ export default function SettingsPage() {
         {/* ── Panels ─────────────────────────────────────────────── */}
         <div className="animate-fadeIn flex min-w-0 flex-col gap-5" key={tab}>
           {tab === "general" && (
+            <section className={CARD} aria-label="Planning timezone">
+              <h2 className={CARD_TITLE}>Planning timezone</h2>
+              <p className="mt-2 text-sm text-muted">
+                Today and weekly reviews follow this timezone across your
+                devices.
+              </p>
+              <label className="mt-3 block text-sm">
+                Timezone (for example Africa/Lagos)
+                <input
+                  className={`${INPUT} mt-2 block w-full`}
+                  value={timezoneDraft || timezoneQuery.data?.timezone || ""}
+                  onChange={(e) => setTimezoneDraft(e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className={`${INK_BTN} mt-3`}
+                disabled={timezoneMutation.isPending || !timezoneQuery.data}
+                onClick={() =>
+                  timezoneMutation.mutate(
+                    timezoneDraft || timezoneQuery.data?.timezone || "UTC",
+                  )
+                }
+              >
+                Save timezone
+              </button>
+            </section>
+          )}
+          {tab === "general" && (
             <section className={CARD}>
               <h2 className={CARD_TITLE}>General</h2>
               <p className="mt-3 text-[13px] leading-relaxed text-muted">
-                Your daily capacity is derived from the weekly hour targets you set in{" "}
+                Your daily capacity is derived from the weekly hour targets you
+                set in{" "}
                 <button
                   type="button"
                   className="font-medium text-[var(--teal)] hover:underline"
@@ -316,13 +445,38 @@ export default function SettingsPage() {
                 . The AI assistant uses these limits when suggesting a schedule.
               </p>
               <p className="mt-3 text-[13px] leading-relaxed text-muted">
-                <strong className="text-foreground">Theme:</strong> use the Sun / Moon control in the top bar to switch
-                light and dark mode.
+                <strong className="text-foreground">Theme:</strong> use the Sun
+                / Moon control in the top bar to switch light and dark mode.
               </p>
+              <div className="mt-4 border-t border-[var(--hairline-soft)] pt-4">
+                <p className="text-[13px] leading-relaxed text-muted">
+                  Want to revisit the simple Add task → Today → Done steps?
+                </p>
+                <button
+                  type="button"
+                  disabled={!userId}
+                  onClick={() => {
+                    if (!userId) return;
+                    localStorage.setItem(
+                      `devplanner.gettingStartedForceShow.${userId}`,
+                      "1",
+                    );
+                    localStorage.removeItem(
+                      `devplanner.gettingStartedDismissed.${userId}`,
+                    );
+                    router.push("/now");
+                  }}
+                  className={`${INK_BTN} mt-3 min-h-11`}
+                >
+                  Show first-task guide
+                </button>
+              </div>
               <div className="mt-4 rounded-lg border border-[var(--hairline-soft)] bg-background p-3 text-xs text-muted">
                 <p>
                   Signed in as{" "}
-                  <span className="text-foreground">{user?.primaryEmailAddress?.emailAddress ?? "—"}</span>
+                  <span className="text-foreground">
+                    {user?.primaryEmailAddress?.emailAddress ?? "—"}
+                  </span>
                 </p>
               </div>
             </section>
@@ -350,19 +504,28 @@ export default function SettingsPage() {
                     ))}
                 </div>
                 <p className="mt-4 text-[13px] leading-relaxed text-muted">
-                  Connect your Google account to sync tasks that have a <strong>scheduled date</strong> or{" "}
-                  <strong>due date</strong> with your primary Google calendar (two-way: edits in DevPlanner push via
-                  the worker; pull imports changes from Google). Set <code className={CODE_CHIP}>GOOGLE_*</code> and{" "}
-                  <code className={CODE_CHIP}>WEB_APP_URL</code> in the API <code className={CODE_CHIP}>.env</code> —
-                  see <code className={CODE_CHIP}>.env.example</code>.
+                  Connect your Google account to sync tasks that have a{" "}
+                  <strong>scheduled date</strong> or <strong>due date</strong>{" "}
+                  with your primary Google calendar (two-way: edits in
+                  DevPlanner push via the worker; pull imports changes from
+                  Google). Set <code className={CODE_CHIP}>GOOGLE_*</code> and{" "}
+                  <code className={CODE_CHIP}>WEB_APP_URL</code> in the API{" "}
+                  <code className={CODE_CHIP}>.env</code> — see{" "}
+                  <code className={CODE_CHIP}>.env.example</code>.
                 </p>
-                {googleQ.isLoading && <p className="mt-3 text-xs text-muted">Loading connection status…</p>}
+                {googleQ.isLoading && (
+                  <p className="mt-3 text-xs text-muted">
+                    Loading connection status…
+                  </p>
+                )}
                 {googleQ.data && (
                   <div className="mt-4 space-y-1.5 text-[13px] text-muted">
                     <p>
                       API OAuth:{" "}
                       <span className="text-foreground">
-                        {googleQ.data.oauthConfigured ? "configured" : "not configured"}
+                        {googleQ.data.oauthConfigured
+                          ? "configured"
+                          : "not configured"}
                       </span>
                       {" · "}
                       Account:{" "}
@@ -376,14 +539,18 @@ export default function SettingsPage() {
                           Last import:{" "}
                           <span className="text-foreground">
                             {googleQ.data.lastGooglePullAt
-                              ? new Date(googleQ.data.lastGooglePullAt).toLocaleString()
+                              ? new Date(
+                                  googleQ.data.lastGooglePullAt,
+                                ).toLocaleString()
                               : "— (run Pull now)"}
                           </span>
                         </p>
                         <p className="text-xs text-[var(--muted-soft)]">
                           Link updated:{" "}
                           {googleQ.data.linkUpdatedAt
-                            ? new Date(googleQ.data.linkUpdatedAt).toLocaleString()
+                            ? new Date(
+                                googleQ.data.linkUpdatedAt,
+                              ).toLocaleString()
                             : "—"}
                         </p>
                       </>
@@ -391,8 +558,10 @@ export default function SettingsPage() {
                     {!googleQ.data.oauthConfigured && (
                       <p>
                         Add Google OAuth credentials and redirect URI{" "}
-                        <code className={cn(CODE_CHIP, "text-foreground")}>…/api/sync/google/callback</code> in Google
-                        Cloud Console.
+                        <code className={cn(CODE_CHIP, "text-foreground")}>
+                          …/api/calendar/google/callback
+                        </code>{" "}
+                        in Google Cloud Console.
                       </p>
                     )}
                   </div>
@@ -417,7 +586,9 @@ export default function SettingsPage() {
                 <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
                   <button
                     type="button"
-                    disabled={!userId || !googleQ.data?.connected || googleBusy !== null}
+                    disabled={
+                      !userId || !googleQ.data?.connected || googleBusy !== null
+                    }
                     className={LINK}
                     onClick={() => void googlePullNow()}
                   >
@@ -425,19 +596,27 @@ export default function SettingsPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={!userId || !googleQ.data?.connected || googleBusy !== null}
+                    disabled={
+                      !userId || !googleQ.data?.connected || googleBusy !== null
+                    }
                     className={LINK}
                     onClick={() => void googleQueuePull()}
                   >
-                    {googleBusy === "queue" ? "Queuing…" : "Queue background sync"}
+                    {googleBusy === "queue"
+                      ? "Queuing…"
+                      : "Queue background sync"}
                   </button>
                   <button
                     type="button"
-                    disabled={!userId || !googleQ.data?.connected || googleBusy !== null}
+                    disabled={
+                      !userId || !googleQ.data?.connected || googleBusy !== null
+                    }
                     className={LINK_MUTED}
                     onClick={() => void disconnectGoogle()}
                   >
-                    {googleBusy === "disconnect" ? "Disconnecting…" : "Disconnect"}
+                    {googleBusy === "disconnect"
+                      ? "Disconnecting…"
+                      : "Disconnect"}
                   </button>
                 </div>
                 {googleQ.data && (
@@ -449,10 +628,14 @@ export default function SettingsPage() {
                       onChange={(e) => {
                         const on = e.target.checked;
                         setCalPrimaryOnly(on);
-                        localStorage.setItem("devplanner.googleImportPrimaryOnly", on ? "1" : "0");
+                        localStorage.setItem(
+                          "devplanner.googleImportPrimaryOnly",
+                          on ? "1" : "0",
+                        );
                       }}
                     />
-                    Only sync the primary calendar (multi-calendar picker coming later)
+                    Only sync the primary calendar (multi-calendar picker coming
+                    later)
                   </label>
                 )}
               </section>
@@ -461,42 +644,62 @@ export default function SettingsPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className={CARD_TITLE}>CalDAV</h2>
-                    <p className="mt-1 text-[13px] text-muted">Apple Calendar, Radicale, and friends</p>
+                    <p className="mt-1 text-[13px] text-muted">
+                      Apple Calendar, Radicale, and friends
+                    </p>
                   </div>
                   <span className={BADGE_MUTED}>Optional</span>
                 </div>
                 <p className="mt-4 text-[13px] leading-relaxed text-muted">
-                  Tasks with a <strong>scheduled date</strong> or <strong>due date</strong> sync as VEVENT{" "}
-                  <code className={CODE_CHIP}>.ics</code> files to a CalDAV collection (e.g. Radicale from{" "}
-                  <code className={CODE_CHIP}>docker compose</code> on port 5232). Run{" "}
-                  <code className={CODE_CHIP}>npm run worker</code> with Redis so jobs run.
+                  Tasks with a <strong>scheduled date</strong> or{" "}
+                  <strong>due date</strong> sync as VEVENT{" "}
+                  <code className={CODE_CHIP}>.ics</code> files to a CalDAV
+                  collection (e.g. Radicale from{" "}
+                  <code className={CODE_CHIP}>docker compose</code> on port
+                  5232). Run <code className={CODE_CHIP}>npm run worker</code>{" "}
+                  with Redis so jobs run.
                 </p>
                 <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] leading-relaxed text-muted">
                   <li>
                     In API <code className={CODE_CHIP}>.env</code>: set{" "}
-                    <code className={CODE_CHIP}>CALDAV_CALENDAR_URL</code> to your collection (must end with{" "}
+                    <code className={CODE_CHIP}>CALDAV_CALENDAR_URL</code> to
+                    your collection (must end with{" "}
                     <code className={CODE_CHIP}>/</code>, e.g.{" "}
-                    <code className={CODE_CHIP}>http://localhost:5232/alice/tasks/</code>
+                    <code className={CODE_CHIP}>
+                      http://localhost:5232/alice/tasks/
+                    </code>
                     ), plus <code className={CODE_CHIP}>CALDAV_USER</code> and{" "}
                     <code className={CODE_CHIP}>CALDAV_PASSWORD</code>.
                   </li>
                   <li>
-                    Optional: <code className={CODE_CHIP}>CALDAV_IMPORT_AREA_ID</code> (UUID) for new events from the
-                    calendar; otherwise the first area (by name) is used.
+                    Optional:{" "}
+                    <code className={CODE_CHIP}>CALDAV_IMPORT_AREA_ID</code>{" "}
+                    (UUID) for new events from the calendar; otherwise the first
+                    area (by name) is used.
                   </li>
                   <li>
-                    Optional: <code className={CODE_CHIP}>CALDAV_PULL_INTERVAL_MS</code> on the <strong>worker</strong>{" "}
-                    for automatic pull (e.g. <code className={cn(CODE_CHIP, "text-foreground")}>3600000</code> hourly).
+                    Optional:{" "}
+                    <code className={CODE_CHIP}>CALDAV_PULL_INTERVAL_MS</code>{" "}
+                    on the <strong>worker</strong> for automatic pull (e.g.{" "}
+                    <code className={cn(CODE_CHIP, "text-foreground")}>
+                      3600000
+                    </code>{" "}
+                    hourly).
                   </li>
                   <li>
-                    <strong>Two-way:</strong> edits in DevPlanner push to CalDAV; use <strong>Pull now</strong> to
-                    import/merge external events and reconcile deletions.
+                    <strong>Two-way:</strong> edits in DevPlanner push to
+                    CalDAV; use <strong>Pull now</strong> to import/merge
+                    external events and reconcile deletions.
                   </li>
                 </ul>
                 <p className="mt-4 text-[13px] text-muted">Server root</p>
-                <p className={cn(MONO_FIELD, "mt-1.5")}>http://localhost:5232/</p>
+                <p className={cn(MONO_FIELD, "mt-1.5")}>
+                  http://localhost:5232/
+                </p>
                 <p className="mt-2 text-xs text-[var(--muted-soft)]">
-                  Push errors land in <code className="font-mono">caldav_sync_log</code> after task edits.
+                  Push errors land in{" "}
+                  <code className="font-mono">caldav_sync_log</code> after task
+                  edits.
                 </p>
                 <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
                   <button
@@ -533,7 +736,8 @@ export default function SettingsPage() {
               <section className={CARD}>
                 <h2 className={CARD_TITLE}>Pomodoro &amp; focus</h2>
                 <p className="mt-2 text-[13px] leading-relaxed text-muted">
-                  Stored in this browser only. Use these values in your focus routine or a future in-app timer.
+                  Stored in this browser only. Use these values in your focus
+                  routine or a future in-app timer.
                 </p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <label className="text-xs text-muted">
@@ -545,7 +749,9 @@ export default function SettingsPage() {
                       className={cn(INPUT, "mt-1.5 w-full")}
                       value={pomoWork}
                       onChange={(e) => setPomoWork(e.target.value)}
-                      onBlur={() => localStorage.setItem(LS_POMO_WORK, pomoWork)}
+                      onBlur={() =>
+                        localStorage.setItem(LS_POMO_WORK, pomoWork)
+                      }
                     />
                   </label>
                   <label className="text-xs text-muted">
@@ -557,7 +763,9 @@ export default function SettingsPage() {
                       className={cn(INPUT, "mt-1.5 w-full")}
                       value={pomoShort}
                       onChange={(e) => setPomoShort(e.target.value)}
-                      onBlur={() => localStorage.setItem(LS_POMO_SHORT, pomoShort)}
+                      onBlur={() =>
+                        localStorage.setItem(LS_POMO_SHORT, pomoShort)
+                      }
                     />
                   </label>
                   <label className="text-xs text-muted">
@@ -569,7 +777,9 @@ export default function SettingsPage() {
                       className={cn(INPUT, "mt-1.5 w-full")}
                       value={pomoLong}
                       onChange={(e) => setPomoLong(e.target.value)}
-                      onBlur={() => localStorage.setItem(LS_POMO_LONG, pomoLong)}
+                      onBlur={() =>
+                        localStorage.setItem(LS_POMO_LONG, pomoLong)
+                      }
                     />
                   </label>
                 </div>
@@ -580,7 +790,10 @@ export default function SettingsPage() {
                     checked={focusModeDef}
                     onChange={(e) => {
                       setFocusModeDef(e.target.checked);
-                      localStorage.setItem(LS_FOCUS_MODE, e.target.checked ? "1" : "0");
+                      localStorage.setItem(
+                        LS_FOCUS_MODE,
+                        e.target.checked ? "1" : "0",
+                      );
                     }}
                   />
                   Prefer focus mode (fewer distractions) by default
@@ -589,7 +802,8 @@ export default function SettingsPage() {
               <section className={CARD}>
                 <h2 className={CARD_TITLE}>Focus export</h2>
                 <p className="mt-2 text-[13px] text-muted">
-                  Export today&apos;s scheduled tasks as JSON (pomodoro estimates).
+                  Export today&apos;s scheduled tasks as JSON (pomodoro
+                  estimates).
                 </p>
                 <button
                   type="button"
@@ -617,10 +831,16 @@ export default function SettingsPage() {
                     ))}
                 </div>
                 <p className="mt-3 text-[13px] leading-relaxed text-muted">
-                  The chat dock calls <code className={CODE_CHIP}>POST /api/ai/chat</code>. Set{" "}
-                  <code className={CODE_CHIP}>OPENAI_API_KEY</code> in the API <code className={CODE_CHIP}>.env</code>{" "}
-                  (never in the browser). Optional: <code className={CODE_CHIP}>OPENAI_SMART_MODEL</code> (default{" "}
-                  <code className={cn(CODE_CHIP, "text-foreground")}>gpt-4o-mini</code>).
+                  The chat dock calls{" "}
+                  <code className={CODE_CHIP}>POST /api/ai/chat</code>. Set{" "}
+                  <code className={CODE_CHIP}>OPENAI_API_KEY</code> in the API{" "}
+                  <code className={CODE_CHIP}>.env</code> (never in the
+                  browser). Optional:{" "}
+                  <code className={CODE_CHIP}>OPENAI_SMART_MODEL</code> (default{" "}
+                  <code className={cn(CODE_CHIP, "text-foreground")}>
+                    gpt-4o-mini
+                  </code>
+                  ).
                 </p>
                 {aiConfigQ.isPending && (
                   <div className="mt-3 space-y-2">
@@ -631,7 +851,9 @@ export default function SettingsPage() {
                 {aiConfigQ.isError && (
                   <p className="mt-3 text-xs text-[var(--high)]">
                     Could not load AI config. Is the API running?{" "}
-                    {aiConfigQ.error instanceof Error ? aiConfigQ.error.message : String(aiConfigQ.error)}
+                    {aiConfigQ.error instanceof Error
+                      ? aiConfigQ.error.message
+                      : String(aiConfigQ.error)}
                   </p>
                 )}
                 {aiConfigQ.data && (
@@ -640,7 +862,7 @@ export default function SettingsPage() {
                       "mt-3 rounded-lg border px-3 py-2 text-xs",
                       aiConfigQ.data.openaiKeySet
                         ? "border-[var(--success-border)] bg-[var(--success-bg)] text-[var(--success-text)]"
-                        : "border-[var(--hairline)] bg-background text-[var(--high)]"
+                        : "border-[var(--hairline)] bg-background text-[var(--high)]",
                     )}
                   >
                     {aiConfigQ.data.openaiKeySet
@@ -649,9 +871,17 @@ export default function SettingsPage() {
                   </div>
                 )}
                 <div className="mt-4 rounded-lg border border-[var(--hairline)] bg-background p-3 text-xs leading-relaxed text-[var(--high)]">
-                  Never paste <code className="rounded bg-[var(--track)] px-1 font-mono">OPENAI_API_KEY</code> into the
-                  browser or client-side settings — it would be exposed to anyone with access to this device. Configure
-                  keys only in the API server <code className="rounded bg-[var(--track)] px-1 font-mono">.env</code>.
+                  Never paste{" "}
+                  <code className="rounded bg-[var(--track)] px-1 font-mono">
+                    OPENAI_API_KEY
+                  </code>{" "}
+                  into the browser or client-side settings — it would be exposed
+                  to anyone with access to this device. Configure keys only in
+                  the API server{" "}
+                  <code className="rounded bg-[var(--track)] px-1 font-mono">
+                    .env
+                  </code>
+                  .
                 </div>
                 <div className="mt-5 space-y-3.5">
                   <label className="block text-xs text-muted">
@@ -661,14 +891,23 @@ export default function SettingsPage() {
                     ) : (
                       <select
                         className={cn(INPUT, "mt-1.5 w-full max-w-xs")}
-                        value={aiModel || aiConfigQ.data?.defaultChatModel || "gpt-4o-mini"}
+                        value={
+                          aiModel ||
+                          aiConfigQ.data?.defaultChatModel ||
+                          "gpt-4o-mini"
+                        }
                         onChange={(e) => {
                           const v = e.target.value;
                           setAiModel(v);
                           localStorage.setItem(LS_CHAT_MODEL, v);
                         }}
                       >
-                        {(aiConfigQ.data?.allowedChatModels ?? ["gpt-4o-mini", "gpt-4o"]).map((m) => (
+                        {(
+                          aiConfigQ.data?.allowedChatModels ?? [
+                            "gpt-4o-mini",
+                            "gpt-4o",
+                          ]
+                        ).map((m) => (
                           <option key={m} value={m}>
                             {m}
                           </option>
@@ -687,12 +926,13 @@ export default function SettingsPage() {
                         localStorage.setItem(LS_AI_WRITES, on ? "1" : "0");
                         if (on) {
                           toast.info(
-                            "The assistant can now create and edit tasks for you. It will say exactly what it changed."
+                            "The assistant can now create and edit tasks for you. It will say exactly what it changed.",
                           );
                         }
                       }}
                     />
-                    Can edit — let the assistant create and change tasks (synced with AI dock)
+                    Can edit — let the assistant create and change tasks (synced
+                    with AI dock)
                   </label>
                   <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-muted">
                     <input
@@ -701,10 +941,14 @@ export default function SettingsPage() {
                       checked={aiBudget}
                       onChange={(e) => {
                         setAiBudget(e.target.checked);
-                        localStorage.setItem(LS_AI_BUDGET, e.target.checked ? "1" : "0");
+                        localStorage.setItem(
+                          LS_AI_BUDGET,
+                          e.target.checked ? "1" : "0",
+                        );
                       }}
                     />
-                    Add daily budget reminder to AI messages (work/personal caps in prompts)
+                    Add daily budget reminder to AI messages (work/personal caps
+                    in prompts)
                   </label>
                   <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-muted">
                     <input
@@ -713,15 +957,20 @@ export default function SettingsPage() {
                       checked={aiEnergySuggest}
                       onChange={(e) => {
                         setAiEnergySuggest(e.target.checked);
-                        localStorage.setItem(LS_AI_ENERGY_SUGGEST, e.target.checked ? "1" : "0");
+                        localStorage.setItem(
+                          LS_AI_ENERGY_SUGGEST,
+                          e.target.checked ? "1" : "0",
+                        );
                       }}
                     />
-                    Send current physical energy to AI (from Now page / shared preference)
+                    Send current physical energy to AI (from Now page / shared
+                    preference)
                   </label>
                 </div>
                 <p className="mt-4 text-xs text-muted">
-                  <strong className="text-foreground">Task tools</strong> live in the floating AI panel. They let the
-                  assistant list, create, update, delete, and reschedule tasks.
+                  <strong className="text-foreground">Task tools</strong> live
+                  in the floating AI panel. They let the assistant list, create,
+                  update, delete, and reschedule tasks.
                 </p>
               </section>
               <section className={CARD}>
@@ -741,8 +990,12 @@ export default function SettingsPage() {
                           <th className="p-2 font-semibold">Time</th>
                           <th className="p-2 font-semibold">Job</th>
                           <th className="p-2 font-semibold">Model</th>
-                          <th className="p-2 text-right font-semibold">Tokens</th>
-                          <th className="p-2 text-right font-semibold">Latency</th>
+                          <th className="p-2 text-right font-semibold">
+                            Tokens
+                          </th>
+                          <th className="p-2 text-right font-semibold">
+                            Latency
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -751,9 +1004,13 @@ export default function SettingsPage() {
                             key={l.id}
                             className="border-b border-[var(--hairline-soft)] transition-colors last:border-b-0 hover:bg-[var(--teal-a08)]"
                           >
-                            <td className="p-2 text-muted">{new Date(l.createdAt).toLocaleDateString()}</td>
+                            <td className="p-2 text-muted">
+                              {new Date(l.createdAt).toLocaleDateString()}
+                            </td>
                             <td className="p-2 text-foreground">{l.jobType}</td>
-                            <td className="p-2 font-mono text-muted">{l.model}</td>
+                            <td className="p-2 font-mono text-muted">
+                              {l.model}
+                            </td>
                             <td className="p-2 text-right text-muted">
                               {l.inputTokens ?? "—"}/{l.outputTokens ?? "—"}
                             </td>
@@ -767,7 +1024,9 @@ export default function SettingsPage() {
                   </div>
                 )}
                 {logsQ.data && logsQ.data.logs.length === 0 && (
-                  <p className="mt-3 text-[13px] text-muted">No AI calls logged yet.</p>
+                  <p className="mt-3 text-[13px] text-muted">
+                    No AI calls logged yet.
+                  </p>
                 )}
               </section>
             </>
@@ -801,7 +1060,8 @@ function AreasSection({ userId }: { userId: string | undefined }) {
     <section className={CARD}>
       <h2 className={CARD_TITLE}>Areas &amp; weekly hour targets</h2>
       <p className="mt-2 text-[13px] leading-relaxed text-muted">
-        Set a weekly hour target for each area. This is shown in the Review time panel as a progress bar.
+        Set a weekly hour target for each area. This is shown in the Review time
+        panel as a progress bar.
       </p>
 
       {areasQ.isLoading && (
@@ -818,13 +1078,18 @@ function AreasSection({ userId }: { userId: string | undefined }) {
               key={area.id}
               className={cn(
                 "flex items-center gap-3 py-3",
-                index > 0 && "border-t border-[var(--hairline-soft)]"
+                index > 0 && "border-t border-[var(--hairline-soft)]",
               )}
             >
               {area.color && (
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: area.color }} />
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: area.color }}
+                />
               )}
-              <span className="min-w-0 flex-1 truncate text-sm text-foreground">{area.name}</span>
+              <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                {area.name}
+              </span>
               <div className="flex items-center gap-1.5">
                 <input
                   type="number"
@@ -837,13 +1102,16 @@ function AreasSection({ userId }: { userId: string | undefined }) {
                   onBlur={(e) => {
                     const raw = e.target.value.trim();
                     const val = raw === "" ? null : Number(raw);
-                    const prev = area.weeklyHourTarget ? Number(area.weeklyHourTarget) : null;
+                    const prev = area.weeklyHourTarget
+                      ? Number(area.weeklyHourTarget)
+                      : null;
                     if (val !== prev) {
                       updateTarget.mutate({ areaId: area.id, value: val });
                     }
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    if (e.key === "Enter")
+                      (e.target as HTMLInputElement).blur();
                   }}
                 />
                 <span className="text-xs text-muted">h/wk</span>
@@ -854,7 +1122,9 @@ function AreasSection({ userId }: { userId: string | undefined }) {
       )}
 
       {areasQ.data && areasQ.data.length === 0 && (
-        <p className="mt-4 text-[13px] text-muted">No areas found. Create areas from the Board view.</p>
+        <p className="mt-4 text-[13px] text-muted">
+          No areas found. Create areas from the Board view.
+        </p>
       )}
     </section>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useAppUserId } from "@/hooks/use-app-user-id";
 import {
@@ -18,8 +18,7 @@ import {
 export function useActiveTimer() {
   const userId = useAppUserId();
   const qc = useQueryClient();
-  const [elapsed, setElapsed] = useState(0);
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const q = useQuery({
     queryKey: ["active-timer", userId],
@@ -32,24 +31,15 @@ export function useActiveTimer() {
   const activeLog = q.data ?? null;
   const isRunning = Boolean(activeLog);
 
-  // Tick elapsed seconds
+  const startMs = activeLog ? new Date(activeLog.startedAt).getTime() : null;
+  const elapsed =
+    startMs === null ? 0 : Math.max(0, Math.floor((now - startMs) / 1000));
+  // Clock updates are driven by the interval; timer identity and start time are derived.
   useEffect(() => {
-    if (tickRef.current) {
-      clearInterval(tickRef.current);
-      tickRef.current = null;
-    }
-    if (!activeLog) {
-      setElapsed(0);
-      return;
-    }
-    const startMs = new Date(activeLog.startedAt).getTime();
-    const update = () => setElapsed(Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
-    update();
-    tickRef.current = setInterval(update, 1000);
-    return () => {
-      if (tickRef.current) clearInterval(tickRef.current);
-    };
-  }, [activeLog?.id, activeLog?.startedAt]);
+    if (!activeLog) return;
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [activeLog]);
 
   const startMut = useMutation({
     mutationFn: (taskId: string) => apiStartTimer(taskId),
@@ -70,11 +60,11 @@ export function useActiveTimer() {
 
   const startTimer = useCallback(
     (taskId: string) => startMut.mutate(taskId),
-    [startMut]
+    [startMut],
   );
 
-  const stopActiveTimer = useCallback(() => {
-    if (activeLog) stopMut.mutate(activeLog.id);
+  const stopActiveTimer = useCallback(async () => {
+    if (activeLog) return stopMut.mutateAsync(activeLog.id);
   }, [activeLog, stopMut]);
 
   return {

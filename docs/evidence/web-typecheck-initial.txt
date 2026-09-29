@@ -1,0 +1,6 @@
+apps/web/app/(app)/now/page.tsx(198,52): error TS2554: Expected 3 arguments, but got 1.
+apps/web/components/getting-started-card.tsx(69,18): error TS2304: Cannot find name 'useQuery'.
+apps/web/components/getting-started-card.tsx(75,20): error TS2304: Cannot find name 'useQuery'.
+apps/web/components/getting-started-card.tsx(81,74): error TS18046: 'goal' is of type 'unknown'.
+apps/web/components/getting-started-card.tsx(82,58): error TS7006: Parameter 'sprint' implicitly has an 'any' type.
+apps/web/components/getting-started-card.tsx(85,19): error TS2304: Cannot find name 'useQuery'.

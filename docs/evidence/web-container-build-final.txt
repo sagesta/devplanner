@@ -1,0 +1,146 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.web
+#1 transferring dockerfile: 1.97kB 0.0s done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/node:22-bookworm-slim
+#2 DONE 3.3s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 33B 0.0s
+#3 transferring context: 370B 0.2s done
+#3 DONE 0.3s
+
+#4 [deps 1/6] FROM docker.io/library/node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 293.92kB 3.0s done
+#5 DONE 3.0s
+
+#6 [deps 5/6] COPY apps/web/package.json apps/web/
+#6 CACHED
+
+#7 [deps 2/6] WORKDIR /app
+#7 CACHED
+
+#8 [deps 4/6] COPY apps/api/package.json apps/api/
+#8 CACHED
+
+#9 [deps 6/6] RUN npm ci --no-audit --no-fund
+#9 CACHED
+
+#10 [deps 3/6] COPY package.json package-lock.json ./
+#10 CACHED
+
+#11 [build 1/4] COPY apps/api/src/contracts apps/api/src/contracts
+#11 CACHED
+
+#12 [build 2/4] COPY apps/web apps/web
+#12 DONE 0.1s
+
+#13 [build 3/4] RUN mkdir -p apps/web/public
+#13 DONE 0.5s
+
+#14 [build 4/4] RUN npm run build -w @devplanner/web
+#14 0.654 
+#14 0.654 > @devplanner/web@0.1.0 build
+#14 0.654 > cross-env NEXT_TELEMETRY_DISABLED=1 next build --webpack
+#14 0.654 
+#14 1.207 ▲ Next.js 16.3.7 (webpack)
+#14 1.207 - Environments: .env.local
+#14 1.230 ✓ Running next.config.mjs took 22ms
+#14 1.253 - Experiments (use with caution):
+#14 1.253   · optimizePackageImports
+#14 1.253 
+#14 1.256 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+#14 1.256 
+#14 1.256   To migrate automatically, run:
+#14 1.256   npx @next/codemod@canary middleware-to-proxy .
+#14 1.256 
+#14 1.256   Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+#14 1.283   Creating an optimized production build ...
+#14 12.59 <w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (192kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+#14 12.90 ⚠ Compiled with warnings in 2.7s
+#14 12.90 
+#14 12.90 ../../node_modules/next/dist/esm/server/app-render/dynamic-rendering.js
+#14 12.90 A Node.js API is used (process.cwd at line: 1044) which is not supported in the Edge Runtime.
+#14 12.90 Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+#14 12.90 
+#14 12.90 Import trace for requested module:
+#14 12.90 ../../node_modules/next/dist/esm/server/app-render/dynamic-rendering.js
+#14 12.90 ../../node_modules/next/dist/esm/client/components/unstable-rethrow.js
+#14 12.90 ../../node_modules/next/dist/esm/client/components/navigation.react-server.js
+#14 12.90 ../../node_modules/next/dist/esm/api/navigation.react-server.js
+#14 12.90 ../../node_modules/@clerk/nextjs/dist/esm/server/clerkMiddleware.js
+#14 12.90 ../../node_modules/@clerk/nextjs/dist/esm/server/index.js
+#14 12.90 
+#14 12.90 ../../node_modules/next/dist/esm/server/app-render/dynamic-rendering.js
+#14 12.90 A Node.js API is used (process.cwd at line: 1044) which is not supported in the Edge Runtime.
+#14 12.90 Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+#14 12.90 
+#14 12.90 Import trace for requested module:
+#14 12.90 ../../node_modules/next/dist/esm/server/app-render/dynamic-rendering.js
+#14 12.90 ../../node_modules/next/dist/esm/client/components/unstable-rethrow.js
+#14 12.90 ../../node_modules/next/dist/esm/client/components/navigation.react-server.js
+#14 12.90 ../../node_modules/next/dist/esm/api/navigation.react-server.js
+#14 12.90 ../../node_modules/@clerk/nextjs/dist/esm/server/clerkMiddleware.js
+#14 12.90 ../../node_modules/@clerk/nextjs/dist/esm/server/index.js
+#14 12.90 
+#14 19.61 ✓ Compiled successfully in 15.7s
+#14 19.62   Running TypeScript ...
+#14 29.76   Finished TypeScript in 8.5s ...
+#14 29.77   Collecting page data using 15 workers ...
+#14 31.55   Generating static pages using 15 workers (0/18) ...
+#14 32.47   Generating static pages using 15 workers (4/18) 
+#14 32.47   Generating static pages using 15 workers (8/18) 
+#14 32.47   Generating static pages using 15 workers (13/18) 
+#14 32.47 ✓ Generating static pages using 15 workers (18/18) in 922ms
+#14 32.88   Finalizing page optimization ...
+#14 32.88   Collecting build traces ...
+#14 43.29 
+#14 43.29 Route (app)
+#14 43.29 ┌ ○ /
+#14 43.29 ├ ○ /_not-found
+#14 43.29 ├ ƒ /api/calendar/google/callback
+#14 43.29 ├ ƒ /api/calendar/google/start
+#14 43.29 ├ ƒ /api/goals
+#14 43.29 ├ ○ /backlog
+#14 43.29 ├ ○ /board
+#14 43.29 ├ ○ /goals
+#14 43.29 ├ ○ /icon.png
+#14 43.29 ├ ○ /insights
+#14 43.29 ├ ○ /login
+#14 43.29 ├ ○ /manifest.webmanifest
+#14 43.29 ├ ○ /now
+#14 43.29 ├ ○ /plan
+#14 43.29 ├ ○ /review
+#14 43.29 ├ ○ /settings
+#14 43.29 ├ ○ /sprints
+#14 43.29 ├ ○ /table
+#14 43.29 └ ○ /timeline
+#14 43.29 
+#14 43.29 
+#14 43.29 ƒ Proxy (Middleware)
+#14 43.29 
+#14 43.29 ○  (Static)   prerendered as static content
+#14 43.29 ƒ  (Dynamic)  server-rendered on demand
+#14 43.29 
+#14 DONE 43.5s
+
+#15 [runner 6/8] RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
+#15 CACHED
+
+#16 [runner 7/8] COPY --from=build /app/apps/web/.next ./apps/web/.next
+#16 DONE 0.9s
+
+#17 [runner 8/8] COPY --from=build /app/apps/web/public ./apps/web/public
+#17 DONE 0.2s
+
+#18 exporting to image
+#18 exporting layers
+#18 exporting layers 0.7s done
+#18 writing image sha256:691a5d06876e6a8b349ab8632535315022d45fee991c64f8c405e5aab795045d done
+#18 naming to docker.io/library/devplanner-web:verified 0.0s done
+#18 DONE 0.8s

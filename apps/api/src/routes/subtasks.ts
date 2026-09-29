@@ -17,6 +17,7 @@ const createBody = z.object({
 });
 
 const patchBody = z.object({
+  expectedRevision: z.number().int().positive().optional(),
   title: z.string().min(1).max(500).optional(),
   completed: z.boolean().optional(),
   estimatedMinutes: z.number().int().nullable().optional(),
@@ -26,37 +27,44 @@ const patchBody = z.object({
 
 const bulkBody = z.object({
   taskId: z.string().uuid(),
-  subtasks: z.array(
-    z.object({
-      title: z.string().min(1).max(500),
-      estimatedMinutes: z.number().int().nullable().optional(),
-    })
-  ).min(1)
+  subtasks: z
+    .array(
+      z.object({
+        title: z.string().min(1).max(500),
+        estimatedMinutes: z.number().int().nullable().optional(),
+      }),
+    )
+    .min(1),
 });
-
-
 
 export const subtasksRoutes = new Hono<AppEnv>()
   .post("/", async (c) => {
     const parsed = createBody.safeParse(await c.req.json());
     if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 422);
-    
+
     const v = parsed.data;
     const userId = c.get("userId");
-    
+
     // Ensure parent task belongs to user
     const task = await db.query.tasks.findFirst({
-      where: and(eq(tasks.id, v.taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt))
+      where: and(
+        eq(tasks.id, v.taskId),
+        eq(tasks.userId, userId),
+        isNull(tasks.deletedAt),
+      ),
     });
     if (!task) return c.json({ error: "Task not found" }, 404);
 
-    const [row] = await db.insert(subtasks).values({
-      taskId: v.taskId,
-      title: v.title,
-      estimatedMinutes: v.estimatedMinutes ?? null,
-      scheduledDate: v.scheduledDate ?? null,
-      scheduledTime: v.scheduledTime ?? null,
-    }).returning();
+    const [row] = await db
+      .insert(subtasks)
+      .values({
+        taskId: v.taskId,
+        title: v.title,
+        estimatedMinutes: v.estimatedMinutes ?? null,
+        scheduledDate: v.scheduledDate ?? null,
+        scheduledTime: v.scheduledTime ?? null,
+      })
+      .returning();
 
     await rollupParentTaskStatus(db, v.taskId);
 
@@ -75,9 +83,9 @@ export const subtasksRoutes = new Hono<AppEnv>()
     // verify ownership
     const sub = await db.query.subtasks.findFirst({
       where: eq(subtasks.id, id),
-      with: { task: true }
+      with: { task: true },
     });
-    if (!sub || sub.task.userId !== userId) {
+    if (!sub || sub.task.userId !== userId || sub.task.deletedAt) {
       return c.json({ error: "not found" }, 404);
     }
 
@@ -87,12 +95,26 @@ export const subtasksRoutes = new Hono<AppEnv>()
       updates.completed = v.completed;
       updates.completedAt = v.completed ? new Date() : null;
     }
-    if (v.estimatedMinutes !== undefined) updates.estimatedMinutes = v.estimatedMinutes;
+    if (v.estimatedMinutes !== undefined)
+      updates.estimatedMinutes = v.estimatedMinutes;
     if (v.scheduledDate !== undefined) updates.scheduledDate = v.scheduledDate;
     if (v.scheduledTime !== undefined) updates.scheduledTime = v.scheduledTime;
 
-    const [row] = await db.update(subtasks).set(updates).where(eq(subtasks.id, id)).returning();
-    
+    const [row] = await db
+      .update(subtasks)
+      .set(updates)
+      .where(
+        and(
+          eq(subtasks.id, id),
+          v.expectedRevision === undefined
+            ? undefined
+            : eq(subtasks.revision, v.expectedRevision),
+        ),
+      )
+      .returning();
+    if (!row)
+      return c.json({ error: "Subtask changed; reload before saving." }, 409);
+
     if (v.completed !== undefined) {
       await rollupParentTaskStatus(db, row.taskId);
     }
@@ -107,9 +129,9 @@ export const subtasksRoutes = new Hono<AppEnv>()
 
     const sub = await db.query.subtasks.findFirst({
       where: eq(subtasks.id, id),
-      with: { task: true }
+      with: { task: true },
     });
-    if (!sub || sub.task.userId !== userId) {
+    if (!sub || sub.task.userId !== userId || sub.task.deletedAt) {
       return c.json({ error: "not found" }, 404);
     }
 
@@ -125,17 +147,24 @@ export const subtasksRoutes = new Hono<AppEnv>()
     const userId = c.get("userId");
 
     const task = await db.query.tasks.findFirst({
-      where: and(eq(tasks.id, v.taskId), eq(tasks.userId, userId), isNull(tasks.deletedAt))
+      where: and(
+        eq(tasks.id, v.taskId),
+        eq(tasks.userId, userId),
+        isNull(tasks.deletedAt),
+      ),
     });
     if (!task) return c.json({ error: "Task not found" }, 404);
 
-    const inserted = await db.insert(subtasks).values(
-      v.subtasks.map(s => ({
-        taskId: v.taskId,
-        title: s.title,
-        estimatedMinutes: s.estimatedMinutes ?? null,
-      }))
-    ).returning();
+    const inserted = await db
+      .insert(subtasks)
+      .values(
+        v.subtasks.map((s) => ({
+          taskId: v.taskId,
+          title: s.title,
+          estimatedMinutes: s.estimatedMinutes ?? null,
+        })),
+      )
+      .returning();
 
     await rollupParentTaskStatus(db, v.taskId);
 

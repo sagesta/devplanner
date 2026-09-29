@@ -1,0 +1,44 @@
+
+> test:coverage
+> npm run test:coverage -w @devplanner/web
+
+
+> @devplanner/web@0.1.0 test:coverage
+> jest --config jest.coverage.config.js --runInBand
+
+PASS components/weekly-review-panel.test.tsx (7.559 s)
+PASS components/quick-add-task.test.tsx
+PASS lib/draft-storage.test.ts
+PASS hooks/use-calendar-date.test.ts
+
+=============================== Coverage summary ===============================
+Statements   : 6.07% ( 297/4890 )
+Branches     : 5.73% ( 154/2683 )
+Functions    : 3.44% ( 50/1452 )
+Lines        : 6.21% ( 267/4293 )
+================================================================================
+Jest: "global" coverage threshold for statements (80%) not met: 5.43%
+Jest: "global" coverage threshold for branches (80%) not met: 4.85%
+Jest: "global" coverage threshold for lines (80%) not met: 5.62%
+Jest: "global" coverage threshold for functions (80%) not met: 2.85%
+Jest: "./lib/draft-storage.ts" coverage threshold for statements (90%) not met: 83.33%
+Jest: "./lib/draft-storage.ts" coverage threshold for branches (90%) not met: 78.12%
+Jest: "./lib/draft-storage.ts" coverage threshold for lines (90%) not met: 84%
+Jest: "./lib/draft-storage.ts" coverage threshold for functions (90%) not met: 75%
+Jest: "./hooks/use-calendar-date.ts" coverage threshold for statements (90%) not met: 24.39%
+Jest: "./hooks/use-calendar-date.ts" coverage threshold for branches (90%) not met: 8.33%
+Jest: "./hooks/use-calendar-date.ts" coverage threshold for lines (90%) not met: 23.52%
+Jest: "./hooks/use-calendar-date.ts" coverage threshold for functions (90%) not met: 33.33%
+
+Test Suites: 4 passed, 4 total
+Tests:       9 passed, 9 total
+Snapshots:   0 total
+Time:        17.068 s
+Ran all test suites.
+npm error Lifecycle script `test:coverage` failed with error:
+npm error code 1
+npm error path C:\Users\adebo\PROJECTS\devplanner\apps\web
+npm error workspace @devplanner/web@0.1.0
+npm error location C:\Users\adebo\PROJECTS\devplanner\apps\web
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c jest --config jest.coverage.config.js --runInBand

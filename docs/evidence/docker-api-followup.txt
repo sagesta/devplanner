@@ -1,0 +1,104 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.api
+#1 transferring dockerfile: 1.67kB 0.0s done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/node:22-bookworm-slim
+#2 DONE 1.4s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 342B 0.2s
+#3 transferring context: 344B 0.2s done
+#3 DONE 0.3s
+
+#4 [deps 1/6] FROM docker.io/library/node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 1.01MB 1.6s done
+#5 DONE 1.7s
+
+#6 [deps 2/6] WORKDIR /app
+#6 CACHED
+
+#7 [deps 3/6] COPY package.json package-lock.json ./
+#7 DONE 0.6s
+
+#8 [deps 4/6] COPY apps/api/package.json apps/api/
+#8 DONE 0.4s
+
+#9 [deps 5/6] COPY apps/web/package.json apps/web/
+#9 DONE 0.5s
+
+#10 [deps 6/6] RUN npm ci --no-audit --no-fund
+#10 12.57 npm warn deprecated whatwg-encoding@2.0.0: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+#10 19.06 npm warn deprecated domexception@4.0.0: Use your platform's native DOMException instead
+#10 21.83 npm warn deprecated abab@2.0.6: Use your platform's native atob() and btoa() methods instead
+#10 33.97 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#10 35.09 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#10 35.32 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#10 35.94 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#10 38.13 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#10 38.26 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#10 39.27 npm warn deprecated eslint@9.39.5: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+#10 77.09 
+#10 77.09 added 1048 packages in 1m
+#10 77.10 npm notice
+#10 77.10 npm notice New major version of npm available! 10.9.9 -> 12.1.0
+#10 77.10 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.1.0
+#10 77.10 npm notice To update run: npm install -g npm@12.1.0
+#10 77.10 npm notice
+#10 DONE 77.8s
+
+#11 [runner 1/8] WORKDIR /app
+#11 DONE 0.4s
+
+#12 [build 1/2] COPY apps/api apps/api
+#12 DONE 0.5s
+
+#13 [build 2/2] RUN npm run build -w @devplanner/api
+#13 1.183 
+#13 1.183 > @devplanner/api@0.1.0 build
+#13 1.183 > tsc -p tsconfig.json
+#13 1.183 
+#13 ...
+
+#14 [runner 2/8] RUN npm prune --omit=dev && npm cache clean --force
+#14 11.18 
+#14 11.18 up to date, audited 236 packages in 10s
+#14 11.18 
+#14 11.18 34 packages are looking for funding
+#14 11.18   run `npm fund` for details
+#14 11.18 
+#14 11.18 found 0 vulnerabilities
+#14 11.35 npm warn using --force Recommended protections disabled.
+#14 DONE 15.3s
+
+#13 [build 2/2] RUN npm run build -w @devplanner/api
+#13 DONE 28.5s
+
+#15 [runner 3/8] COPY --from=build /app/apps/api/dist ./apps/api/dist
+#15 DONE 0.4s
+
+#16 [runner 4/8] COPY apps/api/drizzle.config.ts ./apps/api/
+#16 DONE 0.3s
+
+#17 [runner 5/8] COPY apps/api/src/db ./apps/api/src/db
+#17 DONE 1.7s
+
+#18 [runner 6/8] COPY apps/api/scripts/docker-entrypoint.mjs ./apps/api/scripts/
+#18 DONE 0.3s
+
+#19 [runner 7/8] COPY docker/entrypoint-api.sh ./docker/entrypoint-api.sh
+#19 DONE 0.3s
+
+#20 [runner 8/8] RUN sed -i 's/\r$//' ./docker/entrypoint-api.sh && chmod +x ./docker/entrypoint-api.sh
+#20 DONE 0.7s
+
+#21 exporting to image
+#21 exporting layers
+#21 exporting layers 17.0s done
+#21 writing image sha256:93fa1aea2669f03a0dcce85bb801e8b689c6a2bd524fcd40df2a5fae55f58525 0.0s done
+#21 naming to docker.io/library/devplanner-daily:verified 0.0s done
+#21 DONE 17.2s

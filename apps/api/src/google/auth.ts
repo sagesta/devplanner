@@ -1,22 +1,34 @@
+import { pgOAuthAttemptStore as attemptStore } from "./oauth-store.js";
 import { google } from "googleapis";
 import { eq } from "drizzle-orm";
 import { db } from "../db/client.js";
+import { issueOAuthState, consumeOAuthState } from "./oauth-state.js";
 import { googleCalendarLinks } from "../db/schema.js";
-import { getGoogleClientId, getGoogleClientSecret, getGoogleRedirectUri, googleCalendarConfigured } from "./config.js";
+import {
+  getGoogleClientId,
+  getGoogleClientSecret,
+  getGoogleRedirectUri,
+  googleCalendarConfigured,
+} from "./config.js";
 
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 
-import type { Auth } from 'googleapis';
+import type { Auth } from "googleapis";
 
 export function createOAuth2Client(): Auth.OAuth2Client {
-  return new google.auth.OAuth2(getGoogleClientId(), getGoogleClientSecret(), getGoogleRedirectUri());
+  return new google.auth.OAuth2(
+    getGoogleClientId(),
+    getGoogleClientSecret(),
+    getGoogleRedirectUri(),
+  );
 }
 
-export function buildGoogleAuthorizeUrl(userId: string): string | null {
+export async function buildGoogleAuthorizeUrl(
+  userId: string,
+): Promise<string | null> {
   if (!googleCalendarConfigured()) return null;
-  const oauth2 = createOAuth2Client();
-  const state = Buffer.from(JSON.stringify({ u: userId }), "utf8").toString("base64url");
-  return oauth2.generateAuthUrl({
+  const state = await issueOAuthState(attemptStore, userId);
+  return createOAuth2Client().generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
     scope: [CALENDAR_SCOPE],
@@ -24,18 +36,21 @@ export function buildGoogleAuthorizeUrl(userId: string): string | null {
   });
 }
 
-export function parseOAuthState(state: string): { userId: string } | null {
-  try {
-    const raw = Buffer.from(state, "base64url").toString("utf8");
-    const j = JSON.parse(raw) as { u?: string };
-    if (!j.u || typeof j.u !== "string") return null;
-    return { userId: j.u };
-  } catch {
-    return null;
-  }
+export async function verifyGoogleOAuthState(
+  state: unknown,
+  userId: string,
+): Promise<boolean> {
+  return consumeOAuthState(attemptStore, state, userId);
 }
 
-export async function exchangeCodeForTokens(code: string): Promise<{ access_token?: string | null; refresh_token?: string | null; expiry_date?: number | null; token_type?: string | null; id_token?: string | null; scope?: string }> {
+export async function exchangeCodeForTokens(code: string): Promise<{
+  access_token?: string | null;
+  refresh_token?: string | null;
+  expiry_date?: number | null;
+  token_type?: string | null;
+  id_token?: string | null;
+  scope?: string;
+}> {
   const oauth2 = createOAuth2Client();
   const { tokens } = await oauth2.getToken(code);
   return tokens;
@@ -46,7 +61,9 @@ export type CalendarClientBundle = {
   calendarId: string;
 };
 
-export async function getCalendarForUser(userId: string): Promise<CalendarClientBundle | null> {
+export async function getCalendarForUser(
+  userId: string,
+): Promise<CalendarClientBundle | null> {
   const link = await db.query.googleCalendarLinks.findFirst({
     where: eq(googleCalendarLinks.userId, userId),
   });
@@ -58,7 +75,9 @@ export async function getCalendarForUser(userId: string): Promise<CalendarClient
 }
 
 export async function listGoogleLinkedUserIds(): Promise<string[]> {
-  const rows = await db.select({ userId: googleCalendarLinks.userId }).from(googleCalendarLinks);
+  const rows = await db
+    .select({ userId: googleCalendarLinks.userId })
+    .from(googleCalendarLinks);
   return rows.map((r) => r.userId);
 }
 
@@ -105,7 +124,7 @@ export async function saveGoogleLink(input: {
  */
 export async function upsertGoogleLinkFromOAuth(
   userId: string,
-  tokens: { refresh_token?: string | null }
+  tokens: { refresh_token?: string | null },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const existing = await db.query.googleCalendarLinks.findFirst({
     where: eq(googleCalendarLinks.userId, userId),
@@ -129,7 +148,10 @@ export async function upsertGoogleLinkFromOAuth(
   return { ok: true };
 }
 
-export async function mergeGoogleRefreshToken(userId: string, newRefreshToken: string | null | undefined) {
+export async function mergeGoogleRefreshToken(
+  userId: string,
+  newRefreshToken: string | null | undefined,
+) {
   if (!newRefreshToken?.trim()) return;
   await db
     .update(googleCalendarLinks)
@@ -138,5 +160,7 @@ export async function mergeGoogleRefreshToken(userId: string, newRefreshToken: s
 }
 
 export async function disconnectGoogle(userId: string) {
-  await db.delete(googleCalendarLinks).where(eq(googleCalendarLinks.userId, userId));
+  await db
+    .delete(googleCalendarLinks)
+    .where(eq(googleCalendarLinks.userId, userId));
 }
